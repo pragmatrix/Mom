@@ -58,3 +58,27 @@ type LiveTests() =
             let msg = connection.poll()
             System.Diagnostics.Debug.WriteLine(sprintf "%A" msg)
 
+    // test that if we connect via a second client, we can subscribe to the
+    // channel, this is required for us to process channels independently with
+    // separate processes
+
+    [<Test>]
+    member this.subscribeToChannelOverASecondClient() =
+
+        let client = AriClient(Configuration.endpoint, Configuration.applicationName)
+        use connection = client.connect()
+
+        while true do
+            let msg = connection.poll()
+            System.Diagnostics.Debug.WriteLine(sprintf "primary msg: %A" msg)
+            
+            match msg with
+            | ARIEvent (StasisStart e) ->
+                let id = e.Channel.Id
+                let channelApp = Configuration.applicationName + "." + id.ToString()
+                let client2 = AriClient(Configuration.endpoint, channelApp)
+                use connection = client2.connect()
+                client2.Applications.Subscribe(channelApp, "channel:" + string id) |> ignore
+                let msg = connection.poll()
+                System.Diagnostics.Debug.WriteLine(sprintf "secondary msg: %A" msg)
+            | _ -> ()
