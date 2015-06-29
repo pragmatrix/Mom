@@ -49,14 +49,12 @@ type LiveTests() =
         Assert.True(client.Connected)
         
     [<Test>]
-    member this.waitForStasisEvent() = 
+    member this.runAndDumpEvents() = 
 
         let client = AriClient(Configuration.endpoint, Configuration.applicationName)
         use connection = client.connect()
 
-        match connection.poll() with
-        | ARIEvent (StasisStart _) -> ()
-        | _ -> Assert.Fail()
-            
-              
+        while true do
+            let msg = connection.poll()
+            System.Diagnostics.Debug.WriteLine(sprintf "%A" msg)
 
