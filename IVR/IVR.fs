@@ -7,9 +7,6 @@ open System
     
     - can be ended at any given time without a concrete reason.
     - can only synchronously respond to events. 
-        - a response is either a notification, a Result or an Error
-
-    When an IVR is active, it gets every event in the system.
 *)
 
 
@@ -144,7 +141,9 @@ type IVRBuilder<'result>() =
 
     member this.ReturnFrom ivr = IVR.start ivr
 
-    // We want to delay the startup of an IVR to the moment IVR.start is run.
+    // We want to delay the startup of an IVR to the moment IVR.start is run, because
+    // computation expressions may contain regular code at the beginning that would run at
+    // instantiation of the expression and not when we start / run the ivr
     member this.Delay (f : unit -> IVR<'r>) : IVR<'r> = Delay f
 
 [<AutoOpen>]
