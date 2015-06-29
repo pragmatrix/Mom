@@ -1,0 +1,4 @@
+[submodule "AsterNET.ARI"]
+	path = AsterNET.ARI
+	url = git@github.com:pragmatrix/AsterNET.ARI.git
+	branch = ivr

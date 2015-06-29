@@ -68,14 +68,14 @@ module IVR =
 
             match ivr1, ivr2 with
             | Active f1, Active f2 -> 
-                let ivr1 = f1 2
+                let ivr1 = f1 e
                 match ivr1 with
-
-                Active <| loop (f1 e) (f2 e)
-            | Completed r1, Active _ ->
-                Completed <| Choice1Of2 r1
-            | Active _, Completed r2 ->
-                Completed <| Choice2Of2 r2
+                | Completed r1 -> Completed <| Choice1Of2 r1
+                | _ ->
+                let ivr2 = f2 e
+                match ivr2 with
+                | Completed r2 -> Completed <| Choice2Of2 r2
+                | _ -> Active <| loop ivr1 ivr2
             | _ -> failwithf "par': unexpected %A, %A" ivr1 ivr2
 
         fun () -> 
@@ -87,8 +87,8 @@ module IVR =
             match ivr2 with
             | Completed r2 -> Completed <| Choice2Of2 r2
             | _ ->
-            Active <| loop (start ivr1) (start ivr2)
-
+            Active <| loop ivr1 ivr2
+            
         |> Delay
 
 (*
@@ -117,9 +117,3 @@ type IVRBuilder<'result>() =
 [<AutoOpen>]
 module Helper = 
     let ivr<'result> = IVRBuilder<'result>()
-
-
-
-
-
-
