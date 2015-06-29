@@ -33,6 +33,18 @@ module IVR =
         | Delay f -> f() |> start
         | _ -> ivr
 
+    let step ivr e = 
+        match ivr with
+        // may be we should start it here, too?
+        | Delay _ -> failwith "IVR.step: ivr not started"
+        | Completed _ -> failwith "IVR.step: ivr is completed"
+        | Active f -> f e
+
+    let isCompleted ivr = 
+        match ivr with
+        | Completed _ -> true
+        | _ -> false
+
     // run two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     // events are delivered first to ivr1, then to ivr2.
 
@@ -91,6 +103,25 @@ module IVR =
             
         |> Delay
 
+    //
+    // more basic primitives
+    //
+
+    // wait for some event
+
+    let wait f =
+        let rec waiter e =  
+            if f e then
+                Completed ()
+            else
+                Active waiter
+
+        Active waiter
+
+    // wait for any event
+
+    let waitAny = wait (fun _ -> true)
+
 (*
     Simple computation expression, to build sequential IVR processes by
     continuations / monads.
@@ -110,6 +141,8 @@ type IVRBuilder<'result>() =
         Active (loop ivr)
 
     member this.Return(v) = Completed v
+
+    member this.ReturnFrom ivr = IVR.start ivr
 
     // We want to delay the startup of an IVR to the moment IVR.start is run.
     member this.Delay (f : unit -> IVR<'r>) : IVR<'r> = Delay f

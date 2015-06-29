@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <Tailcalls>false</Tailcalls>
+    <Tailcalls>true</Tailcalls>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
@@ -50,6 +50,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="LiveTests.fs" />
+    <Compile Include="IVRTests.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -74,6 +75,11 @@
     <ProjectReference Include="..\IVR.Asterisk\IVR.Asterisk.fsproj">
       <Name>IVR.Asterisk</Name>
       <Project>{d1a9fc5b-a686-4672-84a3-563a9e477e30}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\IVR\IVR.fsproj">
+      <Name>IVR</Name>
+      <Project>{dfe14fd2-df84-47fa-a547-f43487f80275}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
