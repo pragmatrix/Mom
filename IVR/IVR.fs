@@ -309,8 +309,14 @@ module IVR =
 
     let ivr<'result> = IVRBuilder<'result>()
 
+    // maps the ivr's result type
+
     let map f ivr' = 
         ivr {
             let! r = ivr'
             return f r
         }
+
+    // ignores the ivr's result type (converts it to unit)
+
+    let ignore ivr = ivr |> map ignore

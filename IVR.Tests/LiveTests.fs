@@ -82,7 +82,7 @@ type LiveTests() =
             System.Diagnostics.Debug.WriteLine(sprintf "primary msg: %A" msg)
             
             match msg with
-            | ARIEvent (StasisStart e) ->
+            | ARIEvent (:? StasisStartEvent as e) ->
                 let id = e.Channel.Id
                 let channelApp = Configuration.applicationName + "." + id.ToString()
                 let client2 = AriClient(Configuration.endpoint, channelApp)
@@ -96,9 +96,15 @@ type LiveTests() =
     member this.acceptACallAndHangupAfter5Seconds() = 
 
         let client = AriClient(Configuration.endpoint, Configuration.applicationName)
-        use connection = client.connect()
-
         let host = IVR.newHost()
+
+        let deliverARIEventToHost event = 
+            match event with
+            | ARIEvent e -> host.dispatch e
+            | Disconnected -> host.cancel()
+            | _ -> failwith "unexpected ARI event: %A" event
+
+        use connection = client.connect(deliverARIEventToHost)
 
         let answerAndHangup (channel: Channel) = ivr {
             let id = channel.Id
@@ -119,11 +125,15 @@ type LiveTests() =
         let rec distributor() = ivr {
             let! stasisStart = IVR.waitFor (fun (e: StasisStartEvent) -> e)
             let channel = stasisStart.Channel
-            let channelIVR = IVR.lpar' [waitForStasisEnd channel; waitForHangupAndHangup channel; answerAndHangup channel]
+            let channelIVR =
+                [waitForStasisEnd channel; waitForHangupAndHangup channel; answerAndHangup channel]
+                |> IVR.lpar'
             return! 
-                IVR.lpar [distributor(); channelIVR]
-                |> IVR.map ignore
+                [distributor(); channelIVR]
+                |> IVR.lpar 
+                |> IVR.ignore
         }
 
         IVR.run (distributor()) host
+        |> ignore
 

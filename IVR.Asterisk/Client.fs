@@ -12,6 +12,7 @@ open IVR.Threading
 
 module Client = 
 
+#if false
     type ARIEvent =
         | DeviceStateChanged of DeviceStateChangedEvent
         | PlaybackStarted of PlaybackStartedEvent
@@ -80,16 +81,21 @@ module Client =
                 | "TextMessageReceived" -> e :?> TextMessageReceivedEvent |> TextMessageReceived
                 | "ChannelConnectedLine" -> e :?> ChannelConnectedLineEvent |> ChannelConnectedLine
                 | _ -> e |> Unknown
+#endif
 
     type ARIClientEvent =
-        | ARIEvent of ARIEvent
+        | ARIEvent of obj
         | Connected
         | Disconnected
 
-
-    type ARIConnection(queue : SynchronizedQueue<ARIClientEvent>, disconnect: unit -> unit) =
+    type ARIConnection(disconnect: unit -> unit) =
         interface IDisposable with
             member this.Dispose() = 
+                disconnect()
+
+    type ARIConnectionWithQueue(queue: SynchronizedQueue<ARIClientEvent>, disconnect: unit -> unit) =
+        interface IDisposable with
+            member this.Dispose() =
                 disconnect()
 
         member this.nextEvent() = 
@@ -97,32 +103,30 @@ module Client =
 
     type AriClient with
 
-        // synchronously connect to the ARI endpoint and return a synchronized queue that receives all possible events of 
-        // the ARI client
-
         member this.connect() = 
-            
-            let queue = SynchronizedQueue()
 
-            let connectionStateChanged _ = 
+            let queue = SynchronizedQueue()
+            let connection = this.connect(queue.enqueue)
+            new ARIConnectionWithQueue(queue, (connection :> IDisposable).Dispose)
+
+        member this.connect(f : ARIClientEvent -> unit) =
+            
+            let connectionStateChanged f (_:obj) = 
                 match this.ConnectionState with
-                | ConnectionState.Closed -> queue.enqueue Disconnected
-                | ConnectionState.Open -> queue.enqueue Connected
+                | ConnectionState.Closed -> f Disconnected
+                | ConnectionState.Open -> f Connected
                 | _ -> ()
 
             let unhandledEvent _ event = 
                 System.Diagnostics.Debug.WriteLine("event delivered by thread: " + System.Threading.Thread.CurrentThread.ManagedThreadId.ToString())
-                event |> ARIEvent.import |> ARIEvent |> queue.enqueue
+                event |> ARIEvent |> f
 
-            let connectionHandler = AriClient.ConnectionStateChangedHandler connectionStateChanged
             let eventHandler = UnhandledEventHandler unhandledEvent
 
-            this.OnConnectionStateChanged.AddHandler connectionHandler
             this.OnUnhandledEvent.AddHandler eventHandler
 
             let cleanup() =
                 this.OnUnhandledEvent.RemoveHandler eventHandler
-                this.OnConnectionStateChanged.RemoveHandler connectionHandler
 
             // we never want to handle auto reconnect, the application should completely fail, when the connection
             // gets disconnected, we consider this an application failure, and not a temporary glitch of the connection
@@ -131,16 +135,28 @@ module Client =
 
             // later on, we will poll for the Connected flag to find out when the connection closes.
 
+            let connectionQueue = SynchronizedQueue()
+
+            let connectionHandler = AriClient.ConnectionStateChangedHandler (connectionStateChanged connectionQueue.enqueue)
+            this.OnConnectionStateChanged.AddHandler connectionHandler
+                
             this.Connect(autoReconnect = false)
             assert(this.ConnectionState = Middleware.ConnectionState.Connecting)
-            match queue.dequeue() with
-            | Connected -> 
-                let cleanup() = 
-                    this.Disconnect()
-                    cleanup()
-                new ARIConnection(queue, cleanup)
 
-            | _ ->
-                failwithf "failed to connect to ARI, connection state is %s" (this.ConnectionState.ToString())
+            try
+                match connectionQueue.dequeue() with
+                | Connected -> 
+                    let connectedHandler = AriClient.ConnectionStateChangedHandler(connectionStateChanged f)
+                    this.OnConnectionStateChanged.AddHandler connectedHandler
 
+                    let cleanup() = 
+                        this.OnConnectionStateChanged.RemoveHandler connectedHandler
+                        this.Disconnect()
+                        cleanup()
+                    new ARIConnection(cleanup)
 
+                | _ ->
+                    failwithf "failed to connect to ARI, connection state is %s" (this.ConnectionState.ToString())
+
+            finally
+                this.OnConnectionStateChanged.RemoveHandler connectionHandler
