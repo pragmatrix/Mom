@@ -118,7 +118,6 @@ module Client =
                 | _ -> ()
 
             let unhandledEvent _ event = 
-                System.Diagnostics.Debug.WriteLine("event delivered by thread: " + System.Threading.Thread.CurrentThread.ManagedThreadId.ToString())
                 event |> ARIEvent |> f
 
             let eventHandler = UnhandledEventHandler unhandledEvent

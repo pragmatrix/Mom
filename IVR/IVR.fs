@@ -121,10 +121,12 @@ module IVR =
                 let ivr1 = f1 e
                 match ivr1 with
                 | Completed r1 -> Completed <| Choice1Of2 r1
+                | Delay _ -> failwithf "IVR.par': unexpected ivr1 %A" ivr1
                 | _ ->
                 let ivr2 = f2 e
                 match ivr2 with
                 | Completed r2 -> Completed <| Choice2Of2 r2
+                | Delay _ -> failwithf "IVR.par': unexpected ivr2 %A" ivr2
                 | _ -> Active <| loop ivr1 ivr2
             | _ -> failwithf "par': unexpected %A, %A" ivr1 ivr2
 
@@ -132,10 +134,12 @@ module IVR =
             let ivr1 = start ivr1
             match ivr1 with
             | Completed r1 -> Completed <| Choice1Of2 r1
+            | Delay _ -> failwithf "IVR.par': unexpected ivr1 %A" ivr1
             | _ ->
             let ivr2 = start ivr2
             match ivr2 with
             | Completed r2 -> Completed <| Choice2Of2 r2
+            | Delay _ -> failwithf "IVR.par': unexpected ivr2 %A" ivr2
             | _ ->
             Active <| loop ivr1 ivr2
             
@@ -227,7 +231,40 @@ module IVR =
             | _ -> false
 
         wait' f
-        
+
+    //
+    // Simple computation expression, to build sequential IVR processes
+    //
+
+    type IVRBuilder<'result>() = 
+        member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 ivr) : 'r2 ivr = 
+
+            let rec next ivr = 
+                match ivr with
+                | Active f -> Active (f >> next)
+                | Completed r -> 
+                    match cont r with
+                    | Delay _ -> failwith "IVR.bind: unexpected Delay (3)"
+                    | i2 -> i2
+                | _ -> failwith "IVR.bind: unexpected %A" ivr
+            
+            next (start ivr)
+
+        member this.Return(v) = Completed v
+
+        member this.ReturnFrom ivr = start ivr
+
+        // We want to delay the startup of an IVR to the moment IVR.start is run, because
+        // computation expressions may contain regular code at the beginning that would run at
+        // instantiation of the expression and not when we start / run the ivr
+        member this.Delay (f : unit -> 'r ivr) : 'r ivr = Delay f
+
+        // zero makes only sense for IVR<unit>
+        member this.Zero () = Completed ()
+
+
+    let ivr<'result> = IVRBuilder<'result>()
+
     //
     // The ivr host, where all events are being dispatched
     // 
@@ -237,7 +274,6 @@ module IVR =
     let private newId() = Interlocked.Increment(id)
 
     // predefined host events
-
 
     type Timeout = Timeout of Id
     type CancelIVR = CancelIVR
@@ -252,10 +288,13 @@ module IVR =
             this.dispatch CancelIVR
 
         member this.delay (timespan : TimeSpan) = 
-            let id = newId()
-            let callback _ = this.dispatch (Timeout id)
-            let timer = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
-            waitFor' (fun (Timeout tid) -> tid = id)
+            ivr {
+                let id = newId()
+                let callback _ = this.dispatch (Timeout id)
+                let timer = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
+                do! waitFor' (fun (Timeout tid) -> tid = id)
+                timer.Dispose()
+            }
             
     let newHost() = { queue = SynchronizedQueue() }
 
@@ -269,45 +308,13 @@ module IVR =
             match event with
             | :? CancelIVR -> None
             | event ->
-            let ivr = step ivr event
-            match ivr with
+            let ivr' = step ivr event
+            match ivr' with
             | Completed r -> Some r
-            | Active _ -> runLoop ivr
-            | Delay _ -> failwithf "IVR.run: unexpected: %A" ivr
+            | Active _ -> runLoop ivr'
+            | Delay _ -> failwithf "IVR.run: unexpected: %A" ivr'
 
-        runLoop ivr
-
-    (*
-        Simple computation expression, to build sequential IVR processes by
-        continuations / monads.
-    *)
-
-    type IVRBuilder<'result>() = 
-        member this.Bind(ivr: IVR<'r>, cont: 'r -> IVR<'r2>) : IVR<'r2> = 
-
-            let rec loop (ivr:IVR<'r>) e =
-                match ivr with
-                | Delay _ -> failwith "bind: unexpected Delay"
-                | Active f -> 
-                    let i = f e
-                    Active (loop i)
-                | Completed r -> cont r
-            
-            Active (loop ivr)
-
-        member this.Return(v) = Completed v
-
-        member this.ReturnFrom ivr = start ivr
-
-        // We want to delay the startup of an IVR to the moment IVR.start is run, because
-        // computation expressions may contain regular code at the beginning that would run at
-        // instantiation of the expression and not when we start / run the ivr
-        member this.Delay (f : unit -> IVR<'r>) : IVR<'r> = Delay f
-
-        // zero makes only sense for IVR<unit>
-        member this.Zero () = Completed ()
-
-    let ivr<'result> = IVRBuilder<'result>()
+        runLoop (start ivr)
 
     // maps the ivr's result type
 
@@ -317,6 +324,6 @@ module IVR =
             return f r
         }
 
-    // ignores the ivr's result type (converts it to unit)
+    // ignores the ivr's result type
 
     let ignore ivr = ivr |> map ignore
