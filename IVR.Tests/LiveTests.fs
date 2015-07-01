@@ -1,9 +1,14 @@
 ﻿namespace IVR.Tests
 
+open System
+
+open IVR
+
 open IVR.Asterisk
 open IVR.Asterisk.Client
 
 open AsterNET.ARI
+open AsterNET.ARI.Models
 
 open NUnit.Framework
 
@@ -19,6 +24,10 @@ module Configuration =
 
     let endpoint = StasisEndpoint(host, port, user, password)
     let applicationName = "IVR.Test.Application"
+
+[<AutoOpen>]
+module LiveTest_ = 
+    let ivr<'r> = IVR.ivr<'r>
 
 [<TestFixture>]
 type LiveTests() =
@@ -55,7 +64,7 @@ type LiveTests() =
         use connection = client.connect()
 
         while true do
-            let msg = connection.poll()
+            let msg = connection.nextEvent()
             System.Diagnostics.Debug.WriteLine(sprintf "%A" msg)
 
     // test that if we connect via a second client, we can subscribe to the
@@ -69,7 +78,7 @@ type LiveTests() =
         use connection = client.connect()
 
         while true do
-            let msg = connection.poll()
+            let msg = connection.nextEvent()
             System.Diagnostics.Debug.WriteLine(sprintf "primary msg: %A" msg)
             
             match msg with
@@ -79,6 +88,42 @@ type LiveTests() =
                 let client2 = AriClient(Configuration.endpoint, channelApp)
                 use connection = client2.connect()
                 client2.Applications.Subscribe(channelApp, "channel:" + string id) |> ignore
-                let msg = connection.poll()
+                let msg = connection.nextEvent()
                 System.Diagnostics.Debug.WriteLine(sprintf "secondary msg: %A" msg)
             | _ -> ()
+
+    [<Test>]
+    member this.acceptACallAndHangupAfter5Seconds() = 
+
+        let client = AriClient(Configuration.endpoint, Configuration.applicationName)
+        use connection = client.connect()
+
+        let host = IVR.newHost()
+
+        let answerAndHangup (channel: Channel) = ivr {
+            let id = channel.Id
+            client.Channels.Answer(id)
+            do! host.delay (TimeSpan.FromSeconds(5.))
+            client.Channels.Hangup(id)
+        }
+            
+        let waitForStasisEnd (channel : Channel) = 
+            IVR.waitFor' (fun (e: StasisEndEvent) -> e.Channel.Id = channel.Id) 
+
+        let waitForHangupAndHangup (channel : Channel) = 
+            ivr {
+                do! IVR.waitFor' (fun (e: ChannelHangupRequestEvent) -> e.Channel.Id = channel.Id)
+                client.Channels.Hangup(channel.Id)
+            }
+
+        let rec distributor() = ivr {
+            let! stasisStart = IVR.waitFor (fun (e: StasisStartEvent) -> e)
+            let channel = stasisStart.Channel
+            let channelIVR = IVR.lpar' [waitForStasisEnd channel; waitForHangupAndHangup channel; answerAndHangup channel]
+            return! 
+                IVR.lpar [distributor(); channelIVR]
+                |> IVR.map ignore
+        }
+
+        IVR.run (distributor()) host
+

@@ -1,9 +1,9 @@
-﻿namespace IVR.Asterisk
+﻿namespace IVR
 
 open System.Threading
 open System.Collections.Generic
 
-module Helper = 
+module Threading =
 
     // ConcurrentQueue does not quite support what we want here.
     
@@ -27,3 +27,4 @@ module Helper =
 
                     queue.Dequeue()
                 )
+

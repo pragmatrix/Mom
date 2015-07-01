@@ -8,7 +8,7 @@ open AsterNET.ARI.Actions
 open AsterNET.ARI.Models
 open AsterNET.ARI.Middleware
 
-open Helper
+open IVR.Threading
 
 module Client = 
 
@@ -92,7 +92,7 @@ module Client =
             member this.Dispose() = 
                 disconnect()
 
-        member this.poll() = 
+        member this.nextEvent() = 
             queue.dequeue()
 
     type AriClient with

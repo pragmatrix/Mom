@@ -5,9 +5,8 @@ open NUnit.Framework
 open System
 
 [<AutoOpen>]
-module Helper =
-
-    let ivr<'t> = IVR.Helper.ivr<'t>
+module Helper = 
+    let ivr<'r> = IVR.IVR.ivr<'r>
 
 [<TestFixture>]
 type IVRTests() =

@@ -42,6 +42,7 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Threading.fs" />
     <Compile Include="IVR.fs" />
   </ItemGroup>
   <PropertyGroup>
