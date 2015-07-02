@@ -18,7 +18,7 @@ type IVRTests() =
         // not have an effect
 
         let rec endlessLoop() = ivr {
-            do! IVR.waitAny
+            do! IVR.wait' (fun _ -> true)
             return! endlessLoop()
             }
 

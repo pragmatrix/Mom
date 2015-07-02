@@ -187,19 +187,15 @@ module IVR =
     // more basic primitives
     //
 
-    // wait for some event
+    // wait for some event given a function that returns (Some result) or None
 
-    let wait predicate =
+    let wait f =
         let rec waiter e =  
-            match predicate e with
+            match f e with
             | Some r -> Completed r
             | None -> Active waiter
 
         Active waiter
-
-    // wait for any event
-
-    let waitAny = wait (fun _ -> Some ())
 
     // wait for some event with a predicate that returns
     // true or false
@@ -215,11 +211,11 @@ module IVR =
 
     // wait for an event of a type derived by a function passed in
 
-    let waitFor (f : 'e -> 'r) = 
+    let waitFor (f : 'e -> 'r option) = 
 
         let f (e : Event) = 
             match e with
-            | :? 'e as e -> f e |> Some
+            | :? 'e as e -> f e
             | _ -> None
 
         wait f
@@ -295,26 +291,22 @@ module IVR =
                 do! waitFor' (fun (Timeout tid) -> tid = id)
                 timer.Dispose()
             }
-            
+
+        member this.run ivr = 
+            let rec runLoop ivr = 
+                let event = this.queue.dequeue()
+                match event with
+                | :? CancelIVR -> None
+                | event ->
+                let ivr' = step ivr event
+                match ivr' with
+                | Completed r -> Some r
+                | Active _ -> runLoop ivr'
+                | Delay _ -> failwithf "IVR.run: unexpected: %A" ivr'
+
+            runLoop (start ivr)
+
     let newHost() = { queue = SynchronizedQueue() }
-
-    // Synchronously runs an ivr on a host
-    // Returns Non if the ivr was interrupted
-    
-    let run ivr host = 
-        
-        let rec runLoop ivr = 
-            let event = host.queue.dequeue()
-            match event with
-            | :? CancelIVR -> None
-            | event ->
-            let ivr' = step ivr event
-            match ivr' with
-            | Completed r -> Some r
-            | Active _ -> runLoop ivr'
-            | Delay _ -> failwithf "IVR.run: unexpected: %A" ivr'
-
-        runLoop (start ivr)
 
     // maps the ivr's result type
 
@@ -327,3 +319,11 @@ module IVR =
     // ignores the ivr's result type
 
     let ignore ivr = ivr |> map ignore
+
+    //
+    // TPL naming scheme
+    //
+
+    let waitAll ivrs = lpar ivrs
+    let waitAny ivrs = lpar' ivrs 
+

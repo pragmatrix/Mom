@@ -96,38 +96,37 @@ type LiveTests() =
     member this.acceptACallAndHangupAfter5Seconds() = 
 
         let client = AriClient(Configuration.endpoint, Configuration.applicationName)
-        let host = IVR.newHost()
 
+        let host = IVR.newHost()
         use connection = client.connectWithHost(host)
         
-        let answerAndHangup (channel: Channel) = ivr {
+        let channelIVR (channel: Channel) = ivr {
             let id = channel.Id
             client.Channels.Answer(id)
             do! host.delay (TimeSpan.FromSeconds(5.))
             client.Channels.Hangup(id)
         }
-            
-        let waitForStasisEnd (channel : Channel) = 
-            IVR.waitFor' (fun (e: StasisEndEvent) -> e.Channel.Id = channel.Id) 
-
-        let waitForHangupAndHangup (channel : Channel) = 
+                        
+        let handleHangupRequestByHangingUp (channel : Channel) = 
             ivr {
-                do! IVR.waitFor' (fun (e: ChannelHangupRequestEvent) -> e.Channel.Id = channel.Id)
+                do! channel.waitForHangupRequest() |> IVR.ignore
                 client.Channels.Hangup(channel.Id)
             }
 
         let rec distributor() = ivr {
-            let! stasisStart = IVR.waitFor (fun (e: StasisStartEvent) -> e)
-            let channel = stasisStart.Channel
-            let channelIVR =
-                [waitForStasisEnd channel; waitForHangupAndHangup channel; answerAndHangup channel]
-                |> IVR.lpar'
+            let! channel = IVR.waitFor (fun (e: StasisStartEvent) -> Some e.Channel)
+            let managedChannelIVR =
+                IVR.waitAny [
+                    channel.waitForStasisEnd() |> IVR.ignore
+                    handleHangupRequestByHangingUp channel
+                    channelIVR channel
+                ]
+
             return! 
-                [distributor(); channelIVR]
-                |> IVR.lpar 
+                IVR.waitAll [distributor(); managedChannelIVR]
                 |> IVR.ignore
         }
 
-        IVR.run (distributor()) host
+        host.run (distributor())
         |> ignore
 
