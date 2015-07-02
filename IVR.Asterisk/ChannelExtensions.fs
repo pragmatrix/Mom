@@ -21,7 +21,7 @@ module ChannelExtensions =
         member this.waitForCreated() = this.waitFor<ChannelCreatedEvent>()
         member this.waitForDestroyed() = this.waitFor<ChannelDestroyedEvent>()
         member this.waitForDialplan() = this.waitFor<ChannelDialplanEvent>()
-        member this.waitForDtmReceived() = this.waitFor<ChannelDtmfReceivedEvent>()
+        member this.waitForDTMFReceived() = this.waitFor<ChannelDtmfReceivedEvent>()
         member this.waitForEnteredBridge() = this.waitFor<ChannelEnteredBridgeEvent>()
         member this.waitForHangupRequest() = this.waitFor<ChannelHangupRequestEvent>()
         member this.waitForLeftBridge() = this.waitFor<ChannelLeftBridgeEvent>()
@@ -30,6 +30,16 @@ module ChannelExtensions =
         member this.waitForTalkingStarted() = this.waitFor<ChannelTalkingStartedEvent>()
         member this.waitForUserEvent() = this.waitFor<ChannelUsereventEvent>()
         member this.waitForVarsetEvent() = this.waitFor<ChannelVarsetEvent>()
+
+        member this.waitFor (key: char) = 
+            ivr {
+                let! (e:ChannelDtmfReceivedEvent) = this.waitForDTMFReceived()
+                if e.Digit.[0] <> key then
+                    return! this.waitFor key
+                else 
+                    return ()
+            }
+            
 
 [<assembly:AutoOpen("IVR.Asterisk.ChannelExtensions")>]
 do ()

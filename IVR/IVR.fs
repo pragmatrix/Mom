@@ -1,8 +1,6 @@
 ﻿namespace IVR
 
 open System
-open System.Threading
-
 open Threading
 
 (*
@@ -20,6 +18,17 @@ type IVR<'result> =
     | Completed of 'result
 
 type 'result ivr = IVR<'result>
+
+module TimeSpanExtensions =
+
+    type Int32 with
+        member this.seconds = TimeSpan.FromSeconds(float this)
+        member this.milliseconds = TimeSpan.FromMilliseconds(float this)
+
+    type Double with
+        member this.seconds = TimeSpan.FromSeconds(this)
+        member this.milliseconds = TimeSpan.FromMilliseconds(this)
+        
 
 module IVR = 
 
@@ -327,3 +336,11 @@ module IVR =
     let waitAll ivrs = lpar ivrs
     let waitAny ivrs = lpar' ivrs 
 
+module BuilderExtensions = 
+    let ivr<'r> = IVR.ivr<'r>
+
+// a little inception may not do any harm :)
+
+[<assembly:AutoOpen("IVR.TimeSpanExtensions")>]
+[<assembly:AutoOpen("IVR.BuilderExtensions")>]
+do ()

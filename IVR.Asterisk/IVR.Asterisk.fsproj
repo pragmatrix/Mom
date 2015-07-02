@@ -49,8 +49,10 @@
   </Choose>
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
+    <Compile Include="IVR.fs" />
     <Compile Include="Client.fs" />
     <Compile Include="ChannelExtensions.fs" />
+    <Compile Include="ClientExtensions.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

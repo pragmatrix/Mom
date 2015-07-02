@@ -25,10 +25,6 @@ module Configuration =
     let endpoint = StasisEndpoint(host, port, user, password)
     let applicationName = "IVR.Test.Application"
 
-[<AutoOpen>]
-module LiveTest_ = 
-    let ivr<'r> = IVR.ivr<'r>
-
 [<TestFixture>]
 type LiveTests() =
 
@@ -98,32 +94,51 @@ type LiveTests() =
         let client = AriClient(Configuration.endpoint, Configuration.applicationName)
 
         let host = IVR.newHost()
+
+        let delay = host.delay
+        let ring = client.ring
+        let answer = client.answer
+        let hangup = client.hangup
+        let play id media = client.play(id, media)
+
         use connection = client.connectWithHost(host)
         
         let channelIVR (channel: Channel) = ivr {
             let id = channel.Id
-            client.Channels.Answer(id)
-            do! host.delay (TimeSpan.FromSeconds(5.))
-            client.Channels.Hangup(id)
+
+            ring id
+            do! delay (2 .seconds)
+            answer id
+            do! delay (1 .seconds)
+            do! play id "sound:tt-weasels"
+            hangup id
         }
+
+        let hangupOn1 (channel: Channel) = 
+            ivr {
+                do! channel.waitFor '1'
+                hangup channel.Id
+            }
                         
         let handleHangupRequestByHangingUp (channel : Channel) = 
             ivr {
                 do! channel.waitForHangupRequest() |> IVR.ignore
-                client.Channels.Hangup(channel.Id)
+                hangup channel.Id
             }
 
         let rec distributor() = ivr {
-            let! channel = IVR.waitFor (fun (e: StasisStartEvent) -> Some e.Channel)
-            let managedChannelIVR =
+            let! startEvent = IVR.waitForStasisStart()
+            let channel = startEvent.Channel
+            let activeChannelIVR =
                 IVR.waitAny [
                     channel.waitForStasisEnd() |> IVR.ignore
                     handleHangupRequestByHangingUp channel
                     channelIVR channel
+                    hangupOn1 channel
                 ]
 
             return! 
-                IVR.waitAll [distributor(); managedChannelIVR]
+                IVR.waitAll [distributor(); activeChannelIVR]
                 |> IVR.ignore
         }
 
