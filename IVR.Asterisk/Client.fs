@@ -1,87 +1,14 @@
 ﻿namespace IVR.Asterisk
 
 open System
-open System.Threading
 
+open IVR
 open AsterNET.ARI
-open AsterNET.ARI.Actions
-open AsterNET.ARI.Models
 open AsterNET.ARI.Middleware
 
 open IVR.Threading
 
 module Client = 
-
-#if false
-    type ARIEvent =
-        | DeviceStateChanged of DeviceStateChangedEvent
-        | PlaybackStarted of PlaybackStartedEvent
-        | PlaybackFinished of PlaybackFinishedEvent
-        | RecordingStarted of RecordingStartedEvent
-        | RecordingFinished of RecordingFinishedEvent
-        | RecordingFailed of RecordingFailedEvent
-        | ApplicationReplaced of ApplicationReplacedEvent
-        | BridgeCreated of BridgeCreatedEvent
-        | BridgeDestroyed of BridgeDestroyedEvent
-        | BridgeMerged of BridgeMergedEvent
-        | BridgeBlindTransfer of BridgeBlindTransferEvent
-        | BridgeAttendedTransfer of BridgeAttendedTransferEvent
-        | ChannelCreated of ChannelCreatedEvent
-        | ChannelDestroyed of ChannelDestroyedEvent
-        | ChannelEnteredBridge of ChannelEnteredBridgeEvent
-        | ChannelLeftBridge of ChannelLeftBridgeEvent
-        | ChannelStateChange of ChannelStateChangeEvent
-        | ChannelDtmfReceived of ChannelDtmfReceivedEvent
-        | ChannelDialplan of ChannelDialplanEvent
-        | ChannelCallerId of ChannelCallerIdEvent
-        | ChannelUserevent of ChannelUsereventEvent
-        | ChannelHangupRequest of ChannelHangupRequestEvent
-        | ChannelVarset of ChannelVarsetEvent
-        | ChannelTalkingStarted of ChannelTalkingStartedEvent
-        | ChannelTalkingFinished of ChannelTalkingFinishedEvent
-        | EndpointStateChange of EndpointStateChangeEvent
-        | Dial of DialEvent
-        | StasisEnd of StasisEndEvent
-        | StasisStart of StasisStartEvent
-        | TextMessageReceived of TextMessageReceivedEvent
-        | ChannelConnectedLine of ChannelConnectedLineEvent
-        | Unknown of Event
-        with
-            static member import (e : Event) =
-                match e.Type with
-                | "DeviceStateChanged" -> e :?> DeviceStateChangedEvent |> DeviceStateChanged
-                | "PlaybackStarted" -> e :?> PlaybackStartedEvent |> PlaybackStarted
-                | "PlaybackFinished" -> e :?> PlaybackFinishedEvent |> PlaybackFinished
-                | "RecordingStarted" -> e :?> RecordingStartedEvent |> RecordingStarted
-                | "RecordingFinished" -> e :?> RecordingFinishedEvent |> RecordingFinished
-                | "RecordingFailed" -> e :?> RecordingFailedEvent |> RecordingFailed
-                | "ApplicationReplaced" -> e :?> ApplicationReplacedEvent |> ApplicationReplaced
-                | "BridgeCreated" -> e :?> BridgeCreatedEvent |> BridgeCreated
-                | "BridgeDestroyed" -> e :?> BridgeDestroyedEvent |> BridgeDestroyed
-                | "BridgeMerged" -> e :?> BridgeMergedEvent |> BridgeMerged
-                | "BridgeBlindTransfer" -> e :?> BridgeBlindTransferEvent |> BridgeBlindTransfer
-                | "BridgeAttendedTransfer" -> e :?> BridgeAttendedTransferEvent |> BridgeAttendedTransfer
-                | "ChannelCreated" -> e :?> ChannelCreatedEvent |> ChannelCreated
-                | "ChannelDestroyed" -> e :?> ChannelDestroyedEvent |> ChannelDestroyed
-                | "ChannelEnteredBridge" -> e :?> ChannelEnteredBridgeEvent |> ChannelEnteredBridge
-                | "ChannelLeftBridge" -> e :?> ChannelLeftBridgeEvent |> ChannelLeftBridge
-                | "ChannelStateChange" -> e :?> ChannelStateChangeEvent |> ChannelStateChange
-                | "ChannelDtmfReceived" -> e :?> ChannelDtmfReceivedEvent |> ChannelDtmfReceived
-                | "ChannelDialplan" -> e :?> ChannelDialplanEvent |> ChannelDialplan
-                | "ChannelCallerId" -> e :?> ChannelCallerIdEvent |> ChannelCallerId
-                | "ChannelUserevent" -> e :?> ChannelUsereventEvent |> ChannelUserevent
-                | "ChannelHangupRequest" -> e :?> ChannelHangupRequestEvent |> ChannelHangupRequest
-                | "ChannelVarset" -> e :?> ChannelVarsetEvent |> ChannelVarset
-                | "ChannelTalkingStarted" -> e :?> ChannelTalkingStartedEvent |> ChannelTalkingStarted
-                | "ChannelTalkingFinished" -> e :?> ChannelTalkingFinishedEvent |> ChannelTalkingFinished
-                | "EndpointStateChange" -> e :?> EndpointStateChangeEvent |> EndpointStateChange
-                | "Dial" -> e :?> DialEvent |> Dial
-                | "StasisEnd" -> e :?> StasisEndEvent |> StasisEnd
-                | "StasisStart" -> e :?> StasisStartEvent |> StasisStart
-                | "TextMessageReceived" -> e :?> TextMessageReceivedEvent |> TextMessageReceived
-                | "ChannelConnectedLine" -> e :?> ChannelConnectedLineEvent |> ChannelConnectedLine
-                | _ -> e |> Unknown
-#endif
 
     type ARIClientEvent =
         | ARIEvent of obj
@@ -159,3 +86,15 @@ module Client =
 
             finally
                 this.OnConnectionStateChanged.RemoveHandler connectionHandler
+
+        // connect and deliver all events to the IVR host.
+
+        member this.connectWithHost(host: IVR.Host) = 
+
+            let deliverARIEventToHost event = 
+                match event with
+                | ARIEvent e -> host.dispatch e
+                | Disconnected -> host.cancel()
+                | _ -> failwith "unexpected ARI event: %A" event
+
+            this.connect(deliverARIEventToHost)

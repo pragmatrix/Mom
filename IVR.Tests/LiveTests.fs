@@ -98,14 +98,8 @@ type LiveTests() =
         let client = AriClient(Configuration.endpoint, Configuration.applicationName)
         let host = IVR.newHost()
 
-        let deliverARIEventToHost event = 
-            match event with
-            | ARIEvent e -> host.dispatch e
-            | Disconnected -> host.cancel()
-            | _ -> failwith "unexpected ARI event: %A" event
-
-        use connection = client.connect(deliverARIEventToHost)
-
+        use connection = client.connectWithHost(host)
+        
         let answerAndHangup (channel: Channel) = ivr {
             let id = channel.Id
             client.Channels.Answer(id)
