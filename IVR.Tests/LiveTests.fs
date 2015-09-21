@@ -92,7 +92,6 @@ type LiveTests() =
     member this.parallelIVRBlocks() = 
 
         use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
-        // client.EventDispatchingStrategy <- EventDispatchingStrategy.ThreadPool
         let host = IVR.newHost()
 
         let delay = host.delay

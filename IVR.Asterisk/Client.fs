@@ -38,6 +38,8 @@ module Client =
 
         member this.connect(f : ARIClientEvent -> unit) =
             
+            this.EventDispatchingStrategy <- EventDispatchingStrategy.DedicatedThread
+
             let connectionStateChanged f (_:obj) = 
                 match this.ConnectionState with
                 | ConnectionState.Closed -> f Disconnected
