@@ -91,7 +91,7 @@ module Client =
 
         // connect and deliver all events to the IVR host.
 
-        member this.connectWithHost(host: IVR.Host) = 
+        member this.connectWithHost(host: IVR.Host.Host) = 
 
             let deliverARIEventToHost event = 
                 match event with

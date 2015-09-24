@@ -1,13 +1,13 @@
 ﻿namespace IVR
 
 open System
-open Threading
 
 (*
     An IVR is a definition of an asynchronous process with the following properties:
     
-    - can be ended at any given time without a concrete reason.
-    - can synchronously respond to events.
+    - can be paused and ended at any time.
+    - can synchronously wait and respond to events.
+    - can be combined in parallel or sequentially.
 *)
 
 type Event = obj
@@ -268,53 +268,6 @@ module IVR =
 
 
     let ivr<'result> = IVRBuilder<'result>()
-
-    //
-    // The ivr host, where all events are being dispatched
-    // 
-
-    type Id = int64
-    let private id = ref 0L
-    let private newId() = Interlocked.Increment(id)
-
-    // predefined host events
-
-    type Timeout = Timeout of Id
-    type CancelIVR = CancelIVR
-
-    type Host = { queue: SynchronizedQueue<obj> }
-
-        with 
-        member this.dispatch event = 
-            this.queue.enqueue event
-
-        member this.cancel() = 
-            this.dispatch CancelIVR
-
-        member this.delay (timespan : TimeSpan) = 
-            ivr {
-                let id = newId()
-                let callback _ = this.dispatch (Timeout id)
-                let timer = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
-                do! waitFor' (fun (Timeout tid) -> tid = id)
-                timer.Dispose()
-            }
-
-        member this.run ivr = 
-            let rec runLoop ivr = 
-                let event = this.queue.dequeue()
-                match event with
-                | :? CancelIVR -> None
-                | event ->
-                let ivr' = step ivr event
-                match ivr' with
-                | Completed r -> Some r
-                | Active _ -> runLoop ivr'
-                | Delay _ -> failwithf "IVR.run: unexpected: %A" ivr'
-
-            runLoop (start ivr)
-
-    let newHost() = { queue = SynchronizedQueue() }
 
     // maps the ivr's result type
 
