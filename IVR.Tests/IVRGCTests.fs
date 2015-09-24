@@ -9,9 +9,9 @@ module Helper =
     let ivr<'r> = IVR.IVR.ivr<'r>
 
 [<TestFixture>]
-type IVRTests() =
+type IVRGCTests() =
 
-    [<Test>]
+    [<Test; Category("LongRunning")>]
     member this.longSequentialLoopDoesNotEatUpStackOrMemory() =
     
         // interestingly, the "Generate Tail Calls" option does 

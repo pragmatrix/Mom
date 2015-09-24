@@ -14,10 +14,22 @@ open NUnit.Framework
 
 (*
     Live Tests run with a full active ARI client in real time.
+
+    To configure asterisk to run the following tests, enable http and ARI:
+
+    https://wiki.asterisk.org/wiki/display/AST/Asterisk+Configuration+for+ARI
+    
+    and add the following lines to extensions.conf:
+
+    exten => [the extension, or s for catch-all],1,NoOp()
+    same => n,Stasis(IVR.Test.Application)
+    same => n,Hangup()
+
+    And point host to the IP of the asterisk server (or change the host entry 'asterisk').
 *)
 
 module Configuration = 
-    let host = "192.168.1.21"
+    let host = "asterisk"
     let port = 8088
     let user = "asterisk"
     let password = "password"
@@ -25,16 +37,15 @@ module Configuration =
     let endpoint = StasisEndpoint(host, port, user, password)
     let applicationName = "IVR.Test.Application"
 
-[<TestFixture>]
+[<TestFixture;Category("DependsOnHost")>]
 type LiveTests() =
-
 
     [<Test>]
     member this.failedConnect() =
 
         let failingEndpoint = StasisEndpoint("____unresolvable_host_____", 8088, "", "")
 
-        let client = AriClient(failingEndpoint, Configuration.applicationName)
+        use client = new AriClient(failingEndpoint, Configuration.applicationName)
         try
             use connection = client.connect()
             Assert.Fail()
@@ -43,12 +54,8 @@ type LiveTests() =
 
     [<Test>]
     member this.succeedingConnect() = 
-        // For this to succeed, the endpoint in Configuration must be reachable.
-        //
-        // to configure Asterisk ARI:
-        // https://wiki.asterisk.org/wiki/display/AST/Asterisk+Configuration+for+ARI
-
-        let client = AriClient(Configuration.endpoint, Configuration.applicationName)
+ 
+        use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
         use x = client.connect()
 
         Assert.True(client.Connected)
@@ -56,21 +63,22 @@ type LiveTests() =
     [<Test>]
     member this.runAndDumpEvents() = 
 
-        let client = AriClient(Configuration.endpoint, Configuration.applicationName)
+        use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
         use connection = client.connect()
 
         while true do
             let msg = connection.nextEvent()
             System.Diagnostics.Debug.WriteLine(sprintf "%A" msg)
 
-    // test that if we connect via a second client, we can subscribe to the
-    // channel, this is required for us to process channels independently with
-    // separate processes
 
     [<Test>]
     member this.subscribeToChannelOverASecondClient() =
 
-        let client = AriClient(Configuration.endpoint, Configuration.applicationName)
+        // test that if we connect via a second client, we can subscribe to the
+        // channel, this is required to process channels independently with
+        // separate processes.
+
+        use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
         use connection = client.connect()
 
         while true do
@@ -81,7 +89,7 @@ type LiveTests() =
             | ARIEvent (:? StasisStartEvent as e) ->
                 let id = e.Channel.Id
                 let channelApp = Configuration.applicationName + "." + id.ToString()
-                let client2 = AriClient(Configuration.endpoint, channelApp)
+                use client2 = new AriClient(Configuration.endpoint, channelApp)
                 use connection = client2.connect()
                 client2.Applications.Subscribe(channelApp, "channel:" + string id) |> ignore
                 let msg = connection.nextEvent()
@@ -90,6 +98,8 @@ type LiveTests() =
 
     [<Test>]
     member this.parallelIVRBlocks() = 
+
+        // this is a simple call flow that shows how to combine IVR blocks in parallel.
 
         use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
         let host = IVR.newHost()

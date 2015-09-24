@@ -50,7 +50,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="LiveTests.fs" />
-    <Compile Include="IVRTests.fs" />
+    <Compile Include="IVRGCTests.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

@@ -72,8 +72,7 @@ module IVR =
 
     // note that par retains the result of the completed ivr, which
     // could lead to leaks in nested parallel ivrs of which the result
-    // is never processed
-    // to avoid such leaks, use 
+    // is never processed.
 
     let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
 
@@ -238,7 +237,7 @@ module IVR =
         wait' f
 
     //
-    // Simple computation expression, to build sequential IVR processes
+    // Simple computation expression to build sequential IVR processes
     //
 
     type IVRBuilder<'result>() = 
