@@ -7,7 +7,7 @@ open Threading
     An IVR is a definition of an asynchronous process with the following properties:
     
     - can be ended at any given time without a concrete reason.
-    - can only synchronously respond to events. 
+    - can synchronously respond to events.
 *)
 
 type Event = obj
