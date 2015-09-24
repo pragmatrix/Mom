@@ -32,14 +32,15 @@ module TimeSpanExtensions =
 
 module IVR = 
 
-    // start up this ivr 
-    // this goes through all Delay states and stops at Active or Completed.
+    /// Start up this ivr.
+    /// This goes through all Delay states and stops at Active or Completed.
 
     let rec start ivr = 
         match ivr with
         | Delay f -> f() |> start
         | _ -> ivr
 
+    /// Continue an active ivr with one event.
     let step ivr e = 
         match ivr with
         // may be we should start it here, too?
@@ -50,29 +51,31 @@ module IVR =
         | Completed _ -> failwith "IVR.step: ivr is completed"
         | Active f -> f e
 
-    // note that step would complain about a Completed state
+    /// Continue an active or completed ivr with one event. If the ivr is completed, the result is ivr.
     let private progress ivr e = 
         match ivr with 
         | Completed _ -> ivr
         | Active f -> f e 
-        | Delay _ -> failwithf "IVR.lpar: seen unexpected Delay"
+        | Delay _ -> failwithf "IVR.progress: seen unexpected Delay"
 
+    /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
         match ivr with
         | Completed _ -> true
         | _ -> false
 
+    /// Returns the resulting value of a completed ivr.
     let result ivr = 
         match ivr with
         | Completed r -> r
         | _ -> failwith "IVR.result: ivr is not completed"
 
-    // run two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
-    // events are delivered first to ivr1, then to ivr2.
+    /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
+    /// events are delivered first to ivr1, then to ivr2.
 
-    // note that par retains the result of the completed ivr, which
-    // could lead to leaks in nested parallel ivrs of which the result
-    // is never processed.
+    /// Note that par retains the result of the completed ivr, which
+    /// could lead to leaks in nested parallel ivrs of which the result
+    /// is never processed.
 
     let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
 
@@ -87,7 +90,7 @@ module IVR =
         fun () -> next (start ivr1) (start ivr2)
         |> Delay
 
-    // combine a list of ivrs so that they run in parallel
+    /// Combine a list of ivrs so that they run in parallel
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
@@ -116,9 +119,9 @@ module IVR =
     // tbd
     // lpar_ 
 
-    // run two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
-    // events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
-    // the same event. Note that if ivr1 completes, no event is delivered to ivr2.
+    /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
+    /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
+    /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
     
     let par' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<Choice<'r1, 'r2>> =
 
@@ -136,7 +139,7 @@ module IVR =
                 | Completed r2 -> Completed <| Choice2Of2 r2
                 | Delay _ -> failwithf "IVR.par': unexpected ivr2 %A" ivr2
                 | _ -> Active <| loop ivr1 ivr2
-            | _ -> failwithf "par': unexpected %A, %A" ivr1 ivr2
+            | _ -> failwithf "IVR.par': unexpected %A, %A" ivr1 ivr2
 
         fun () -> 
             let ivr1 = start ivr1
@@ -153,7 +156,7 @@ module IVR =
             
         |> Delay
 
-    // runs a list of ivrs in parallel and finish with the first one that completes.
+    /// Runs a list of ivrs in parallel and finish with the first one that completes.
 
     let lpar' (ivrs: 'r ivr list) : 'r ivr =
 
@@ -195,7 +198,7 @@ module IVR =
     // more basic primitives
     //
 
-    // wait for some event given a function that returns (Some result) or None
+    /// Waits for some event given a function that returns (Some result) or None.
 
     let wait f =
         let rec waiter e =  
@@ -205,8 +208,8 @@ module IVR =
 
         Active waiter
 
-    // wait for some event with a predicate that returns
-    // true or false
+    /// Waits for some event with a predicate that returns
+    /// true or false
 
     let wait' predicate = 
         let f e = 
@@ -217,7 +220,7 @@ module IVR =
 
         wait f
 
-    // wait for an event of a type derived by a function passed in
+    /// Waits for an event of a type derived by a function passed in.
 
     let waitFor (f : 'e -> 'r option) = 
 
@@ -266,10 +269,24 @@ module IVR =
         // zero makes only sense for IVR<unit>
         member this.Zero () = Completed ()
 
+        member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
+            
+            let rec next ivr =
+                match ivr with
+                | Active f -> Active (f >> next)
+                | Completed _ ->
+                    disposable.Dispose()
+                    ivr
+                |  _ -> failwith "IVR.using: unexpected %A" ivr
+
+            disposable
+            |> body //< need a try finally around the body call here to enable exception handling!
+            |> start
+            |> next
 
     let ivr<'result> = IVRBuilder<'result>()
 
-    // maps the ivr's result type
+    /// Maps the ivr's result type.
 
     let map f ivr' = 
         ivr {
@@ -277,7 +294,7 @@ module IVR =
             return f r
         }
 
-    // ignores the ivr's result type
+    /// Ignores the ivr's result type.
 
     let ignore ivr = ivr |> map ignore
 
@@ -285,7 +302,10 @@ module IVR =
     // TPL naming scheme
     //
 
+    /// Wait for all ivrs to finish.
     let waitAll ivrs = lpar ivrs
+
+    /// Wait for any one of the ivrs to finish.
     let waitAny ivrs = lpar' ivrs 
 
 module BuilderExtensions = 

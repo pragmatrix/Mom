@@ -21,13 +21,16 @@ module Host =
     type Timeout = Timeout of Id
     type CancelIVR = CancelIVR
 
-    type Host = { queue: SynchronizedQueue<obj> }
+    type Host() = 
+        let queue = SynchronizedQueue<obj>();
 
-        with 
+        interface IDisposable with
+            member this.Dispose() = this.cancel()
+
         member this.dispatch event = 
-            this.queue.enqueue event
+            queue.enqueue event
 
-        member this.cancel() = 
+        member private this.cancel() = 
             this.dispatch CancelIVR
 
         member this.delay (timespan : TimeSpan) = 
@@ -41,7 +44,7 @@ module Host =
 
         member this.run ivr = 
             let rec runLoop ivr = 
-                let event = this.queue.dequeue()
+                let event = queue.dequeue()
                 match event with
                 | :? CancelIVR -> None
                 | event ->
@@ -53,4 +56,4 @@ module Host =
 
             runLoop (start ivr)
     
-    let newHost() = { queue = SynchronizedQueue() }
+    let newHost() = new Host()

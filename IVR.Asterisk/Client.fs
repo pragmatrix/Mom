@@ -96,7 +96,7 @@ module Client =
             let deliverARIEventToHost event = 
                 match event with
                 | ARIEvent e -> host.dispatch e
-                | Disconnected -> host.cancel()
+                | Disconnected -> (host :> IDisposable).Dispose()
                 | _ -> failwith "unexpected ARI event: %A" event
 
             this.connect(deliverARIEventToHost)
