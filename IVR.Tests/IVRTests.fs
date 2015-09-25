@@ -114,7 +114,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.FirstIVRIsCancelledInAParallelListWhenTheSecondOneFinishesFirst() = 
+    member this.``lpar': first ivr is cancelled when the second one finishes first``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
@@ -132,7 +132,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.SecondIVRIsCancelledInAParallelListWhenTheFirstOneFinishesFirst() = 
+    member this.``lpar': second ivr is cancelled when the first one finishes first``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
