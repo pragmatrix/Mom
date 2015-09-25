@@ -59,7 +59,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.ivrIsCancelledInAParallelAbandonedRightBranch() = 
+    member this.``par': right ivr is cancelled after left completes``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
@@ -71,13 +71,13 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event2) -> true)
         }
 
-        let r = IVR.par' left right
-        let started = IVR.start r
+        let test = IVR.par' left right
+        let started = IVR.start test
         IVR.step started Event1 |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.ivrIsCancelledInAParallelAbandonedLeftBranch() = 
+    member this.``par': left ivr is cancelled after right completes``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
@@ -89,10 +89,67 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event2) -> true)
         }
 
-        let r = IVR.par' left right
+        let test = IVR.par' left right
+        let started = IVR.start test
+        IVR.step started Event2 |> ignore
+        ct.disposed |> should equal true
+
+
+    [<Test>]
+    member this.``par': left ivr is cancelled when the right one is completed after startup``() = 
+        let ct = new CancellationTracker()
+
+        let left = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun (Event1) -> true)
+        }
+
+        let right = ivr {
+            return 0
+        }
+
+        let test = IVR.par' left right
+        let started = IVR.start test
+        IVR.isCompleted started |> should equal true
+        ct.disposed |> should equal true
+
+    [<Test>]
+    member this.FirstIVRIsCancelledInAParallelListWhenTheSecondOneFinishesFirst() = 
+        let ct = new CancellationTracker()
+
+        let left = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun (Event1) -> true)
+        }
+
+        let right = ivr {
+            do! IVR.waitFor' (fun (Event2) -> true)
+        }
+
+        let r = IVR.lpar' [left; right]
         let started = IVR.start r
         IVR.step started Event2 |> ignore
         ct.disposed |> should equal true
+
+    [<Test>]
+    member this.SecondIVRIsCancelledInAParallelListWhenTheFirstOneFinishesFirst() = 
+        let ct = new CancellationTracker()
+
+        let left = ivr {
+            do! IVR.waitFor' (fun (Event1) -> true)
+        }
+
+        let right = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun (Event2) -> true)
+        }
+
+        let r = IVR.lpar' [left; right]
+        let started = IVR.start r
+        IVR.step started Event1 |> ignore
+        ct.disposed |> should equal true
+
+
 
     [<Test>]
     member this.hostProperlyCancelsTheIVRIfItsDisposed() =

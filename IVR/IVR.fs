@@ -202,7 +202,9 @@ module IVR =
             | _ ->
             let ivr2 = start ivr2
             match ivr2 with
-            | Completed r2 -> r2.map Choice2Of2 |> Completed
+            | Completed r2 ->
+                cancel ivr1 
+                r2.map Choice2Of2 |> Completed
             | _ ->
             Active <| loop ivr1 ivr2
             
@@ -212,35 +214,54 @@ module IVR =
 
     let lpar' (ivrs: 'r ivr list) : 'r ivr =
 
-        let folder f (ivrs, result) ivr = 
-            // don't step pending ivrs, if we already have a result!
-            // also: this is a kind of idle part of this algorithm, actually
-            // we need to break the folder as soon we see a Completed ivr
-            match result with
-            | Some r -> [], Some r
-            | None ->
-            let ivr = f ivr
-            match ivr with
-            | Active _ -> (ivr::ivrs), None
-            | Completed r -> [], Some r
+        let rec startAll res active ivrs = 
+            match res with
+            | Some _ -> res, []
+            | _ ->
+            match ivrs with
+            | [] -> res, (active |> List.rev)
+            | ivr::todo ->
+                let ivr = start ivr
+                match ivr with
+                | Completed r -> 
+                    // cancel all the running ones in reversed order 
+                    // (which is how they stored until returned)
+                    active |> List.iter cancel
+                    Some r, []
+                | Active _ -> 
+                    startAll None (ivr::active) todo
 
-        let stepFolder e = folder (fun ivr -> step ivr e)
-        let startFolder = folder start
+        let rec stepAll e res active ivrs =
+            match res with
+            | Some _ -> res, []
+            | _ ->
+            match ivrs with
+            | [] -> res, (active |> List.rev)
+            | ivr::todo ->
+                let ivr = step ivr e
+                match ivr with
+                | Completed r ->
+                    // cancel all the running ones in reversed order
+                    // and the future ones (also in reversed order)
+                    active |> List.iter cancel
+                    todo |> List.rev |> List.iter cancel
+                    Some r, []
+                | Active _ ->
+                    stepAll e None (ivr::active) todo
 
         let rec active ivrs e = 
-
             ivrs 
-            |> List.fold (stepFolder e) ([], None)
+            |> stepAll e None []
             |> next
            
-        and next (ivrs, result) = 
+        and next (result, ivrs) = 
             match result with
-            | Some r -> Completed r
-            | None -> Active (active (ivrs |> List.rev))
+            | Some r -> r |> Completed
+            | None -> Active (active ivrs)
 
         fun () ->
             ivrs
-            |> List.fold startFolder ([], None)
+            |> startAll None []
             |> next
 
         |> Delay
