@@ -150,10 +150,28 @@ type IVRTests() =
         ct.disposed |> should equal true
 
 
-
     [<Test>]
-    member this.hostProperlyCancelsTheIVRIfItsDisposed() =
-        Assert.Fail()
+    member this.``host properly cancels its ivr if it gets disposed asynchronously``() =
+        let ct = new CancellationTracker()
+
+        let ivr = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun (Event1) -> true)
+        }
+
+        let host = Host.newHost()
+
+        async {
+            host.run ivr |> ignore
+        } |> Async.Start
+
+        (host :> IDisposable).Dispose();
+
+        // wait a while... tbd: this makes this test brittle and should be fixed
+        Async.Sleep(100) |> Async.RunSynchronously
+
+        ct.disposed |> should equal true
+
 
 
 

@@ -18,10 +18,11 @@ module Host =
 
     // predefined host events
 
-    type Timeout = Timeout of Id
-    type CancelIVR = CancelIVR
+    type private Timeout = Timeout of Id
+    type private CancelIVR = CancelIVR
 
     type Host() = 
+
         let queue = SynchronizedQueue<obj>();
 
         interface IDisposable with
@@ -47,7 +48,9 @@ module Host =
             let rec runLoop ivr = 
                 let event = queue.dequeue()
                 match event with
-                | :? CancelIVR -> None
+                | :? CancelIVR -> 
+                    cancel ivr
+                    Some Cancelled
                 | event ->
                 let ivr' = step ivr event
                 match ivr' with
