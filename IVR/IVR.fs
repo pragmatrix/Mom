@@ -12,15 +12,25 @@ open System
 
 type Event = obj
 
+type Result<'result> =
+    | Result of 'result
+    | Cancelled
+    with 
+        member this.map f =
+            match this with
+            | Cancelled -> Cancelled
+            | Result r -> Result (f r)
+
 type AIVR<'result> = 
     | Active of (Event -> AIVR<'result>)
-    | Completed of 'result
+    | Completed of Result<'result>
 
 type IVR<'result> = 
     | Delay of (unit -> AIVR<'result>)
 
-type 'result ivr = IVR<'result>
+type 'result result = Result<'result>
 type 'result aivr = AIVR<'result>
+type 'result ivr = IVR<'result>
 
 module TimeSpanExtensions =
 
@@ -34,6 +44,10 @@ module TimeSpanExtensions =
         
 
 module IVR = 
+
+    // 
+    // IVR Primitives
+    //
 
     /// Start up this ivr.
 
@@ -61,11 +75,41 @@ module IVR =
         | Completed _ -> true
         | _ -> false
 
-    /// Returns the resulting value of a completed ivr.
+    let isCancelled ivr = 
+        match ivr with
+        | Completed Cancelled -> true
+        | Completed _ -> false
+        | _ -> failwithf "IVR.isCancelled incomplete: %A" ivr
+
+    /// Returns the result of a completed ivr.
     let result ivr = 
         match ivr with
         | Completed r -> r
         | _ -> failwith "IVR.result: ivr is not completed"
+
+    /// Returns the resulting value of a completed ivr.
+    let resultValue ivr = 
+        match ivr with
+        | Completed (Result r) -> r
+        | Completed _ -> failwithf "IVR.resultValue ivr has not been completed with a resulting value: %A" ivr
+        | _ -> failwithf "IVR.resultValue: ivr is not completed: %A" ivr
+
+    /// The event that is sent to an active IVR when it gets cancelled. The only accepted return state is Cancelled.
+    type Cancel = Cancel
+
+    /// Cancels the ivr. For now it is expected that the ivr immediately returns the Cancelled state.
+    let cancel ivr = 
+        match ivr with
+        | Active f -> 
+            let r = f Cancel 
+            match r with
+            | Completed Cancelled -> ()
+            | _ -> failwithf "IVR.cancel: cancellation unhandled: %A" r
+        | _ -> failwith "IVR.cancel: ivr is not active"
+
+    //
+    // IVR Combinators
+    //
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// events are delivered first to ivr1, then to ivr2.
@@ -81,7 +125,10 @@ module IVR =
 
         and next ivr1 ivr2 =
             match ivr1, ivr2 with
-            | Completed r1, Completed r2 -> Completed (r1, r2)
+            | Completed r1, Completed r2 -> 
+                match r1, r2 with
+                | Result r1, Result r2 -> (r1, r2) |> Result |> Completed
+                | _ -> Cancelled |> Completed
             | _ -> active ivr1 ivr2 |> Active
 
         fun () -> next (start ivr1) (start ivr2)
@@ -104,9 +151,17 @@ module IVR =
             match anyActive with
             | true -> active ivrs |> Active
             | false ->
-                ivrs
-                |> List.map result
-                |> Completed
+                let anyCancelled = 
+                    ivrs
+                    |> List.exists (isCancelled)
+
+                if anyCancelled then
+                    Completed Cancelled
+                else
+                    ivrs
+                    |> List.map resultValue
+                    |> Result
+                    |> Completed
 
         fun () -> next (List.map start ivrs)
         |> Delay
@@ -128,22 +183,26 @@ module IVR =
             | Active f1, Active f2 -> 
                 let ivr1 = f1 e
                 match ivr1 with
-                | Completed r1 -> Completed <| Choice1Of2 r1
+                | Completed r1 -> 
+                    cancel ivr2
+                    r1.map Choice1Of2 |> Completed
                 | _ ->
                 let ivr2 = f2 e
                 match ivr2 with
-                | Completed r2 -> Completed <| Choice2Of2 r2
+                | Completed r2 -> 
+                    cancel ivr1
+                    r2.map Choice2Of2 |> Completed
                 | _ -> Active <| loop ivr1 ivr2
             | _ -> failwithf "IVR.par': unexpected %A, %A" ivr1 ivr2
 
         fun () -> 
             let ivr1 = start ivr1
             match ivr1 with
-            | Completed r1 -> Completed <| Choice1Of2 r1
+            | Completed r1 -> r1.map Choice1Of2 |> Completed
             | _ ->
             let ivr2 = start ivr2
             match ivr2 with
-            | Completed r2 -> Completed <| Choice2Of2 r2
+            | Completed r2 -> r2.map Choice2Of2 |> Completed
             | _ ->
             Active <| loop ivr1 ivr2
             
@@ -194,8 +253,11 @@ module IVR =
 
     let wait f =
         let rec waiter e =  
+            match box e with
+            | :? Cancel -> Cancelled |> Completed
+            | _ ->
             match f e with
-            | Some r -> Completed r
+            | Some r -> r |> Result |> Completed
             | None -> Active waiter
 
         fun () ->
@@ -243,11 +305,12 @@ module IVR =
             let rec next ivr = 
                 match ivr with
                 | Active f -> Active (f >> next)
-                | Completed r -> (cont r)
-            
+                | Completed (Result r) -> (cont r)
+                | Completed Cancelled -> Completed Cancelled
+
             next (start ivr)
 
-        member this.Return(v) = Completed v
+        member this.Return(v) = v |> Result |> Completed
 
         member this.ReturnFrom ivr = start ivr
 
@@ -257,7 +320,7 @@ module IVR =
         member this.Delay (f : unit -> 'r aivr) : 'r ivr = Delay f
 
         // zero makes only sense for IVR<unit>
-        member this.Zero () = Completed ()
+        member this.Zero () = () |> Result |> Completed
 
         member this.Using(disposable : 't, body : 't -> 'u aivr when 't :> IDisposable) : 'u aivr = 
             

@@ -44,7 +44,7 @@ type IVRTests() =
 
 
     [<Test>]
-    member this.disposeIsCalledInASequentialIVRSurroundingAWait() = 
+    member this.ivrIsCancelledInASequentialIVRSurroundingAWait() = 
         let ct = new CancellationTracker()
 
         let a = ivr {
@@ -59,7 +59,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.disposableIsCalledForAParallelIVRThatIsCancelled() = 
+    member this.ivrIsCancelledInAParallelAbandonedRightBranch() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
@@ -74,6 +74,24 @@ type IVRTests() =
         let r = IVR.par' left right
         let started = IVR.start r
         IVR.step started Event1 |> ignore
+        ct.disposed |> should equal true
+
+    [<Test>]
+    member this.ivrIsCancelledInAParallelAbandonedLeftBranch() = 
+        let ct = new CancellationTracker()
+
+        let left = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun (Event1) -> true)
+        }
+
+        let right = ivr {
+            do! IVR.waitFor' (fun (Event2) -> true)
+        }
+
+        let r = IVR.par' left right
+        let started = IVR.start r
+        IVR.step started Event2 |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
