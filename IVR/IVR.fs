@@ -12,12 +12,15 @@ open System
 
 type Event = obj
 
-type IVR<'result> = 
-    | Delay of (unit -> IVR<'result>)
-    | Active of (Event -> IVR<'result>)
+type AIVR<'result> = 
+    | Active of (Event -> AIVR<'result>)
     | Completed of 'result
 
+type IVR<'result> = 
+    | Delay of (unit -> AIVR<'result>)
+
 type 'result ivr = IVR<'result>
+type 'result aivr = AIVR<'result>
 
 module TimeSpanExtensions =
 
@@ -33,12 +36,8 @@ module TimeSpanExtensions =
 module IVR = 
 
     /// Start up this ivr.
-    /// This goes through all Delay states and stops at Active or Completed.
 
-    let rec start ivr = 
-        match ivr with
-        | Delay f -> f() |> start
-        | _ -> ivr
+    let start (Delay f) = f()
 
     /// Continue an active ivr with one event.
     let step ivr e = 
@@ -47,16 +46,14 @@ module IVR =
         //> no: delays are not supported, once an IVR starts, subsequential
         //> IVRs do have to be started before stepping through
 
-        | Delay _ -> failwith "IVR.step: ivr not started"
         | Completed _ -> failwith "IVR.step: ivr is completed"
         | Active f -> f e
 
-    /// Continue an active or completed ivr with one event. If the ivr is completed, the result is ivr.
+    /// Continue an active or completed ivr with one event. If the ivr is completed, the ivr is the result.
     let private progress ivr e = 
         match ivr with 
         | Completed _ -> ivr
         | Active f -> f e 
-        | Delay _ -> failwithf "IVR.progress: seen unexpected Delay"
 
     /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
@@ -132,12 +129,10 @@ module IVR =
                 let ivr1 = f1 e
                 match ivr1 with
                 | Completed r1 -> Completed <| Choice1Of2 r1
-                | Delay _ -> failwithf "IVR.par': unexpected ivr1 %A" ivr1
                 | _ ->
                 let ivr2 = f2 e
                 match ivr2 with
                 | Completed r2 -> Completed <| Choice2Of2 r2
-                | Delay _ -> failwithf "IVR.par': unexpected ivr2 %A" ivr2
                 | _ -> Active <| loop ivr1 ivr2
             | _ -> failwithf "IVR.par': unexpected %A, %A" ivr1 ivr2
 
@@ -145,12 +140,10 @@ module IVR =
             let ivr1 = start ivr1
             match ivr1 with
             | Completed r1 -> Completed <| Choice1Of2 r1
-            | Delay _ -> failwithf "IVR.par': unexpected ivr1 %A" ivr1
             | _ ->
             let ivr2 = start ivr2
             match ivr2 with
             | Completed r2 -> Completed <| Choice2Of2 r2
-            | Delay _ -> failwithf "IVR.par': unexpected ivr2 %A" ivr2
             | _ ->
             Active <| loop ivr1 ivr2
             
@@ -171,7 +164,6 @@ module IVR =
             match ivr with
             | Active _ -> (ivr::ivrs), None
             | Completed r -> [], Some r
-            | Delay _ -> failwith "IVR.lpar`: unexpected Delay"
 
         let stepFolder e = folder (fun ivr -> step ivr e)
         let startFolder = folder start
@@ -198,7 +190,7 @@ module IVR =
     // more basic primitives
     //
 
-    /// Waits for some event given a function that returns (Some result) or None.
+    /// An IVR that waits for some event given a function that returns (Some result) or None.
 
     let wait f =
         let rec waiter e =  
@@ -206,7 +198,9 @@ module IVR =
             | Some r -> Completed r
             | None -> Active waiter
 
-        Active waiter
+        fun () ->
+            Active waiter
+        |> Delay
 
     /// Waits for some event with a predicate that returns
     /// true or false
@@ -244,16 +238,12 @@ module IVR =
     //
 
     type IVRBuilder<'result>() = 
-        member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 ivr) : 'r2 ivr = 
+        member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 aivr) : 'r2 aivr = 
 
             let rec next ivr = 
                 match ivr with
                 | Active f -> Active (f >> next)
-                | Completed r -> 
-                    match cont r with
-                    | Delay _ -> failwith "IVR.bind: unexpected Delay (3)"
-                    | i2 -> i2
-                | _ -> failwith "IVR.bind: unexpected %A" ivr
+                | Completed r -> (cont r)
             
             next (start ivr)
 
@@ -264,12 +254,12 @@ module IVR =
         // We want to delay the startup of an IVR to the moment IVR.start is run, because
         // computation expressions may contain regular code at the beginning that would run at
         // instantiation of the expression and not when we start / run the ivr
-        member this.Delay (f : unit -> 'r ivr) : 'r ivr = Delay f
+        member this.Delay (f : unit -> 'r aivr) : 'r ivr = Delay f
 
         // zero makes only sense for IVR<unit>
         member this.Zero () = Completed ()
 
-        member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
+        member this.Using(disposable : 't, body : 't -> 'u aivr when 't :> IDisposable) : 'u aivr = 
             
             let rec next ivr =
                 match ivr with
@@ -277,11 +267,9 @@ module IVR =
                 | Completed _ ->
                     disposable.Dispose()
                     ivr
-                |  _ -> failwith "IVR.using: unexpected %A" ivr
 
             disposable
             |> body //< need a try finally around the body call here to enable exception handling!
-            |> start
             |> next
 
     let ivr<'result> = IVRBuilder<'result>()

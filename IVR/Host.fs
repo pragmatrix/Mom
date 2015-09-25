@@ -43,6 +43,7 @@ module Host =
             }
 
         member this.run ivr = 
+
             let rec runLoop ivr = 
                 let event = queue.dequeue()
                 match event with
@@ -52,7 +53,6 @@ module Host =
                 match ivr' with
                 | Completed r -> Some r
                 | Active _ -> runLoop ivr'
-                | Delay _ -> failwithf "IVR.run: unexpected: %A" ivr'
 
             runLoop (start ivr)
     
