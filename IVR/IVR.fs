@@ -24,6 +24,13 @@ type Result<'result> =
 type AIVR<'result> = 
     | Active of (Event -> AIVR<'result>)
     | Completed of Result<'result>
+    with 
+        member this.map f =
+            match this with
+            | Completed r -> Completed (r.map f)
+            | Active step -> 
+                fun e -> (step e).map f
+                |> Active
 
 type IVR<'result> = 
     | Delay of (unit -> AIVR<'result>)
@@ -75,19 +82,20 @@ module IVR =
         | Completed _ -> true
         | _ -> false
 
+    let isActive ivr = 
+        match ivr with
+        | Active _ -> true
+        | _ -> false
+
     let isCancelled ivr = 
         match ivr with
         | Completed Cancelled -> true
-        | Completed _ -> false
-        | _ -> failwithf "IVR.isCancelled incomplete: %A" ivr
+        | _ -> false
 
     /// Maps the ivr's result
-    let rec map f ivr  =
-        match ivr with
-        | Completed r -> Completed (r.map f)
-        | Active step -> 
-            fun e -> step e |> map f
-            |> Active
+    let rec map f (Delay c) =
+        fun () -> c().map f
+        |> Delay
 
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
@@ -123,8 +131,9 @@ module IVR =
     //
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
-    /// events are delivered first to ivr1, then to ivr2. When an exception or cancellation in one of 
-    /// the ivrs occurs, the resulting ivr is ended immediately.
+    /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
+    /// (cancellation or exception),
+    /// the resulting ivr is ended immediately.
 
     /// Note that par retains the result of the completed ivr, which
     /// could lead to leaks in nested parallel ivrs of which the result
@@ -143,8 +152,12 @@ module IVR =
                 | _ -> Cancelled |> Completed
             | Completed r1, _ ->
                 match r1 with
-                | Result r1 -> ivr2 |> IVR.map
-                | Cancelled -> Cancelled |> Completed 
+                | Result r1 -> ivr2.map (fun r2 -> r1, r2)
+                | Cancelled -> Cancelled |> Completed
+            | _, Completed r2 ->
+                match r2 with
+                | Result r2 -> ivr1.map (fun r1 -> r1, r2)
+                | Cancelled -> Cancelled |> Completed
             | _ -> active ivr1 ivr2 |> Active
 
         fun () -> next (start ivr1) (start ivr2)
@@ -162,23 +175,22 @@ module IVR =
             next ivrs
 
         and next ivrs = 
+            let anyCancelled = 
+                ivrs
+                |> List.exists (isCancelled)
+
             let anyActive = 
                 ivrs
-                |> List.exists (isCompleted >> not)
-            match anyActive with
-            | true -> active ivrs |> Active
-            | false ->
-                let anyCancelled = 
-                    ivrs
-                    |> List.exists (isCancelled)
+                |> List.exists (isActive)
 
-                if anyCancelled then
-                    Completed Cancelled
-                else
-                    ivrs
-                    |> List.map resultValue
-                    |> Result
-                    |> Completed
+            match anyCancelled, anyActive with
+            | true, _ -> Completed Cancelled
+            | false, true -> active ivrs |> Active
+            | false, false ->
+                ivrs
+                |> List.map resultValue
+                |> Result
+                |> Completed
 
         fun () -> next (List.map start ivrs)
         |> Delay
