@@ -248,6 +248,42 @@ type IVRTests() =
         x |> should equal true
 
     [<Test>]
+    member this.``computation expression: handle exception at startup time``() =
+        let mutable x = false
+
+        let test = ivr {
+            try
+                failwith "Nooooo"
+                return 0
+            with e ->
+                return 1
+        }
+
+        test
+        |> IVR.start
+        |> IVR.result
+        |> should equal (Result 1)
+
+    [<Test>]
+    member this.``computation expression: handle exception at runtime``() =
+        let mutable x = false
+
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun Event1 -> true)
+                failwith "Nooooo"
+                return 0
+            with e ->
+                return 1
+        }
+
+        test
+        |> IVR.start
+        |> IVR.step Event1
+        |> IVR.result
+        |> should equal (Result 1)
+
+    [<Test>]
     member this.``host properly cancels its ivr if it gets disposed asynchronously``() =
         let ct = new CancellationTracker()
 

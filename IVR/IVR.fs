@@ -135,6 +135,13 @@ module IVR =
                 fun e -> (this |> step e).whenCompleted f
                 |> Active
 
+        member this.continueWith f =
+            match this with
+            | Completed _ -> f this
+            | Active _ ->
+                fun e -> (this |> step e).continueWith f
+                |> Active
+
     //
     // Primitives Part 2
     //
@@ -150,6 +157,11 @@ module IVR =
     /// Invokes a function when the ivr is completed.
     let whenCompleted f ivr =
         fun () -> (start ivr).whenCompleted f
+        |> Delay
+
+    /// Continues the ivr with a followup ivr
+    let continueWith f ivr =
+        fun () -> (start ivr).continueWith f
         |> Delay
 
     /// Returns the result of a completed ivr.
@@ -438,6 +450,17 @@ module IVR =
             ivr
             |> whenCompleted f
             |> start
+
+        member this.TryWith (ivr: 'r ivr, eh: exn -> 'r aivr) : 'r aivr =
+            ivr
+            |> continueWith (function
+                | Completed (Error e) -> 
+                    fun () -> eh e
+                    |> Delay
+                    |> start
+                | r -> r)
+            |> start
+
 
     let ivr<'result> = IVRBuilder<'result>()
 
