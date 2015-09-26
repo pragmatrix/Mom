@@ -178,6 +178,9 @@ module IVR =
             | _ -> failwithf "IVR.cancel: cancellation unhandled: %A" r
         | _ -> failwith "IVR.cancel: ivr is not active"
 
+    let cancelIfActive ivr = 
+        if isActive ivr then cancel ivr
+
     //
     // IVR Combinators
     //
@@ -188,12 +191,17 @@ module IVR =
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
-        let rec active ivrs e =
-            let ivrs = 
-                ivrs
-                |> List.map (stepWhenActive e)
-            next ivrs
+        // Cancellation is always in reverse order!
+        let cancelAllActive ivrs = 
+            ivrs
+            |> List.rev 
+            |> List.iter cancelIfActive
 
+        let rec active ivrs e =
+            ivrs
+            |> List.map (stepWhenActive e)
+            |> next
+            
         and next ivrs = 
             let anyError = 
                 ivrs
@@ -204,7 +212,12 @@ module IVR =
                 |> List.exists (isActive)
 
             match anyError, anyActive with
-            | true, _ -> ivrs |> List.find (isError) |> error |> Error |> Completed
+            | true, _ -> 
+                cancelAllActive ivrs
+                // return the first error, but since we step them all in parallel, multiple 
+                // errors may be found, and we should accumulate them.
+                // (better would be to change the semantic to only step one at a time and terminate on the first error seen)
+                ivrs |> List.find (isError) |> error |> Error |> Completed
             | false, true -> active ivrs |> Active
             | false, false ->
                 ivrs
@@ -229,7 +242,7 @@ module IVR =
         |> lpar
         |> map (function 
             | [l;r] -> unbox l, unbox r 
-            | _ -> failwith "internal error")
+            | _ -> failwith "internal error: here to keep the compiler happy")
 
     /// Note that par retains the result of the completed ivr, which
     /// could lead to leaks in nested parallel ivrs of which the result

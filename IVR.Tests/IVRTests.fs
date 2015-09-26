@@ -81,6 +81,28 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
+    member this.``par: left ivr is cancelled when right throws an exception``() = 
+        let ct = new CancellationTracker()
+
+        let left = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun Event1 -> true)
+        }
+
+        let right = ivr {
+            do! IVR.waitFor' (fun Event2 -> true)
+            failwith "HellNo!"
+        }
+
+        IVR.par left right
+        |> IVR.start
+        |> IVR.step Event2
+        |> IVR.isError
+        |> should equal true
+
+        ct.disposed |> should equal true
+
+    [<Test>]
     member this.``par': right ivr is cancelled after left completes``() = 
         let ct = new CancellationTracker()
 
