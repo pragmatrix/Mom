@@ -233,6 +233,10 @@ module IVR =
     /// (cancellation or exception),
     /// the resulting ivr is ended immediately.
 
+    /// Note that par retains the result of the completed ivr, which
+    /// could lead to leaks in nested parallel ivrs of which the result
+    /// is never processed.
+
     let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
 
         // we implement par in terms of lpar so that we avoid
@@ -244,9 +248,6 @@ module IVR =
             | [l;r] -> unbox l, unbox r 
             | _ -> failwith "internal error: here to keep the compiler happy")
 
-    /// Note that par retains the result of the completed ivr, which
-    /// could lead to leaks in nested parallel ivrs of which the result
-    /// is never processed.
 
     // specialized version of lpar that removes results from processing when
     // the return type is unit.
@@ -414,7 +415,7 @@ module IVR =
 
             next (start ivr)
 
-        member this.Return(v) = v |> Result |> Completed
+        member this.Return v = v |> Result |> Completed
 
         member this.ReturnFrom ivr = start ivr
 
@@ -423,24 +424,15 @@ module IVR =
         // instantiation of the expression and not when we start / run the ivr
         member this.Delay (f : unit -> 'r aivr) : 'r ivr = Delay f
 
-        // zero makes only sense for IVR<unit>
+        // zero only makes sense for IVR<unit>
         member this.Zero () = () |> Result |> Completed
 
         member this.Using(disposable : 't, body : 't -> 'u aivr when 't :> IDisposable) : 'u aivr = 
-            
-            let rec next ivr =
-                match ivr with
-                | Active f -> Active (f >> next)
-                | Completed _ ->
-                    disposable.Dispose()
-                    ivr
-
             // we need to use start! for powering up the body, to ensure proper exception handling.
-            fun () ->
-                body disposable
+            fun () -> body disposable
             |> Delay
+            |> whenCompleted disposable.Dispose
             |> start
-            |> next
 
     let ivr<'result> = IVRBuilder<'result>()
 
