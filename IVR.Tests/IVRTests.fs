@@ -193,6 +193,59 @@ type IVRTests() =
         IVR.step Event1 started |> ignore
         ct.disposed |> should equal true
 
+    [<Test>]
+    member this.``computation expression: try finally handler is run on a regular completion``() =
+        let mutable x = false
+
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun Event1 -> true)
+            finally
+                x <- true
+        }
+
+        test
+        |> IVR.start
+        |> IVR.step Event1
+        |> ignore
+
+        x |> should equal true
+
+    [<Test>]
+    member this.``computation expression: try finally handler is run on an error completion``() =
+        let mutable x = false
+
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun Event1 -> true)
+                failwith "Nooooo"
+            finally
+                x <- true
+        }
+
+        test
+        |> IVR.start
+        |> IVR.step Event1
+        |> ignore
+
+        x |> should equal true
+
+    [<Test>]
+    member this.``computation expression: try finally handler is run on an error completion at startup time``() =
+        let mutable x = false
+
+        let test = ivr {
+            try
+                failwith "Nooooo"
+            finally
+                x <- true
+        }
+
+        test
+        |> IVR.start
+        |> ignore
+
+        x |> should equal true
 
     [<Test>]
     member this.``host properly cancels its ivr if it gets disposed asynchronously``() =

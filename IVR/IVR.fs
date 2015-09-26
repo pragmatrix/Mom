@@ -434,6 +434,11 @@ module IVR =
             |> whenCompleted disposable.Dispose
             |> start
 
+        member this.TryFinally (ivr: 'r ivr, f: unit -> unit) : 'r aivr =
+            ivr
+            |> whenCompleted f
+            |> start
+
     let ivr<'result> = IVRBuilder<'result>()
 
     //
