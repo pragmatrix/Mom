@@ -267,32 +267,37 @@ module IVR =
 
             match ivr1, ivr2 with
             | Active _, Active _ -> 
-                let ivr1 = ivr1 |> step e
-                match ivr1 with
+                ivr1
+                |> step e
+                |> function
                 | Completed r1 -> 
                     cancel ivr2
                     r1.map Choice1Of2 |> Completed
-                | _ ->
-                let ivr2 = ivr2 |> step e
-                match ivr2 with
+                | ivr1 ->
+                ivr2 
+                |> step e
+                |> function
                 | Completed r2 -> 
                     cancel ivr1
                     r2.map Choice2Of2 |> Completed
-                | _ -> Active <| loop ivr1 ivr2
+                | ivr2 ->
+                    loop ivr1 ivr2 |> Active
             | _ -> failwithf "IVR.par': unexpected %A, %A" ivr1 ivr2
 
         fun () -> 
-            let ivr1 = start ivr1
-            match ivr1 with
+            ivr1
+            |> start
+            |> function
             | Completed r1 -> r1.map Choice1Of2 |> Completed
-            | _ ->
-            let ivr2 = start ivr2
-            match ivr2 with
+            | ivr1 ->
+            ivr2 
+            |> start
+            |> function
             | Completed r2 ->
                 cancel ivr1 
                 r2.map Choice2Of2 |> Completed
-            | _ ->
-            Active <| loop ivr1 ivr2
+            | ivr2 ->
+                loop ivr1 ivr2 |> Active
             
         |> Delay
 
@@ -307,33 +312,34 @@ module IVR =
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-                let ivr = start ivr
-                match ivr with
+                ivr
+                |> start
+                |> function
                 | Completed r -> 
                     // cancel all the running ones in reversed order 
                     // (which is how they stored until returned)
                     active |> List.iter cancel
                     Some r, []
-                | Active _ -> 
+                | Active _ as ivr -> 
                     startAll None (ivr::active) todo
 
         let rec stepAll e res active ivrs =
-            let step = step e
             match res with
             | Some _ -> res, []
             | _ ->
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-                let ivr = ivr |> step
-                match ivr with
+                ivr
+                |> step e
+                |> function
                 | Completed r ->
                     // cancel all the running ones in reversed order
                     // and the future ones (also in reversed order)
                     active |> List.iter cancel
                     todo |> List.rev |> List.iter cancel
                     Some r, []
-                | Active _ ->
+                | Active _ as ivr ->
                     stepAll e None (ivr::active) todo
 
         let rec active ivrs e = 
@@ -410,13 +416,17 @@ module IVR =
     type IVRBuilder<'result>() = 
         member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 aivr) : 'r2 aivr = 
 
-            let rec next ivr = 
-                match ivr with
-                | Active f -> Active (f >> next)
-                | Completed (Result r) -> (cont r)
+            ivr
+            |> continueWith (
+                function 
+                | Completed (Result r) -> 
+                    fun () -> cont r
+                    |> Delay
+                    |> start 
                 | Completed (Error err) -> err |> Error |> Completed
-
-            next (start ivr)
+                | _ -> failwith "internal error"
+                )
+            |> start
 
         member this.Return v = v |> Result |> Completed
 
