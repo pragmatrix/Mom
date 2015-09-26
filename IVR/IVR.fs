@@ -81,6 +81,17 @@ module IVR =
         | Completed _ -> false
         | _ -> failwithf "IVR.isCancelled incomplete: %A" ivr
 
+    /// Maps the ivr's result
+    let rec map f ivr  =
+        match ivr with
+        | Completed r -> Completed (r.map f)
+        | Active step -> 
+            fun e -> step e |> map f
+            |> Active
+
+    /// Ignores the ivr's result type.
+    let ignore ivr = ivr |> map ignore
+
     /// Returns the result of a completed ivr.
     let result ivr = 
         match ivr with
@@ -112,7 +123,8 @@ module IVR =
     //
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
-    /// events are delivered first to ivr1, then to ivr2.
+    /// events are delivered first to ivr1, then to ivr2. When an exception or cancellation in one of 
+    /// the ivrs occurs, the resulting ivr is ended immediately.
 
     /// Note that par retains the result of the completed ivr, which
     /// could lead to leaks in nested parallel ivrs of which the result
@@ -129,12 +141,17 @@ module IVR =
                 match r1, r2 with
                 | Result r1, Result r2 -> (r1, r2) |> Result |> Completed
                 | _ -> Cancelled |> Completed
+            | Completed r1, _ ->
+                match r1 with
+                | Result r1 -> ivr2 |> IVR.map
+                | Cancelled -> Cancelled |> Completed 
             | _ -> active ivr1 ivr2 |> Active
 
         fun () -> next (start ivr1) (start ivr2)
         |> Delay
 
-    /// Combine a list of ivrs so that they run in parallel
+    /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
+    /// All ivrs ended.
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
@@ -357,18 +374,6 @@ module IVR =
             |> next
 
     let ivr<'result> = IVRBuilder<'result>()
-
-    /// Maps the ivr's result type.
-
-    let map f ivr' = 
-        ivr {
-            let! r = ivr'
-            return f r
-        }
-
-    /// Ignores the ivr's result type.
-
-    let ignore ivr = ivr |> map ignore
 
     //
     // TPL naming scheme
