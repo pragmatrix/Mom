@@ -38,9 +38,8 @@ module Host =
             ivr {
                 let id = newId()
                 let callback _ = this.dispatch (Timeout id)
-                let timer = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
+                use _ = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
                 do! waitFor' (fun (Timeout tid) -> tid = id)
-                timer.Dispose()
             }
 
         member this.run ivr = 
