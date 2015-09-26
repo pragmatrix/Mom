@@ -12,25 +12,20 @@ open System
 
 type Event = obj
 
+exception Cancelled
+
 type Result<'result> =
     | Result of 'result
-    | Cancelled
+    | Error of Exception
     with 
         member this.map f =
             match this with
-            | Cancelled -> Cancelled
+            | Error e -> Error e
             | Result r -> Result (f r)
 
 type AIVR<'result> = 
     | Active of (Event -> AIVR<'result>)
     | Completed of Result<'result>
-    with 
-        member this.map f =
-            match this with
-            | Completed r -> Completed (r.map f)
-            | Active step -> 
-                fun e -> (step e).map f
-                |> Active
 
 type IVR<'result> = 
     | Delay of (unit -> AIVR<'result>)
@@ -53,7 +48,7 @@ module TimeSpanExtensions =
 module IVR = 
 
     // 
-    // IVR Primitives
+    // IVR Primitives Part 1
     //
 
     /// Start up this ivr.
@@ -61,7 +56,7 @@ module IVR =
     let start (Delay f) = f()
 
     /// Continue an active ivr with one event.
-    let step ivr e = 
+    let step e ivr = 
         match ivr with
         // may be we should start it here, too?
         //> no: delays are not supported, once an IVR starts, subsequential
@@ -71,11 +66,13 @@ module IVR =
         | Active f -> f e
 
     /// Continue an active or completed ivr with one event. If the ivr is completed, the ivr is the result.
-    let private progress ivr e = 
+    /// Note: this function should be removed and its name is confusing, because the IVR might not 'progress' at all if 
+    /// it's already completed.
+    let private progress e ivr = 
         match ivr with 
         | Completed _ -> ivr
-        | Active f -> f e 
-
+        | _ -> step e ivr
+        
     /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
         match ivr with
@@ -87,24 +84,75 @@ module IVR =
         | Active _ -> true
         | _ -> false
 
-    let isCancelled ivr = 
+    let isError ivr = 
         match ivr with
-        | Completed Cancelled -> true
+        | Completed (Error _) -> true
         | _ -> false
 
+    let (|IsError|_|) aivr = 
+        match aivr with
+        | Completed (Error e) -> Some e
+        | _ -> None
+
+    /// Returns the error of a completed ivr.
+    let error ivr = 
+        match ivr with
+        | Completed (Error e) -> e
+        | _ -> failwithf "IVR.error: ivr is not in error: %A" ivr
+
+
+    let isCancelled ivr = 
+        match ivr with
+        | Completed (Error Cancelled) -> true
+        | _ -> false
+
+    let (|IsCancelled|_|) aivr = 
+        if isCancelled aivr then Some() else None
+
+    // 
+    // IVR Extensions
+    //
+
+    type AIVR<'result> with
+
+        // tbd: the semantic for exceptions that happen in f is not defined.
+        member this.map f =
+            match this with
+            | Completed r -> Completed (r.map f)
+            | Active _ -> 
+                fun e -> (this |> step e).map f
+                |> Active
+
+        // tbd: the semantic for exceptions that happen in f() is not defined.
+        member this.whenCompleted f =
+            match this with
+            | Completed r -> f(); this
+            | Active _ ->
+                fun e -> (this |> step e).whenCompleted f
+                |> Active
+
+    //
+    // Primitives Part 2
+    //
+
     /// Maps the ivr's result
-    let rec map f (Delay c) =
-        fun () -> c().map f
+    let rec map f ivr =
+        fun () -> (start ivr).map f
         |> Delay
 
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
 
+    /// Invokes a function when the ivr is completed.
+    let whenCompleted f ivr =
+        fun () -> (start ivr).whenCompleted f
+        |> Delay
+
     /// Returns the result of a completed ivr.
     let result ivr = 
         match ivr with
         | Completed r -> r
-        | _ -> failwith "IVR.result: ivr is not completed"
+        | _ -> failwithf "IVR.result: ivr is not completed: %A" ivr
 
     /// Returns the resulting value of a completed ivr.
     let resultValue ivr = 
@@ -119,10 +167,10 @@ module IVR =
     /// Cancels the ivr. For now it is expected that the ivr immediately returns the Cancelled state.
     let cancel ivr = 
         match ivr with
-        | Active f -> 
-            let r = f Cancel 
+        | Active _ -> 
+            let r = ivr |> step Cancel
             match r with
-            | Completed Cancelled -> ()
+            | IsCancelled -> ()
             | _ -> failwithf "IVR.cancel: cancellation unhandled: %A" r
         | _ -> failwith "IVR.cancel: ivr is not active"
 
@@ -142,49 +190,50 @@ module IVR =
     let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
 
         let rec active ivr1 ivr2 e = 
-            next (progress ivr1 e) (progress ivr2 e)
+            next (progress e ivr1) (progress e ivr2)
 
         and next ivr1 ivr2 =
             match ivr1, ivr2 with
             | Completed r1, Completed r2 -> 
                 match r1, r2 with
                 | Result r1, Result r2 -> (r1, r2) |> Result |> Completed
-                | _ -> Cancelled |> Completed
+                | _ -> Cancelled |> Error |> Completed
             | Completed r1, _ ->
                 match r1 with
+                | Error e -> Error e |> Completed
                 | Result r1 -> ivr2.map (fun r2 -> r1, r2)
-                | Cancelled -> Cancelled |> Completed
             | _, Completed r2 ->
                 match r2 with
+                | Error e -> Error e |> Completed
                 | Result r2 -> ivr1.map (fun r1 -> r1, r2)
-                | Cancelled -> Cancelled |> Completed
             | _ -> active ivr1 ivr2 |> Active
 
         fun () -> next (start ivr1) (start ivr2)
         |> Delay
 
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
-    /// All ivrs ended.
+    /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
+    /// that error.
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
         let rec active ivrs e =
             let ivrs = 
                 ivrs
-                |> List.map (fun ivr -> progress ivr e)
+                |> List.map (progress e)
             next ivrs
 
         and next ivrs = 
-            let anyCancelled = 
+            let anyError = 
                 ivrs
-                |> List.exists (isCancelled)
+                |> List.exists (isError)
 
             let anyActive = 
                 ivrs
                 |> List.exists (isActive)
 
-            match anyCancelled, anyActive with
-            | true, _ -> Completed Cancelled
+            match anyError, anyActive with
+            | true, _ -> ivrs |> List.find (isError) |> error |> Error |> Completed
             | false, true -> active ivrs |> Active
             | false, false ->
                 ivrs
@@ -209,14 +258,14 @@ module IVR =
         let rec loop ivr1 ivr2 e = 
 
             match ivr1, ivr2 with
-            | Active f1, Active f2 -> 
-                let ivr1 = f1 e
+            | Active _, Active _ -> 
+                let ivr1 = ivr1 |> step e
                 match ivr1 with
                 | Completed r1 -> 
                     cancel ivr2
                     r1.map Choice1Of2 |> Completed
                 | _ ->
-                let ivr2 = f2 e
+                let ivr2 = ivr2 |> step e
                 match ivr2 with
                 | Completed r2 -> 
                     cancel ivr1
@@ -267,7 +316,7 @@ module IVR =
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-                let ivr = step ivr e
+                let ivr = step e ivr
                 match ivr with
                 | Completed r ->
                     // cancel all the running ones in reversed order
@@ -304,7 +353,7 @@ module IVR =
     let wait f =
         let rec waiter e =  
             match box e with
-            | :? Cancel -> Cancelled |> Completed
+            | :? Cancel -> Cancelled |> Error |> Completed
             | _ ->
             match f e with
             | Some r -> r |> Result |> Completed
@@ -356,7 +405,7 @@ module IVR =
                 match ivr with
                 | Active f -> Active (f >> next)
                 | Completed (Result r) -> (cont r)
-                | Completed Cancelled -> Completed Cancelled
+                | Completed (Error err) -> err |> Error |> Completed
 
             next (start ivr)
 

@@ -50,13 +50,19 @@ module Host =
                 match event with
                 | :? CancelIVR -> 
                     cancel ivr
-                    Some Cancelled
+                    raise Cancelled
                 | event ->
-                let ivr' = step ivr event
-                match ivr' with
-                | Completed r -> Some r
-                | Active _ -> runLoop ivr'
+                let ivr' = step event ivr
+                next ivr'
 
-            runLoop (start ivr)
-    
+            and next ivr =
+                match ivr with
+                | Completed (Result r) -> Some r
+                | Completed (Error e) -> raise e
+                | Active _ -> runLoop ivr
+
+            ivr
+            |> start
+            |> next
+            
     let newHost() = new Host()

@@ -55,7 +55,29 @@ type IVRTests() =
 
         let started = IVR.start a
         ct.disposed |> should equal false
-        IVR.step started Event1 |> ignore
+        IVR.step Event1 started |> ignore
+        ct.disposed |> should equal true
+
+    [<Test>]
+    member this.``par: right ivr is cancelled when left throws an exception``() = 
+        let ct = new CancellationTracker()
+
+        let left = ivr {
+            do! IVR.waitFor' (fun Event1 -> true)
+            failwith "HellNo!"
+        }
+
+        let right = ivr {
+            use ct = ct
+            do! IVR.waitFor' (fun Event2 -> true)
+        }
+
+        IVR.par left right
+        |> IVR.start
+        |> IVR.step Event1 
+        |> IVR.isError
+        |> should equal true
+
         ct.disposed |> should equal true
 
     [<Test>]
@@ -63,17 +85,17 @@ type IVRTests() =
         let ct = new CancellationTracker()
 
         let left = ivr {
-            do! IVR.waitFor' (fun (Event1) -> true)
+            do! IVR.waitFor' (fun Event1 -> true)
         }
 
         let right = ivr {
             use ct = ct
-            do! IVR.waitFor' (fun (Event2) -> true)
+            do! IVR.waitFor' (fun Event2 -> true)
         }
 
         let test = IVR.par' left right
         let started = IVR.start test
-        IVR.step started Event1 |> ignore
+        IVR.step Event1 started |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
@@ -91,7 +113,7 @@ type IVRTests() =
 
         let test = IVR.par' left right
         let started = IVR.start test
-        IVR.step started Event2 |> ignore
+        IVR.step Event2 started |> ignore
         ct.disposed |> should equal true
 
 
@@ -128,7 +150,7 @@ type IVRTests() =
 
         let r = IVR.lpar' [left; right]
         let started = IVR.start r
-        IVR.step started Event2 |> ignore
+        IVR.step Event2 started |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
@@ -146,7 +168,7 @@ type IVRTests() =
 
         let r = IVR.lpar' [left; right]
         let started = IVR.start r
-        IVR.step started Event1 |> ignore
+        IVR.step Event1 started |> ignore
         ct.disposed |> should equal true
 
 
@@ -162,7 +184,10 @@ type IVRTests() =
         let host = Host.newHost()
 
         async {
-            host.run ivr |> ignore
+            try
+                host.run ivr |> ignore
+            with Cancelled ->
+                ()
         } |> Async.Start
 
         (host :> IDisposable).Dispose();
