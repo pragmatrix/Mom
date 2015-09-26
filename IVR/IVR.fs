@@ -182,39 +182,6 @@ module IVR =
     // IVR Combinators
     //
 
-    /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
-    /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
-    /// (cancellation or exception),
-    /// the resulting ivr is ended immediately.
-
-    /// Note that par retains the result of the completed ivr, which
-    /// could lead to leaks in nested parallel ivrs of which the result
-    /// is never processed.
-
-    let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
-
-        let rec active ivr1 ivr2 e = 
-            next (stepWhenActive e ivr1) (stepWhenActive e ivr2)
-
-        and next ivr1 ivr2 =
-            match ivr1, ivr2 with
-            | Completed r1, Completed r2 -> 
-                match r1, r2 with
-                | Result r1, Result r2 -> (r1, r2) |> Result |> Completed
-                | _ -> Cancelled |> Error |> Completed
-            | Completed r1, _ ->
-                match r1 with
-                | Error e -> Error e |> Completed
-                | Result r1 -> ivr2.map (fun r2 -> r1, r2)
-            | _, Completed r2 ->
-                match r2 with
-                | Error e -> Error e |> Completed
-                | Result r2 -> ivr1.map (fun r1 -> r1, r2)
-            | _ -> active ivr1 ivr2 |> Active
-
-        fun () -> next (start ivr1) (start ivr2)
-        |> Delay
-
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
     /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
     /// that error.
@@ -247,6 +214,26 @@ module IVR =
 
         fun () -> next (List.map start ivrs)
         |> Delay
+
+    /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
+    /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
+    /// (cancellation or exception),
+    /// the resulting ivr is ended immediately.
+
+    let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
+
+        // we implement par in terms of lpar so that we avoid
+        // the maintainance of two semantics
+
+        [map box ivr1; map box ivr2] 
+        |> lpar
+        |> map (function 
+            | [l;r] -> unbox l, unbox r 
+            | _ -> failwith "internal error")
+
+    /// Note that par retains the result of the completed ivr, which
+    /// could lead to leaks in nested parallel ivrs of which the result
+    /// is never processed.
 
     // specialized version of lpar that removes results from processing when
     // the return type is unit.
