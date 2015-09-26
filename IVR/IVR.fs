@@ -51,9 +51,12 @@ module IVR =
     // IVR Primitives Part 1
     //
 
-    /// Start up this ivr.
-
-    let start (Delay f) = f()
+    /// Start up an ivr.
+    let start (Delay f) = 
+        try
+            f()
+        with e ->
+            e |> Error |> Completed
 
     /// Continue an active ivr with one event.
     let step e ivr = 
@@ -62,16 +65,18 @@ module IVR =
         //> no: delays are not supported, once an IVR starts, subsequential
         //> IVRs do have to be started before stepping through
 
-        | Completed _ -> failwith "IVR.step: ivr is completed"
-        | Active f -> f e
+        | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
+        | Active f -> 
+            try
+                f e
+            with e ->
+                e |> Error |> Completed
 
-    /// Continue an active or completed ivr with one event. If the ivr is completed, the ivr is the result.
-    /// Note: this function should be removed and its name is confusing, because the IVR might not 'progress' at all if 
-    /// it's already completed.
-    let private progress e ivr = 
+    /// Step an active ivr, otherwise do nothing.
+    let private stepWhenActive e ivr = 
         match ivr with 
-        | Completed _ -> ivr
-        | _ -> step e ivr
+        | Active _ -> step e ivr
+        | _ -> ivr
         
     /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
@@ -99,7 +104,6 @@ module IVR =
         match ivr with
         | Completed (Error e) -> e
         | _ -> failwithf "IVR.error: ivr is not in error: %A" ivr
-
 
     let isCancelled ivr = 
         match ivr with
@@ -190,7 +194,7 @@ module IVR =
     let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
 
         let rec active ivr1 ivr2 e = 
-            next (progress e ivr1) (progress e ivr2)
+            next (stepWhenActive e ivr1) (stepWhenActive e ivr2)
 
         and next ivr1 ivr2 =
             match ivr1, ivr2 with
@@ -220,7 +224,7 @@ module IVR =
         let rec active ivrs e =
             let ivrs = 
                 ivrs
-                |> List.map (progress e)
+                |> List.map (stepWhenActive e)
             next ivrs
 
         and next ivrs = 
@@ -310,13 +314,14 @@ module IVR =
                     startAll None (ivr::active) todo
 
         let rec stepAll e res active ivrs =
+            let step = step e
             match res with
             | Some _ -> res, []
             | _ ->
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-                let ivr = step e ivr
+                let ivr = ivr |> step
                 match ivr with
                 | Completed r ->
                     // cancel all the running ones in reversed order
@@ -430,8 +435,11 @@ module IVR =
                     disposable.Dispose()
                     ivr
 
-            disposable
-            |> body //< need a try finally around the body call here to enable exception handling!
+            // we need to use start! for powering up the body, to ensure proper exception handling.
+            fun () ->
+                body disposable
+            |> Delay
+            |> start
             |> next
 
     let ivr<'result> = IVRBuilder<'result>()
