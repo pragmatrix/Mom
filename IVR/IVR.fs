@@ -127,14 +127,6 @@ module IVR =
                 fun e -> (this |> step e).map f
                 |> Active
 
-        // tbd: the semantic for exceptions that happen in f() is not defined.
-        member this.whenCompleted f =
-            match this with
-            | Completed r -> f(); this
-            | Active _ ->
-                fun e -> (this |> step e).whenCompleted f
-                |> Active
-
         member this.continueWith f =
             match this with
             | Completed _ -> f this
@@ -154,15 +146,14 @@ module IVR =
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
 
-    /// Invokes a function when the ivr is completed.
-    let whenCompleted f ivr =
-        fun () -> (start ivr).whenCompleted f
-        |> Delay
-
     /// Continues the ivr with a followup ivr
     let continueWith f ivr =
         fun () -> (start ivr).continueWith f
         |> Delay
+
+    /// Invokes a function when the ivr is completed.
+    let whenCompleted f =
+        continueWith (fun r -> f(); r)
 
     /// Returns the result of a completed ivr.
     let result ivr = 
