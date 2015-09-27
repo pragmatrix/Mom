@@ -44,14 +44,16 @@ module Host =
 
         member this.run ivr = 
 
+            let host = this.dispatch
+
             let rec runLoop ivr = 
                 let event = queue.dequeue()
                 match event with
                 | :? CancelIVR -> 
-                    cancel ivr
+                    cancel host ivr
                     raise Cancelled
                 | event ->
-                let ivr' = step event ivr
+                let ivr' = step host event ivr
                 next ivr'
 
             and next ivr =
@@ -61,7 +63,7 @@ module Host =
                 | Active _ -> runLoop ivr
 
             ivr
-            |> start
+            |> start host
             |> next
             
     let newHost() = new Host()

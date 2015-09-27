@@ -24,7 +24,11 @@ type Event1 = Event1
 type Event2 = Event2
 
 [<TestFixture>]
-type IVRTests() = 
+type IVRTests() =
+
+    let withoutHost = fun _ -> ()
+    let start ivr = IVR.start withoutHost ivr
+    let step ivr = IVR.step withoutHost ivr
 
     //
     // Automatic cancellation of Active ivrs.
@@ -39,7 +43,7 @@ type IVRTests() =
             return 0
         }
 
-        IVR.start a |> ignore
+        start a |> IVR.resultValue |> should equal 0
         ct.disposed |> should equal true
 
 
@@ -53,9 +57,9 @@ type IVRTests() =
             return 0
         }
 
-        let started = IVR.start a
+        let started = start a
         ct.disposed |> should equal false
-        IVR.step Event1 started |> ignore
+        step Event1 started |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
@@ -73,8 +77,8 @@ type IVRTests() =
         }
 
         IVR.par left right
-        |> IVR.start
-        |> IVR.step Event1 
+        |> start
+        |> step Event1 
         |> IVR.isError
         |> should equal true
 
@@ -95,8 +99,8 @@ type IVRTests() =
         }
 
         IVR.par left right
-        |> IVR.start
-        |> IVR.step Event2
+        |> start
+        |> step Event2
         |> IVR.isError
         |> should equal true
 
@@ -116,8 +120,8 @@ type IVRTests() =
         }
 
         let test = IVR.par' left right
-        let started = IVR.start test
-        IVR.step Event1 started |> ignore
+        let started = start test
+        step Event1 started |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
@@ -134,8 +138,8 @@ type IVRTests() =
         }
 
         let test = IVR.par' left right
-        let started = IVR.start test
-        IVR.step Event2 started |> ignore
+        let started = start test
+        step Event2 started |> ignore
         ct.disposed |> should equal true
 
 
@@ -153,7 +157,7 @@ type IVRTests() =
         }
 
         let test = IVR.par' left right
-        let started = IVR.start test
+        let started = start test
         IVR.isCompleted started |> should equal true
         ct.disposed |> should equal true
 
@@ -171,8 +175,8 @@ type IVRTests() =
         }
 
         let r = IVR.lpar' [left; right]
-        let started = IVR.start r
-        IVR.step Event2 started |> ignore
+        let started = start r
+        step Event2 started |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
@@ -189,8 +193,8 @@ type IVRTests() =
         }
 
         let r = IVR.lpar' [left; right]
-        let started = IVR.start r
-        IVR.step Event1 started |> ignore
+        let started = start r
+        step Event1 started |> ignore
         ct.disposed |> should equal true
 
     [<Test>]
@@ -205,8 +209,8 @@ type IVRTests() =
         }
 
         test
-        |> IVR.start
-        |> IVR.step Event1
+        |> start
+        |> step Event1
         |> ignore
 
         x |> should equal true
@@ -224,8 +228,8 @@ type IVRTests() =
         }
 
         test
-        |> IVR.start
-        |> IVR.step Event1
+        |> start
+        |> step Event1
         |> ignore
 
         x |> should equal true
@@ -242,7 +246,7 @@ type IVRTests() =
         }
 
         test
-        |> IVR.start
+        |> start
         |> ignore
 
         x |> should equal true
@@ -260,7 +264,7 @@ type IVRTests() =
         }
 
         test
-        |> IVR.start
+        |> start
         |> IVR.result
         |> should equal (Result 1)
 
@@ -278,8 +282,8 @@ type IVRTests() =
         }
 
         test
-        |> IVR.start
-        |> IVR.step Event1
+        |> start
+        |> step Event1
         |> IVR.result
         |> should equal (Result 1)
 
