@@ -4,8 +4,8 @@ open NUnit.Framework
 open FsUnit
 
 open System
+open System.Collections.Generic
 open IVR
-open IVR.Host
 
 //
 // Basic Combinator and semantic tests.
@@ -311,6 +311,40 @@ type IVRTests() =
         Async.Sleep(100) |> Async.RunSynchronously
 
         ct.disposed |> should equal true
+
+    [<Test>]
+    member this.``computation expression: yield sends a command to the host``() =
+        let myHost = Queue()
+        
+        let test = ivr {
+            yield 0
+        } 
+
+        test
+        |> IVR.start myHost.Enqueue
+        |> ignore
+
+        myHost |> should equal [0]
+
+
+    [<Test>]
+    member this.``computation expression: yield sends combined commands to the host in the right order``() =
+        let myHost = Queue()
+        
+        let test = ivr {
+            yield 0
+            yield 1
+        } 
+
+        test
+        |> IVR.start myHost.Enqueue
+        |> ignore
+
+        myHost |> should equal [0;1]
+
+
+
+
 
 
 

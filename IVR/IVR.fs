@@ -444,6 +444,18 @@ module IVR =
                 | Completed (Error e) -> eh e
                 | r -> fun _ -> r)
 
+        member this.Yield (cmd: Command) : unit ivr =
+            fun h ->
+                h cmd
+                () |> Result |> Completed
+
+        member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
+            ivr1
+            |> continueWith (function
+                | Completed (Error e) -> fun _ -> e |> Error |> Completed
+                | _ -> ivr2
+            )
+
     let ivr<'result> = IVRBuilder<'result>()
 
     //
