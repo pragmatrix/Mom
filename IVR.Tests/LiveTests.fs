@@ -104,7 +104,7 @@ type LiveTests() =
         use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
         let host = IVR.Host.newHost()
 
-        let delay = host.delay
+        let delay = IVR.delay
         let ring = client.ring
         let answer = client.answer
         let hangup = client.hangup

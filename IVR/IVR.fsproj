@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Threading.fs" />
+    <Compile Include="Ids.fs" />
     <Compile Include="IVR.fs" />
     <Compile Include="Tracing.fs" />
     <Compile Include="Host.fs" />

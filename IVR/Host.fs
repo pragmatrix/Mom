@@ -12,13 +12,8 @@ module Host =
     // The ivr host, where all events are being dispatched
     // 
 
-    type Id = int64
-    let id = ref 0L
-    let newId() = Interlocked.Increment(id)
-
     // predefined host events
 
-    type private Timeout = Timeout of Id
     type private CancelIVR = CancelIVR
 
     type Host() = 
@@ -34,13 +29,11 @@ module Host =
         member private this.cancel() = 
             this.dispatch CancelIVR
 
-        member this.delay (timespan : TimeSpan) = 
-            ivr {
-                let id = newId()
-                let callback _ = this.dispatch (Timeout id)
-                use _ = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
-                do! waitFor' (fun (Timeout tid) -> tid = id)
-            }
+        member this.serviceCommand (sc : ServiceCommand) = 
+            match sc with
+            | Delay (id, timespan) ->
+                let callback _ = this.dispatch (IVR.DelayCompleted id)
+                new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
 
         member this.run ivr = 
 

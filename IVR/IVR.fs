@@ -353,54 +353,6 @@ module IVR =
             |> startAll h None []
             |> next h
 
-    //
-    // more basic primitives
-    //
-
-    /// An IVR that waits for some event given a function that returns (Some result) or None.
-
-    let wait f =
-        let rec waiter e _ =  
-            match box e with
-            | :? Cancel -> Cancelled |> Error |> Completed
-            | _ ->
-            match f e with
-            | Some r -> r |> Result |> Completed
-            | None -> Active waiter
-
-        fun _ ->
-            Active waiter
-
-    /// Waits for some event with a predicate that returns
-    /// true or false
-
-    let wait' predicate = 
-        let f e = 
-            let r = predicate e
-            match r with 
-            | true -> Some ()
-            | false -> None
-
-        wait f
-
-    /// Waits for an event of a type derived by a function passed in.
-
-    let waitFor (f : 'e -> 'r option) = 
-
-        let f (e : Event) = 
-            match e with
-            | :? 'e as e -> f e
-            | _ -> None
-
-        wait f
-
-    let waitFor' (f : 'e -> bool) =
-        let f (e: Event) =
-            match e with
-            | :? 'e as e -> f e
-            | _ -> false
-
-        wait' f
 
     //
     // Simple computation expression to build sequential IVR processes
@@ -457,6 +409,74 @@ module IVR =
             )
 
     let ivr<'result> = IVRBuilder<'result>()
+
+    //
+    // Wait primitives
+    //
+
+    /// An IVR that waits for some event given a function that returns (Some result) or None.
+
+    let wait f =
+        let rec waiter e _ =  
+            match box e with
+            | :? Cancel -> Cancelled |> Error |> Completed
+            | _ ->
+            match f e with
+            | Some r -> r |> Result |> Completed
+            | None -> Active waiter
+
+        fun _ ->
+            Active waiter
+
+    /// Waits for some event with a predicate that returns
+    /// true or false
+
+    let wait' predicate = 
+        let f e = 
+            let r = predicate e
+            match r with 
+            | true -> Some ()
+            | false -> None
+
+        wait f
+
+    /// Waits for an event of a type derived by a function passed in.
+
+    let waitFor (f : 'e -> 'r option) = 
+
+        let f (e : Event) = 
+            match e with
+            | :? 'e as e -> f e
+            | _ -> None
+
+        wait f
+
+    let waitFor' (f : 'e -> bool) =
+        let f (e: Event) =
+            match e with
+            | :? 'e as e -> f e
+            | _ -> false
+
+        wait' f
+
+    //
+    // IVR Basic Services
+    //
+
+    type ServiceCommand = 
+        | Delay of Id * TimeSpan
+
+    type ServiceEvent = 
+        | DelayCompleted of Id
+
+    let private delayIdGenerator = Ids.newGenerator()
+
+    let delay (ts: TimeSpan) =
+        ivr {
+            let id = delayIdGenerator.generateId()
+            yield Delay (id, ts)
+            do! waitFor' (fun (DelayCompleted id') -> id' = id)
+        }
 
     //
     // TPL naming scheme
