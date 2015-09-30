@@ -11,6 +11,8 @@ open System
 *)
 
 type Event = obj
+type Command = obj
+type Host = Command -> unit
 
 exception Cancelled
 
@@ -24,14 +26,11 @@ type Result<'result> =
             | Result r -> Result (f r)
 
 type AIVR<'result> = 
-    | Active of (Event -> AIVR<'result>)
+    | Active of (Event -> IVR<'result>)
     | Completed of Result<'result>
 
-type IVR<'result> = 
-    | Delay of (unit -> AIVR<'result>)
+and IVR<'result> = Host -> AIVR<'result>
 
-type 'result result = Result<'result>
-type 'result aivr = AIVR<'result>
 type 'result ivr = IVR<'result>
 
 module TimeSpanExtensions =
@@ -52,14 +51,14 @@ module IVR =
     //
 
     /// Start up an ivr.
-    let start (Delay f) = 
+    let start host ivr = 
         try
-            f()
+            ivr host
         with e ->
             e |> Error |> Completed
 
     /// Continue an active ivr with one event.
-    let step e ivr = 
+    let step h e ivr = 
         match ivr with
         // may be we should start it here, too?
         //> no: delays are not supported, once an IVR starts, subsequential
@@ -68,14 +67,14 @@ module IVR =
         | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
         | Active f -> 
             try
-                f e
+                f e h
             with e ->
                 e |> Error |> Completed
 
     /// Step an active ivr, otherwise do nothing.
-    let private stepWhenActive e ivr = 
+    let private stepWhenActive h e ivr = 
         match ivr with 
-        | Active _ -> step e ivr
+        | Active _ -> step h e ivr
         | _ -> ivr
         
     /// Returns true if the ivr is completed (i.e. has a result).
@@ -124,15 +123,17 @@ module IVR =
             match this with
             | Completed r -> Completed (r.map f)
             | Active _ -> 
-                fun e -> (this |> step e).map f
+                fun e h -> (this |> step h e).map f
                 |> Active
 
-        member this.continueWith f =
+        member this.continueWith h f =
             match this with
-            | Completed _ -> f this
             | Active _ ->
-                fun e -> (this |> step e).continueWith f
+                fun e lh -> (this |> step lh e).continueWith h f
                 |> Active
+            | Completed _ -> 
+                f this
+                |> start h
 
     //
     // Primitives Part 2
@@ -140,20 +141,18 @@ module IVR =
 
     /// Maps the ivr's result
     let rec map f ivr =
-        fun () -> (start ivr).map f
-        |> Delay
+        fun h -> (start h ivr).map f
 
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
 
     /// Continues the ivr with a followup ivr
-    let continueWith f ivr =
-        fun () -> (start ivr).continueWith f
-        |> Delay
+    let continueWith f (ivr: IVR<_>) : IVR<_> =
+        fun h -> (start h ivr).continueWith h f
 
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
-        continueWith (fun r -> f(); r)
+        continueWith (fun r -> f(); fun _ -> r)
 
     /// Returns the result of a completed ivr.
     let result ivr = 
@@ -172,17 +171,17 @@ module IVR =
     type Cancel = Cancel
 
     /// Cancels the ivr. For now it is expected that the ivr immediately returns the Cancelled state.
-    let cancel ivr = 
+    let cancel h ivr = 
         match ivr with
         | Active _ -> 
-            let r = ivr |> step Cancel
+            let r = ivr |> step h Cancel
             match r with
             | IsCancelled -> ()
             | _ -> failwithf "IVR.cancel: cancellation unhandled: %A" r
         | _ -> failwith "IVR.cancel: ivr is not active"
 
-    let cancelIfActive ivr = 
-        if isActive ivr then cancel ivr
+    let cancelIfActive h ivr = 
+        if isActive ivr then cancel h ivr
 
     //
     // IVR Combinators
@@ -195,17 +194,17 @@ module IVR =
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
         // Cancellation is always in reverse order!
-        let cancelAllActive ivrs = 
+        let cancelAllActive h ivrs = 
             ivrs
             |> List.rev 
-            |> List.iter cancelIfActive
+            |> List.iter (cancelIfActive h)
 
-        let rec active ivrs e =
+        let rec active ivrs e h =
             ivrs
-            |> List.map (stepWhenActive e)
-            |> next
+            |> List.map (stepWhenActive h e)
+            |> next h
             
-        and next ivrs = 
+        and next h ivrs = 
             let anyError = 
                 ivrs
                 |> List.exists (isError)
@@ -216,7 +215,7 @@ module IVR =
 
             match anyError, anyActive with
             | true, _ -> 
-                cancelAllActive ivrs
+                cancelAllActive h ivrs
                 // return the first error, but since we step them all in parallel, multiple 
                 // errors may be found, and we should accumulate them.
                 // (better would be to change the semantic to only step one at a time and terminate on the first error seen)
@@ -228,8 +227,7 @@ module IVR =
                 |> Result
                 |> Completed
 
-        fun () -> next (List.map start ivrs)
-        |> Delay
+        fun h -> next h (List.map (start h) ivrs)
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
@@ -263,49 +261,47 @@ module IVR =
     
     let par' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<Choice<'r1, 'r2>> =
 
-        let rec loop ivr1 ivr2 e = 
+        let rec loop ivr1 ivr2 e h = 
 
             match ivr1, ivr2 with
             | Active _, Active _ -> 
                 ivr1
-                |> step e
+                |> step h e
                 |> function
                 | Completed r1 -> 
-                    cancel ivr2
+                    cancel h ivr2
                     r1.map Choice1Of2 |> Completed
                 | ivr1 ->
                 ivr2 
-                |> step e
+                |> step h e
                 |> function
                 | Completed r2 -> 
-                    cancel ivr1
+                    cancel h ivr1
                     r2.map Choice2Of2 |> Completed
                 | ivr2 ->
                     loop ivr1 ivr2 |> Active
             | _ -> failwithf "IVR.par': unexpected %A, %A" ivr1 ivr2
 
-        fun () -> 
+        fun h -> 
             ivr1
-            |> start
+            |> start h
             |> function
             | Completed r1 -> r1.map Choice1Of2 |> Completed
             | ivr1 ->
             ivr2 
-            |> start
+            |> start h
             |> function
             | Completed r2 ->
-                cancel ivr1 
+                cancel h ivr1 
                 r2.map Choice2Of2 |> Completed
             | ivr2 ->
                 loop ivr1 ivr2 |> Active
-            
-        |> Delay
 
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
 
     let lpar' (ivrs: 'r ivr list) : 'r ivr =
 
-        let rec startAll res active ivrs = 
+        let rec startAll h res active ivrs = 
             match res with
             | Some _ -> res, []
             | _ ->
@@ -313,17 +309,17 @@ module IVR =
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
                 ivr
-                |> start
+                |> start h
                 |> function
                 | Completed r -> 
                     // cancel all the running ones in reversed order 
                     // (which is how they stored until returned)
-                    active |> List.iter cancel
+                    active |> List.iter (cancel h)
                     Some r, []
                 | Active _ as ivr -> 
-                    startAll None (ivr::active) todo
+                    startAll h None (ivr::active) todo
 
-        let rec stepAll e res active ivrs =
+        let rec stepAll h e res active ivrs =
             match res with
             | Some _ -> res, []
             | _ ->
@@ -331,42 +327,97 @@ module IVR =
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
                 ivr
-                |> step e
+                |> step h e
                 |> function
                 | Completed r ->
                     // cancel all the running ones in reversed order
                     // and the future ones (also in reversed order)
-                    active |> List.iter cancel
-                    todo |> List.rev |> List.iter cancel
+                    active |> List.iter (cancel h)
+                    todo |> List.rev |> List.iter (cancel h)
                     Some r, []
                 | Active _ as ivr ->
-                    stepAll e None (ivr::active) todo
+                    stepAll h e None (ivr::active) todo
 
-        let rec active ivrs e = 
+        let rec active ivrs e h = 
             ivrs 
-            |> stepAll e None []
-            |> next
+            |> stepAll h e None []
+            |> next h
            
-        and next (result, ivrs) = 
+        and next h (result, ivrs) = 
             match result with
             | Some r -> r |> Completed
             | None -> Active (active ivrs)
 
-        fun () ->
+        fun h ->
             ivrs
-            |> startAll None []
-            |> next
+            |> startAll h None []
+            |> next h
 
-        |> Delay
 
     //
-    // more basic primitives
+    // Simple computation expression to build sequential IVR processes
+    //
+
+    type IVRBuilder<'result>() = 
+        member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 ivr) : 'r2 ivr = 
+
+            ivr
+            |> continueWith (
+                function 
+                | Completed (Result r) -> cont r
+                | Completed (Error err) -> 
+                    fun _ -> err |> Error |> Completed
+                | _ -> failwith "internal error")
+
+
+        member this.Return v = fun _ -> v |> Result |> Completed
+
+        member this.ReturnFrom ivr = ivr
+
+        member this.Delay (f : unit -> 'r ivr) : 'r ivr =
+            fun h ->
+                f()
+                |> start h
+              
+        member this.Zero () = 
+            fun _ -> () |> Result |> Completed
+
+        member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
+            body disposable
+            |> whenCompleted disposable.Dispose
+
+        member this.TryFinally (ivr: 'r ivr, f: unit -> unit) : 'r ivr =
+            ivr
+            |> whenCompleted f
+
+        member this.TryWith (ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
+            ivr
+            |> continueWith (function
+                | Completed (Error e) -> eh e
+                | r -> fun _ -> r)
+
+        member this.Yield (cmd: Command) : unit ivr =
+            fun h ->
+                h cmd
+                () |> Result |> Completed
+
+        member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
+            ivr1
+            |> continueWith (function
+                | Completed (Error e) -> fun _ -> e |> Error |> Completed
+                | _ -> ivr2
+            )
+
+    let ivr<'result> = IVRBuilder<'result>()
+
+    //
+    // Wait primitives
     //
 
     /// An IVR that waits for some event given a function that returns (Some result) or None.
 
     let wait f =
-        let rec waiter e =  
+        let rec waiter e _ =  
             match box e with
             | :? Cancel -> Cancelled |> Error |> Completed
             | _ ->
@@ -374,9 +425,8 @@ module IVR =
             | Some r -> r |> Result |> Completed
             | None -> Active waiter
 
-        fun () ->
+        fun _ ->
             Active waiter
-        |> Delay
 
     /// Waits for some event with a predicate that returns
     /// true or false
@@ -410,60 +460,23 @@ module IVR =
         wait' f
 
     //
-    // Simple computation expression to build sequential IVR processes
+    // IVR Basic Services
     //
 
-    type IVRBuilder<'result>() = 
-        member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 aivr) : 'r2 aivr = 
+    type ServiceCommand = 
+        | Delay of Id * TimeSpan
 
-            ivr
-            |> continueWith (
-                function 
-                | Completed (Result r) -> 
-                    fun () -> cont r
-                    |> Delay
-                    |> start 
-                | Completed (Error err) -> err |> Error |> Completed
-                | _ -> failwith "internal error"
-                )
-            |> start
+    type ServiceEvent = 
+        | DelayCompleted of Id
 
-        member this.Return v = v |> Result |> Completed
+    let private delayIdGenerator = Ids.newGenerator()
 
-        member this.ReturnFrom ivr = start ivr
-
-        // We want to delay the startup of an IVR to the moment IVR.start is run, because
-        // computation expressions may contain regular code at the beginning that would run at
-        // instantiation of the expression and not when we start / run the ivr
-        member this.Delay (f : unit -> 'r aivr) : 'r ivr = Delay f
-
-        // zero only makes sense for IVR<unit>
-        member this.Zero () = () |> Result |> Completed
-
-        member this.Using(disposable : 't, body : 't -> 'u aivr when 't :> IDisposable) : 'u aivr = 
-            // we need to use start! for powering up the body, to ensure proper exception handling.
-            fun () -> body disposable
-            |> Delay
-            |> whenCompleted disposable.Dispose
-            |> start
-
-        member this.TryFinally (ivr: 'r ivr, f: unit -> unit) : 'r aivr =
-            ivr
-            |> whenCompleted f
-            |> start
-
-        member this.TryWith (ivr: 'r ivr, eh: exn -> 'r aivr) : 'r aivr =
-            ivr
-            |> continueWith (function
-                | Completed (Error e) -> 
-                    fun () -> eh e
-                    |> Delay
-                    |> start
-                | r -> r)
-            |> start
-
-
-    let ivr<'result> = IVRBuilder<'result>()
+    let delay (ts: TimeSpan) =
+        ivr {
+            let id = delayIdGenerator.generateId()
+            yield Delay (id, ts)
+            do! waitFor' (fun (DelayCompleted id') -> id' = id)
+        }
 
     //
     // TPL naming scheme

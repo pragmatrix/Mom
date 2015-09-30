@@ -12,7 +12,7 @@ module Tracing =
 
     /// For an IVR to be eligable for tracing, it must be declared. The instance given is to 
     /// associate the IVR, it can be a string or any other instance, like a union cases.
-
+    #if false
     let declare instance ivr = 
 
         fun () ->
@@ -29,3 +29,4 @@ module Tracing =
         |> Delay
 
 
+    #endif

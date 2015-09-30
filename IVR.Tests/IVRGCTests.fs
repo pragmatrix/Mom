@@ -22,7 +22,7 @@ type IVRGCTests() =
             return! endlessLoop()
             }
 
-        let ivr = IVR.start (endlessLoop())
+        let ivr = IVR.start (fun _ -> ()) (endlessLoop())
 
         let count = 10000000
         let memTraces = count / 10000
@@ -38,7 +38,7 @@ type IVRGCTests() =
                 GC.Collect()
                 let totalMem = GC.GetTotalMemory(true)
                 array.[cnt / memTrace] <- totalMem
-            stepLoop (IVR.step null ivr) (cnt+1)
+            stepLoop (IVR.step (fun _ -> ()) null ivr) (cnt+1)
 
         stepLoop ivr 0
 
