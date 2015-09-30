@@ -314,22 +314,22 @@ type IVRTests() =
 
     [<Test>]
     member this.``computation expression: yield sends a command to the host``() =
-        let myHost = Queue()
+        let queue = Queue()
         
         let test = ivr {
             yield 0
         } 
 
         test
-        |> IVR.start myHost.Enqueue
+        |> IVR.start queue.Enqueue
         |> ignore
 
-        myHost |> should equal [0]
+        queue |> should equal [0]
 
 
     [<Test>]
     member this.``computation expression: yield sends combined commands to the host in the right order``() =
-        let myHost = Queue()
+        let queue = Queue()
         
         let test = ivr {
             yield 0
@@ -337,8 +337,26 @@ type IVRTests() =
         } 
 
         test
-        |> IVR.start myHost.Enqueue
+        |> IVR.start queue.Enqueue
         |> ignore
 
-        myHost |> should equal [0;1]
+        queue |> should equal [0;1]
 
+    [<Test>]
+    member this.``IVR.delay (simulated)``() = 
+        let queue = Queue()
+        let host = queue.Enqueue
+
+        let test = IVR.delay (TimeSpan(1, 0, 0))            
+
+        let state = 
+            test |> IVR.start host 
+            
+        let sc = queue.Dequeue()
+        match unbox sc with
+        | IVR.Delay (id, ts) ->
+
+        state 
+        |> IVR.step host (IVR.DelayCompleted id)
+        |> IVR.isCompleted |> should equal true
+        
