@@ -11,7 +11,7 @@ module Tracing =
     let private beginTrace instance = Tracer(instance)
 
     /// For an IVR to be eligable for tracing, it must be declared. The instance given is to 
-    /// associate the IVR, it can be a string or any other instance, like a union cases.
+    /// associate the IVR, it can be a string or any other instance, like a union cases for example.
     #if false
     let declare instance ivr = 
 
