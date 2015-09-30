@@ -307,10 +307,3 @@ type IVRTests() =
         Async.Sleep(100) |> Async.RunSynchronously
 
         ct.disposed |> should equal true
-
-
-
-
-    
-
-
