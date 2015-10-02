@@ -152,7 +152,7 @@ module Tracing =
             Registry.removeTracer ivrName tracer
         )
 
-    /// For an IVR to be eligable for tracing, it must be declared. 
+    /// For an IVR to be eligible for tracing, it must be declared. 
     ///
     /// name is used to identify the IVR and register tracers.
     /// f is a function that creates an IVR by passing in a (serializable) parameterization for the IVR.
