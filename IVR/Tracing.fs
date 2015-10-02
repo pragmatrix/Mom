@@ -69,8 +69,7 @@ module Tracing =
                     _tracers.[name] <- tracers
             )
         
-
-        /// Create an instance tracer that forwards to all the tracers given.
+        /// Create an session tracer that forwards to all the tracers given.
         let private aggregateTracer tracers sessionInfo : SessionTracer = 
             let itracers = tracers |> List.map (fun t -> t sessionInfo)
             fun stepTrace ->
@@ -85,6 +84,7 @@ module Tracing =
                 | true, tracers ->
                     Some (aggregateTracer tracers)
                 )
+
     module private SessionIds = 
         
         let private _section = obj()
@@ -146,13 +146,28 @@ module Tracing =
     /// Register a tracer for tracing a specific declared IVR. Whenever the declared IVR is run, the tracer will receive
     /// a full trace of the ivr in realtime.
 
-    let registerTracer (ivrName: Name) tracer =
-        Registry.addTracer ivrName tracer
+    let registerTracer (name: Name) tracer =
+        Registry.addTracer name tracer
         Helper.disposeAction (fun () ->
-            Registry.removeTracer ivrName tracer
+            Registry.removeTracer name tracer
         )
 
-    /// For an IVR to be eligible for tracing, it must be declared. 
+    /// Traces an IVR.
+    let trace sessionTracer ivr = 
+        fun host ->
+            let step = Helper.traceStep sessionTracer
+
+            let rec next ivr = 
+                match ivr with
+                | Completed _ -> ivr
+                | Active _ ->
+                fun e h ->
+                    ivr |> step h e |> next
+                |> Active
+
+            ivr |> Helper.traceStart sessionTracer host |> next
+
+    /// For an IVR to be eligible for tracing by a registered tracer, it must be declared. 
     ///
     /// name is used to identify the IVR and register tracers.
     /// f is a function that creates an IVR by passing in a (serializable) parameterization for the IVR.
@@ -167,18 +182,8 @@ module Tracing =
             | None -> ivr
             | Some tracer ->
             let id = SessionIds.generateNew name
-            let sessionInfo = {name = name; id = id; param = param }
+            let sessionInfo = { name = name; id = id; param = param }
             let sessionTracer = tracer sessionInfo
 
-            fun host ->
-                let step = Helper.traceStep sessionTracer
-
-                let rec next ivr = 
-                    match ivr with
-                    | Completed _ -> ivr
-                    | Active _ ->
-                    fun e h ->
-                        ivr |> step h e |> next
-                    |> Active
-
-                ivr |> Helper.traceStart sessionTracer host |> next
+            ivr 
+            |> trace sessionTracer
