@@ -25,11 +25,11 @@ type Result<'result> =
             | Error e -> Error e
             | Result r -> Result (f r)
 
-type AIVR<'result> = 
+type IVRState<'result> = 
     | Active of (Event -> IVR<'result>)
     | Completed of Result<'result>
 
-and IVR<'result> = Host -> AIVR<'result>
+and IVR<'result> = Host -> IVRState<'result>
 
 type 'result ivr = IVR<'result>
 
@@ -93,8 +93,8 @@ module IVR =
         | Completed (Error _) -> true
         | _ -> false
 
-    let (|IsError|_|) aivr = 
-        match aivr with
+    let (|IsError|_|) ivr = 
+        match ivr with
         | Completed (Error e) -> Some e
         | _ -> None
 
@@ -109,14 +109,14 @@ module IVR =
         | Completed (Error Cancelled) -> true
         | _ -> false
 
-    let (|IsCancelled|_|) aivr = 
-        if isCancelled aivr then Some() else None
+    let (|IsCancelled|_|) ivr = 
+        if isCancelled ivr then Some() else None
 
     // 
     // IVR Extensions
     //
 
-    type AIVR<'result> with
+    type IVRState<'result> with
 
         // tbd: the semantic for exceptions that happen in f is not defined.
         member this.map f =
