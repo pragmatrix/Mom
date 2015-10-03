@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="IVRTests.fs" />
     <Compile Include="IVRGCTests.fs" />
+    <Compile Include="TracingTests.fs" />
     <Compile Include="LiveTests.fs" />
     <Content Include="packages.config" />
     <Content Include="app.config" />

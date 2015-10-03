@@ -36,6 +36,8 @@ module Tracing =
     
     type SessionInfo = { name: Name; id: Id; param: obj }
  
+    let sessionInfo name id param = { name = name; id = id; param = param }
+
     /// A tracer creates a session trace for a specific ivr session.
     type Tracer = SessionInfo -> SessionTracer
 

@@ -52,12 +52,13 @@ module Tracers =
                 | Some _ ->
                 writer.Close() // this also closes the underlying stream!
 
-    /// Traces in a list of strings (json encoded). The list is prepended for each trace entry, and so results in a reversed list).
-    let stringTracer (sessionInfo: SessionInfo) (lst: string list ref) = 
+    /// Traces in a list of strings (json encoded). The receiver receives each string, the header, and all steps. When the
+    /// last line is written, which contains the result, the boolean is set to true, otherwise, it's false.
+    let stringTracer (sessionInfo: SessionInfo) (receiver: bool -> string -> unit) = 
         fun header ->
-            lst := header :: !lst
-            fun _ step ->
-                lst := step :: !lst
+            receiver false header
+            fun hasResult step ->
+                receiver hasResult step
         |> stringReceiver
         |> entryTracer sessionInfo
 
