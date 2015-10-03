@@ -3,7 +3,7 @@
 open Tracing
 open System
 open System.IO
-open Nessos.FsPickler.Json
+open Newtonsoft.Json
 open System.Diagnostics
 
 module Tracers = 
@@ -16,8 +16,6 @@ module Tracers =
             str.ToCharArray() 
             |> Array.map (fun c -> if Array.IndexOf(invalidFilenameChars, c) = -1 then c else '_') 
             |> String
-
-        let serializer = FsPickler.CreateJsonSerializer(indent = true)
 
     /// Traces entries.
     let entryTracer (sessionInfo : SessionInfo) (receiver: Format.HeaderEntry -> Format.StepEntry -> unit) = 
@@ -35,18 +33,20 @@ module Tracers =
     /// Receives traces and writes them to a string receiver.
     let stringReceiver (receiver: string -> bool -> string -> unit) =
         fun (header: Format.HeaderEntry) ->
-            let headerStr = Helper.serializer.PickleToString(header)
+            let headerStr = JsonConvert.SerializeObject(header)
             let stepReceiver = receiver headerStr
             fun (step: Format.StepEntry) ->
-                Helper.serializer.PickleToString(step)
+                JsonConvert.SerializeObject(step)
                 |> stepReceiver step.result.IsSome
 
     /// Receives traces and writes them to a text writer.
     let textWriterReceiver (writer: TextWriter) =
         fun (header: Format.HeaderEntry) ->
-            Helper.serializer.Serialize(writer, header, leaveOpen = true)
+            let str = JsonConvert.SerializeObject(header)
+            writer.WriteLine str
             fun (step: Format.StepEntry) ->
-                Helper.serializer.Serialize(writer, step, leaveOpen = true)
+                let str = JsonConvert.SerializeObject(step)
+                writer.WriteLine str
                 match step.result with
                 | None -> ()
                 | Some _ ->
