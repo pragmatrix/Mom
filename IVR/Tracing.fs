@@ -12,7 +12,7 @@ module Tracing =
 
     type Name = obj
 
-    /// A virtual StartEvent that descripes the first initial (start) step of an IVR
+    /// A virtual StartEvent that describes the first initial (start) step of an IVR
     type StartEvent = StartEvent
 
     /// Represents a trace of a command. A command can either return without a result or throw an exception.
@@ -29,16 +29,18 @@ module Tracing =
     /// result is set for the last step.
 
     type StepTrace = { event: Event; commands: CommandTrace list; result: ResultTrace option }
-    type Trace = StepTrace list
 
-    /// A session tracer is a function that consumes Trace records for a specific IVR instantiation (session).
+    /// A session tracer is a function that consumes trace records for a specific IVR instantiation (session).
     type SessionTracer = StepTrace -> unit
     
+    /// Describes the an IVR tracing session.
     type SessionInfo = { name: Name; id: Id; param: obj }
- 
-    let sessionInfo name id param = { name = name; id = id; param = param }
 
-    /// A tracer creates a session trace for a specific ivr session.
+    /// Creates a new SessionInfo record with a name, an id and a parameterization. 
+    let sessionInfo name id param = 
+        { name = name; id = id; param = param }
+
+    /// A Tracer is a function that creates a session tracer for a specific IVR session.
     type Tracer = SessionInfo -> SessionTracer
 
     module private Registry = 
@@ -146,7 +148,7 @@ module Tracing =
                 |> sessionTracer
                 r
 
-    /// Register a tracer for tracing a specific declared IVR. Whenever the declared IVR is run, the tracer will receive
+    /// Register a tracer for tracing a declared IVR. Whenever the declared IVR is run, the tracer will receive
     /// a full trace of the ivr in realtime.
 
     let registerTracer (name: Name) tracer =
@@ -155,7 +157,7 @@ module Tracing =
             Registry.removeTracer name tracer
         )
 
-    /// Traces an IVR.
+    /// Wraps an IVR so that it is traced by the sessionTracer given.
     let trace sessionTracer ivr = 
         fun host ->
             let step = Helper.traceStep sessionTracer
