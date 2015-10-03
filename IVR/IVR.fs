@@ -138,23 +138,22 @@ module IVR =
     let ignore ivr = ivr |> map ignore
 
     /// Continues the ivr with a followup ivr.
-    let continueWith (f : IVRState<'a> -> IVR<'b>) (ivr: IVR<'a>) : IVR<'b> =
+    let continueWith (f : Result<'a> -> IVR<'b>) (ivr: IVR<'a>) : IVR<'b> =
 
         let rec next h state = 
             match state with
-            | Active _ ->
-                fun e h ->
-                    state |> step h e |> next h
+            | Active _ -> 
+                fun e h -> state |> step h e |> next h
                 |> Active
-            | Completed _ ->
-                f state |> start h
+            | Completed r -> 
+                f r |> start h
 
         fun h ->
-            start h ivr |> next h
+            ivr |> start h |> next h
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
-        continueWith (fun r -> f(); fun _ -> r)
+        continueWith (fun r -> f(); fun _ -> r |> Completed)
 
     /// Returns the result of a completed ivr.
     let result ivr = 
@@ -366,11 +365,9 @@ module IVR =
             ivr
             |> continueWith (
                 function 
-                | Completed (Result r) -> cont r
-                | Completed (Error err) -> 
-                    fun _ -> err |> Error |> Completed
-                | _ -> failwith "internal error")
-
+                | Result r -> cont r
+                | Error err -> 
+                    fun _ -> err |> Error |> Completed)
 
         member this.Return v = fun _ -> v |> Result |> Completed
 
@@ -395,8 +392,8 @@ module IVR =
         member this.TryWith (ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
             ivr
             |> continueWith (function
-                | Completed (Error e) -> eh e
-                | r -> fun _ -> r)
+                | Error e -> eh e
+                | r -> fun _ -> r |> Completed)
 
         member this.Yield (cmd: Command) : unit ivr =
             fun h ->
@@ -406,7 +403,7 @@ module IVR =
         member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
             |> continueWith (function
-                | Completed (Error e) -> fun _ -> e |> Error |> Completed
+                | Error e -> fun _ -> e |> Error |> Completed
                 | _ -> ivr2
             )
 
