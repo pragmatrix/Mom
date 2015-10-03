@@ -34,7 +34,5 @@ type TracingTests() =
         |> IVR.step host (TraceEvent1 10)
         |> ignore
 
-        printf "%A" (trace.ToArray())
-
-        ()
-
+        trace.ToArray()
+        |> Array.iter (fun s -> printfn "%s" s)
