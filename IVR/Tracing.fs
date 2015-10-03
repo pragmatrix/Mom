@@ -200,7 +200,7 @@ module Tracing =
 
         let private formatTimeSpan (ts: TimeSpan) = 
             let ms = ts.TotalSeconds
-            ms.ToString("######0.000", CultureInfo.InvariantCulture)
+            ms.ToString("#######.000", CultureInfo.InvariantCulture)
 
         type HeaderEntry = { time: string; name: string; id: string; }
 
