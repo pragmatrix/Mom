@@ -343,6 +343,23 @@ type IVRTests() =
         queue |> should equal [0;1]
 
     [<Test>]
+    member this.``computation expression: after a wait, yield sends a command to the host``() =
+        let queue = Queue()
+        
+        let test = ivr {
+            yield 0
+            do! IVR.waitFor' (fun Event1 -> true)
+            yield 1
+        } 
+
+        test
+        |> IVR.start queue.Enqueue
+        |> IVR.step queue.Enqueue Event1
+        |> ignore
+
+        queue |> should equal [0;1]
+
+    [<Test>]
     member this.``IVR.delay (simulated)``() = 
         let queue = Queue()
         let host = queue.Enqueue
