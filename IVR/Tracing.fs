@@ -2,6 +2,7 @@
 
 open System
 open System.Collections.Generic
+open System.Globalization
 
 //
 // IVR Tracing support.
@@ -187,3 +188,24 @@ module Tracing =
 
             ivr 
             |> trace sessionTracer
+
+    module Format =
+
+        let private formatTime (dt: DateTime) = 
+            // Inspired by ISO 8601, 
+            // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
+            dt.ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
+
+        let private formatTimeSpan (ts: TimeSpan) = 
+            let ms = ts.TotalSeconds
+            ms.ToString("######0.000", CultureInfo.InvariantCulture)
+
+        type HeaderEntry = { time: string; name: string; id: string; }
+
+        let header time (sessionInfo: SessionInfo) = 
+            { time = formatTime time; name = sprintf "%A" sessionInfo.name; id = sessionInfo.id |> string }
+
+        type StepEntry = { offset: string; event: Event; commands: CommandTrace list; result: ResultTrace option }
+
+        let step (offset: TimeSpan) (step: StepTrace) = 
+            { offset = formatTimeSpan offset; event = step.event; commands = step.commands; result = step.result }
