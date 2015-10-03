@@ -202,10 +202,10 @@ module Tracing =
             let ms = ts.TotalSeconds
             ms.ToString("#######.000", CultureInfo.InvariantCulture)
 
-        type HeaderEntry = { time: string; name: string; id: string; }
+        type HeaderEntry = { time: string; name: obj; id: Id; }
 
         let header time (sessionInfo: SessionInfo) = 
-            { time = formatTime time; name = sprintf "%A" sessionInfo.name; id = sessionInfo.id |> string }
+            { time = formatTime time; name = sessionInfo.name; id = sessionInfo.id }
 
         type StepEntry = { offset: string; event: Event; commands: CommandTrace list; result: ResultTrace option }
 

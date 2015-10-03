@@ -34,5 +34,5 @@ type TracingTests() =
         |> IVR.step host (TraceEvent1 10)
         |> ignore
 
-        trace.ToArray()
-        |> Array.iter (fun s -> printfn "%s" s)
+        trace
+        |> Seq.iter (fun s -> printfn "%s" s)
