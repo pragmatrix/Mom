@@ -126,30 +126,32 @@ module IVR =
                 fun e h -> (this |> step h e).map f
                 |> Active
 
-        member this.continueWith h f =
-            match this with
-            | Active _ ->
-                fun e lh -> (this |> step lh e).continueWith h f
-                |> Active
-            | Completed _ -> 
-                f this
-                |> start h
-
     //
     // Primitives Part 2
     //
 
-    /// Maps the ivr's result
+    /// Maps the ivr's result.
     let rec map f ivr =
         fun h -> (start h ivr).map f
 
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
 
-    /// Continues the ivr with a followup ivr
-    let continueWith f (ivr: IVR<_>) : IVR<_> =
-        fun h -> (start h ivr).continueWith h f
+    /// Continues the ivr with a followup ivr.
+    let continueWith (f : IVRState<'a> -> IVR<'b>) (ivr: IVR<'a>) : IVR<'b> =
 
+        let rec next h state = 
+            match state with
+            | Active _ ->
+                fun e h ->
+                    state |> step h e |> next h
+                |> Active
+            | Completed _ ->
+                f state |> start h
+
+        fun h ->
+            start h ivr |> next h
+            
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
         continueWith (fun r -> f(); fun _ -> r)
