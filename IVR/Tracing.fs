@@ -115,19 +115,18 @@ module Tracing =
             { new IDisposable with
                 member this.Dispose() = action() }
             
-        /// Create a host that traces commands
+        /// Create a host that traces commands. Note that the commands are traced in reversed order.
         let private traceCommands commands host =
             fun command ->
-                let error = 
-                    try
-                        host command
-                        None
-                    with e ->
-                        Some e
-                commands := { command = command; error = error } :: !commands
-
-        let private traceResult r = 
-            match r with
+                try
+                    host command
+                    commands := { command = command; error = None } :: !commands
+                with e ->
+                    commands := { command = command; error = Some e } :: !commands
+                    reraise()
+                    
+        let traceResult state = 
+            match state with
             | Active _ -> None
             | Completed (IVR.Result r) -> Result r |> Some
             | Completed (IVR.Error e) -> Error e |> Some
@@ -137,7 +136,7 @@ module Tracing =
                 let commands = ref []
                 let host = traceCommands commands host
                 let r = IVR.start host ivr
-                { event = StartEvent; commands = !commands; result = traceResult r }
+                { event = StartEvent; commands = !commands |> List.rev; result = traceResult r }
                 |> sessionTracer
                 r
 
@@ -146,9 +145,21 @@ module Tracing =
                 let commands = ref []
                 let host = traceCommands commands host
                 let r = IVR.step host event ivr
-                { event = event; commands = !commands; result = traceResult r }
+                { event = event; commands = !commands |> List.rev; result = traceResult r }
                 |> sessionTracer
                 r
+
+        let startAndTraceCommands =
+            fun host ivr ->
+                let commands = ref []
+                let host = traceCommands commands host
+                IVR.start host ivr, !commands |> List.rev
+
+        let stepAndTraceCommands =
+            fun host event ivr -> 
+                let commands = ref []
+                let host = traceCommands commands host
+                IVR.step host event ivr, !commands |> List.rev
 
     /// Register a tracer for tracing a declared IVR. Whenever the declared IVR is run, the tracer will receive
     /// a full trace of the ivr in realtime.
@@ -202,6 +213,54 @@ module Tracing =
     type TraceHeader = DateTime * SessionInfo
     type TraceStep = TimeSpan * StepTrace
     type Trace = TraceHeader * TraceStep list
+
+
+    /// Describes the individual differences of a StepTrace
+    [<Flags>]
+    type StepTraceDiff = 
+        | None = 0x0
+        | Event = 0x1
+        | Commands = 0x2 
+        | Result = 0x4
+
+    type StepTraceReport = StepTraceReport of StepTraceDiff * StepTrace * StepTrace 
+        
+    let private mkReport (expected: StepTrace) (actual: StepTrace) = 
+        let none = StepTraceDiff.None
+        let diff =
+            if (expected.event <> actual.event) then StepTraceDiff.Event else none
+            |||
+            if (expected.commands <> actual.commands) then StepTraceDiff.Commands else none
+            |||
+            if (expected.result <> actual.result) then StepTraceDiff.Result else none
+
+        StepTraceReport (diff, expected, actual)
+
+    /// Replay a trace to an IVR and return a report.
+    let replay (f: 'param -> IVR<'r>) (trace: Trace) : StepTraceReport list = 
+        let sessionInfo = trace |> fst |> snd
+        let stepTraces = trace |> snd |> List.map snd
+        let ivr = unbox sessionInfo.param |> f
+        let host _ = ()
+        
+        let rec next report stepTraces (state, commands) = 
+            match stepTraces with
+            | [] -> failwith "internal error, a trace must have at least one StepTrace with a StartEvent"
+            | step :: rest ->
+            let actual = { event = step.event; commands = commands; result = Helper.traceResult state}
+            let report = mkReport step actual :: report
+            match state with
+            | Completed _ -> report |> List.rev
+            | _ ->
+            match rest with
+            | [] -> report |> List.rev // premature end
+            | nextStep :: _ ->
+            state
+            |> Helper.stepAndTraceCommands host nextStep.event |> next report rest
+        
+        ivr 
+        |> Helper.startAndTraceCommands host 
+        |> next [] stepTraces
 
 
     /// Module to convert traces into a human comprehensible format.
