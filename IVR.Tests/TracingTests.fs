@@ -3,8 +3,7 @@
 open IVR
 
 open NUnit.Framework
-open FsUnit
-open System.Collections.Generic
+open Tracing
 
 type TraceEvent1 = TraceEvent1 of int
 
@@ -22,8 +21,8 @@ type TracingTests() =
         }
 
         let sessionInfo = Tracing.sessionInfo "" 0L null
-        let trace = List<string>()
-        let tracer = Tracers.stringTracer sessionInfo (fun _ str -> trace.Add(str))
+        let mutable trace = None
+        let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
         let test = 
             test 
             |> Tracing.trace tracer
@@ -34,5 +33,6 @@ type TracingTests() =
         |> IVR.step host (TraceEvent1 10)
         |> ignore
 
-        trace
+        trace.Value
+        |> Format.trace
         |> Seq.iter (fun s -> printfn "%s" s)

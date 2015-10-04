@@ -53,6 +53,7 @@
     <Compile Include="Client.fs" />
     <Compile Include="ChannelExtensions.fs" />
     <Compile Include="ClientExtensions.fs" />
+    <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -62,8 +63,6 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\AsterNET.ARI\AsterNET.ARI\AsterNET.ARI.csproj">
       <Name>AsterNET.ARI</Name>
       <Project>{f4c8c633-2207-4c25-89a8-4d23d9cfa964}</Project>

@@ -29,6 +29,8 @@ module Tracing =
     /// result is set for the last step.
 
     type StepTrace = { event: Event; commands: CommandTrace list; result: ResultTrace option }
+        with
+        member this.hasResult = this.result.IsSome
 
     /// A session tracer is a function that consumes trace records for a specific IVR instantiation (session).
     type SessionTracer = StepTrace -> unit
@@ -193,23 +195,68 @@ module Tracing =
             ivr 
             |> trace sessionTracer
 
+    //
+    // Types for a trace that is annotated with timing information.
+    //
+
+    type TraceHeader = DateTime * SessionInfo
+    type TraceStep = TimeSpan * StepTrace
+    type Trace = TraceHeader * TraceStep list
+
+
+    /// Module to convert traces into a human comprehensible format.
     module Format =
 
-        let private formatTime (dt: DateTime) = 
+        open System.Text.RegularExpressions
+
+        let private dateTime (dt: DateTime) = 
             // Inspired by ISO 8601, 
             // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
             dt.ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
 
-        let private formatTimeSpan (ts: TimeSpan) = 
+        let private timeSpan (ts: TimeSpan) = 
             let ms = ts.TotalSeconds
             ms.ToString("#######.000", CultureInfo.InvariantCulture)
 
-        type HeaderEntry = { time: string; name: obj; id: Id; }
+        // sprintf requires the following types to be public!
+        /// Internally used for formatting purposes only, do not use!
+        type Header = { time: string; name: Name; id: Id; param: obj }
+        /// Internally used for formatting purposes only, do not use!
+        type Step = { offset: string; event: Event; commands: CommandTrace list; result: ResultTrace option }
 
-        let header time (sessionInfo: SessionInfo) = 
-            { time = formatTime time; name = sessionInfo.name; id = sessionInfo.id }
+        let private replace (pattern: string) (repl: string) (input: string) = 
+            Regex.Replace(input, pattern, repl)
 
-        type StepEntry = { offset: string; event: Event; commands: CommandTrace list; result: ResultTrace option }
+        let private postProcess (str: string) = 
+            str 
+            |> replace "\n" "" // newlines
+            |> replace ";[\s]+" "; " // indents
+            // defaults
+            |> replace " result = null;" ""
+            |> replace " param = null;" ""
+            |> replace " error = null;" ""
+            |> replace " commands = \[\];" ""
+            |> replace " name = \"\";" ""
+            |> replace " id = 0L;" ""
+            // option
+            |> replace "Some \((.*)\)" "$1"
+            
+        /// Formats a TraceHeader to a human comprehensible format. Note that this format might change.
+        let header (header: TraceHeader) = 
+            let (time, si) = header
+            { time = dateTime time; name = si.name; id = si.id; param = si.param }
+            |> sprintf "%A" |> postProcess
 
-        let step (offset: TimeSpan) (step: StepTrace) = 
-            { offset = formatTimeSpan offset; event = step.event; commands = step.commands; result = step.result }
+        /// Formats a TraceStep to a human comprehensible format. Note that this format might change.
+        let step (step: TraceStep) = 
+            let (offset, step) = step
+            { offset = timeSpan offset; event = step.event; commands = step.commands; result = step.result }
+            |> sprintf "%A" |> postProcess
+ 
+        /// Formats a Trace to a human comprehensible format. Note that this format might change.
+        let trace (trace: Trace) = 
+            seq {
+                yield header (fst trace)
+                for s in (snd trace) ->
+                    step s
+            }

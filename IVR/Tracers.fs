@@ -3,7 +3,7 @@
 open Tracing
 open System
 open System.IO
-open Newtonsoft.Json
+open Nessos.FsPickler
 open System.Diagnostics
 
 module Tracers = 
@@ -17,57 +17,51 @@ module Tracers =
             |> Array.map (fun c -> if Array.IndexOf(invalidFilenameChars, c) = -1 then c else '_') 
             |> String
 
-    /// Traces entries.
-    let entryTracer (sessionInfo : SessionInfo) (receiver: Format.HeaderEntry -> Format.StepEntry -> unit) = 
+        let serializer = FsPickler.CreateBinarySerializer()
+
+    /// Traces entries by receiving a session info and subsequent StepTraces and then attaches timing information to it.
+    /// Resulting into a TraceHeader and a number of TraceSteps.
+
+    let entryTracer (sessionInfo : SessionInfo) (receiver: TraceHeader -> TraceStep -> unit) = 
         
         let startTimeAbsolute = DateTime.Now
         // use the stopwatch to avoid time skews.
         let stopWatch = Stopwatch.StartNew()
-        let header = Format.header startTimeAbsolute sessionInfo
+        let header = startTimeAbsolute, sessionInfo
         let stepReceiver = receiver header
 
         fun (step: StepTrace) ->
-            let stepF = Format.step stopWatch.Elapsed step
+            let stepF = stopWatch.Elapsed, step
             stepReceiver stepF
 
-    /// Receives traces and writes them to a string receiver.
-    let stringReceiver (receiver: string -> bool -> string -> unit) =
-        fun (header: Format.HeaderEntry) ->
-            let headerStr = JsonConvert.SerializeObject(header)
-            let stepReceiver = receiver headerStr
-            fun (step: Format.StepEntry) ->
-                JsonConvert.SerializeObject(step)
-                |> stepReceiver step.result.IsSome
+    /// Receives traces, collects them all, and finishes up by writing them to the trace reference.
+    let traceReceiver (traceReceiver: Tracing.Trace -> unit) = 
+        fun (header: TraceHeader) ->
+            let mutable steps = []
+            fun (step: TraceStep) ->
+                steps <- step :: steps
+                if (snd step).hasResult then
+                    (header, (steps |> List.rev)) |> traceReceiver
 
-    /// Receives traces and writes them to a text writer.
-    let textWriterReceiver (writer: TextWriter) =
-        fun (header: Format.HeaderEntry) ->
-            let str = JsonConvert.SerializeObject(header)
-            writer.WriteLine str
-            fun (step: Format.StepEntry) ->
-                let str = JsonConvert.SerializeObject(step)
-                writer.WriteLine str
-                match step.result with
-                | None -> ()
-                | Some _ ->
-                writer.Close() // this also closes the underlying stream!
-
-    /// Traces in a list of strings (json encoded). The receiver receives each string, the header, and all steps. When the
-    /// last line is written, which contains the result, the boolean is set to true, otherwise, it's false.
-    let stringTracer (sessionInfo: SessionInfo) (receiver: bool -> string -> unit) = 
-        fun header ->
-            receiver false header
-            fun hasResult step ->
-                receiver hasResult step
-        |> stringReceiver
+    /// Receives traces and writes them to a stream in binary format.
+    let binaryStreamReceiver (stream: Stream) =
+        fun (header: TraceHeader) ->
+            Helper.serializer.Serialize(stream, header, leaveOpen = true)
+            fun (step: TraceStep) ->
+                let lastStep = (snd step).hasResult
+                Helper.serializer.Serialize(stream, step, leaveOpen = not lastStep)
+                
+    let streamTracer sessionInfo stream =
+        stream
+        |> binaryStreamReceiver
         |> entryTracer sessionInfo
 
     let fileTracer (sessionInfo : SessionInfo) =
-        let fn = sprintf "%s.%d.trace.json" (sessionInfo.name |> sprintf "%A" |> Helper.toFilename) sessionInfo.id
-        let f = File.Open(fn, FileMode.Create, FileAccess.Write, FileShare.Read)
-        let writer = new StreamWriter(f, Text.Encoding.UTF8)
+        let fn = sprintf "%s.%d.trace.bin" (sessionInfo.name |> sprintf "%A" |> Helper.toFilename) sessionInfo.id
+        let f = File.Open(fn, FileMode.Create, FileAccess.Write, FileShare.None)
+        f |> streamTracer sessionInfo
 
-        writer
-        |> textWriterReceiver
+    let memoryTracer sessionInfo (receiver: Tracing.Trace -> unit) =
+        traceReceiver receiver
         |> entryTracer sessionInfo
-
+    
