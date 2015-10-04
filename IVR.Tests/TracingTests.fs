@@ -13,12 +13,6 @@ type TracingTests() =
     [<Test>]
     member this.simpleTraceAndReplay() =
 
-        let ivr2 = ivr {
-            let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
-//            yield x
-            return x
-        }
-
         let ivr = ivr {
             let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
             yield x
