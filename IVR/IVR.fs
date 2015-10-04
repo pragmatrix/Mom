@@ -112,32 +112,11 @@ module IVR =
     let (|IsCancelled|_|) ivr = 
         if isCancelled ivr then Some() else None
 
-    // 
-    // IVR Extensions
-    //
-
-    type IVRState<'result> with
-
-        // tbd: the semantic for exceptions that happen in f is not defined.
-        member this.map f =
-            match this with
-            | Completed r -> Completed (r.map f)
-            | Active _ -> 
-                fun e h -> (this |> step h e).map f
-                |> Active
-
     //
     // Primitives Part 2
     //
 
-    /// Maps the ivr's result.
-    let rec map f ivr =
-        fun h -> (start h ivr).map f
-
-    /// Ignores the ivr's result type.
-    let ignore ivr = ivr |> map ignore
-
-    /// Continues the ivr with a followup ivr.
+    /// Continues the ivr with a followup ivr (Monad bind).
     let continueWith (f : Result<'a> -> IVR<'b>) (ivr: IVR<'a>) : IVR<'b> =
 
         let rec next h state = 
@@ -150,6 +129,14 @@ module IVR =
 
         fun h ->
             ivr |> start h |> next h
+
+    /// Maps the ivr's result.
+    let map (f: 'a -> 'b) (ivr: IVR<'a>) : IVR<'b> = 
+        let f (r: Result<'a>) = fun _ -> r.map f |> Completed
+        continueWith f ivr
+
+    /// Ignores the ivr's result type.
+    let ignore ivr = ivr |> map ignore
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =

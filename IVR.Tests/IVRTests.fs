@@ -395,4 +395,3 @@ type IVRTests() =
         state 
         |> IVR.step host (IVR.DelayCompleted id)
         |> IVR.isCompleted |> should equal true
-        
