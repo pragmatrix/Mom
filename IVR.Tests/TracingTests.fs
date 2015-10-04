@@ -66,6 +66,8 @@ type TracingTests() =
         |> ignore
 
         let trace = Tracers.readFileTrace fn
-        printfn "%A" trace
-
+        
+        trace
+        |> Tracing.replay (fun _ -> ivr)
+        |> Seq.iter (fun d -> printfn "%A" d)
 
