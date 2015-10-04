@@ -209,7 +209,7 @@ module Tracing =
         
     type ReplayReport = StepTraceReport list
 
-    let private mkReport (expected: StepTrace) (actual: StepTrace) = 
+    let private diffStepTrace (expected: StepTrace) (actual: StepTrace) = 
         let none = StepTraceDiff.None
         let diff =
             if (expected.event <> actual.event) then StepTraceDiff.Event else none
@@ -232,7 +232,7 @@ module Tracing =
             | [] -> failwith "internal error, a trace must have at least one StepTrace with a StartEvent"
             | step :: rest ->
             let actual = { event = step.event; commands = commands; result = Helper.traceResult state}
-            let report = mkReport step actual :: report
+            let report = diffStepTrace step actual :: report
             match state with
             | Completed _ -> report
             | _ ->
