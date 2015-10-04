@@ -8,6 +8,8 @@ open System
     - can be paused and ended at any time.
     - can synchronously wait and respond to events.
     - can be combined in parallel or sequentially.
+    - can send any number of commands to a host.
+    - can be run in individual steps.
 *)
 
 type Event = obj
