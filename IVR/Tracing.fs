@@ -131,24 +131,6 @@ module Tracing =
             | Completed (IVR.Result r) -> Result r |> Some
             | Completed (IVR.Error e) -> Error e |> Some
 
-        let traceStart sessionTracer =
-            fun host ivr ->
-                let commands = ref []
-                let host = traceCommands commands host
-                let r = IVR.start host ivr
-                { event = StartEvent; commands = !commands |> List.rev; result = traceResult r }
-                |> sessionTracer
-                r
-
-        let traceStep sessionTracer =
-            fun host event ivr -> 
-                let commands = ref []
-                let host = traceCommands commands host
-                let r = IVR.step host event ivr
-                { event = event; commands = !commands |> List.rev; result = traceResult r }
-                |> sessionTracer
-                r
-
         let startAndTraceCommands =
             fun host ivr ->
                 let commands = ref []
@@ -173,17 +155,17 @@ module Tracing =
     /// Wraps an IVR so that it is traced by the sessionTracer given.
     let trace sessionTracer ivr = 
         fun host ->
-            let step = Helper.traceStep sessionTracer
-
-            let rec next ivr = 
-                match ivr with
-                | Completed _ -> ivr
+            let rec next event (state, commands) = 
+                { event = event; commands = commands; result = Helper.traceResult state }
+                |> sessionTracer
+                match state with
+                | Completed _ -> 
+                    state
                 | Active _ ->
-                fun e h ->
-                    ivr |> step h e |> next
-                |> Active
+                    fun e h -> state |> Helper.stepAndTraceCommands h e |> next e
+                    |> Active
 
-            ivr |> Helper.traceStart sessionTracer host |> next
+            ivr |> Helper.startAndTraceCommands host |> next StartEvent
 
     /// For an IVR to be eligible for tracing by a registered tracer, it must be declared. 
     ///
@@ -225,6 +207,8 @@ module Tracing =
 
     type StepTraceReport = StepTraceReport of StepTraceDiff * StepTrace * StepTrace 
         
+    type ReplayReport = StepTraceReport list
+
     let private mkReport (expected: StepTrace) (actual: StepTrace) = 
         let none = StepTraceDiff.None
         let diff =
@@ -237,7 +221,7 @@ module Tracing =
         StepTraceReport (diff, expected, actual)
 
     /// Replay a trace to an IVR and return a report.
-    let replay (f: 'param -> IVR<'r>) (trace: Trace) : StepTraceReport list = 
+    let replay (f: 'param -> IVR<'r>) (trace: Trace) : ReplayReport = 
         let sessionInfo = trace |> fst |> snd
         let stepTraces = trace |> snd |> List.map snd
         let ivr = unbox sessionInfo.param |> f
@@ -250,17 +234,18 @@ module Tracing =
             let actual = { event = step.event; commands = commands; result = Helper.traceResult state}
             let report = mkReport step actual :: report
             match state with
-            | Completed _ -> report |> List.rev
+            | Completed _ -> report
             | _ ->
             match rest with
-            | [] -> report |> List.rev // premature end
+            | [] -> report // premature end
             | nextStep :: _ ->
             state
-            |> Helper.stepAndTraceCommands host nextStep.event |> next report rest
+            |> Helper.stepAndTraceCommands host nextStep.event 
+            |> next report rest
         
         ivr 
         |> Helper.startAndTraceCommands host 
-        |> next [] stepTraces
+        |> next [] stepTraces |> List.rev
 
 
     /// Module to convert traces into a human comprehensible format.
