@@ -1,10 +1,10 @@
 ﻿namespace IVR
 
-open Tracing
 open System
 open System.IO
 open Nessos.FsPickler
 open System.Diagnostics
+open Tracing
 
 module Tracers = 
 
@@ -35,7 +35,7 @@ module Tracers =
             stepReceiver stepF
 
     /// Receives traces, collects them all, and finishes up by writing them to the trace reference.
-    let traceReceiver (traceReceiver: Tracing.Trace -> unit) = 
+    let traceReceiver (traceReceiver: Trace -> unit) = 
         fun (header: TraceHeader) ->
             let mutable steps = []
             fun (step: TraceStep) ->
@@ -56,12 +56,30 @@ module Tracers =
         |> binaryStreamReceiver
         |> entryTracer sessionInfo
 
-    let fileTracer (sessionInfo : SessionInfo) =
-        let fn = sprintf "%s.%d.trace.bin" (sessionInfo.name |> sprintf "%A" |> Helper.toFilename) sessionInfo.id
+    let filename (sessionInfo: SessionInfo) : string =
+        sprintf "%s.%d.trace.bin" (sessionInfo.name |> sprintf "%A" |> Helper.toFilename) sessionInfo.id
+        
+    let fileTracer fn (sessionInfo : SessionInfo) =
         let f = File.Open(fn, FileMode.Create, FileAccess.Write, FileShare.None)
         f |> streamTracer sessionInfo
 
-    let memoryTracer sessionInfo (receiver: Tracing.Trace -> unit) =
+    let readFileTrace (fn: string) : Trace = 
+        use stream = File.Open(fn, FileMode.Open, FileAccess.Read, FileShare.Read)
+        let (header : TraceHeader) = Helper.serializer.Deserialize(stream, leaveOpen = true)
+
+        let rec readSteps steps = 
+            let (step : TraceStep) = Helper.serializer.Deserialize(stream, leaveOpen = true)
+            let steps = step :: steps
+            if (snd step).hasResult then steps
+            else readSteps steps
+
+        let steps = 
+            readSteps []
+            |> List.rev
+
+        header, steps
+
+    let memoryTracer sessionInfo (receiver: Trace -> unit) =
         traceReceiver receiver
         |> entryTracer sessionInfo
     
