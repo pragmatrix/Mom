@@ -473,13 +473,13 @@ module IVR =
         wait' f
 
     //
-    // IVR Basic Services
+    // IVR System Services
     //
 
-    type ServiceCommand = 
+    type SystemCommand = 
         | Delay of Id * TimeSpan
 
-    type ServiceEvent = 
+    type SystemEvent = 
         | DelayCompleted of Id
 
     let private delayIdGenerator = Ids.newGenerator()

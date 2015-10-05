@@ -29,7 +29,7 @@ module Host =
         member private this.cancel() = 
             this.dispatch CancelIVR
 
-        member this.serviceCommand (sc : ServiceCommand) = 
+        member this.serviceCommand (sc : SystemCommand) = 
             match sc with
             | Delay (id, timespan) ->
                 let callback _ = this.dispatch (IVR.DelayCompleted id)
