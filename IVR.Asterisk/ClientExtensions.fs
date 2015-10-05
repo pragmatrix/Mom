@@ -23,10 +23,6 @@ module ClientExtensions =
         with
         interface IReturns<Channel list>
 
-    [<AbstractClass; Sealed>]   
-    type Channels() =
-        static member List() = List
-
     type Originate = { 
         endpoint:string
         extension: string option 
@@ -105,10 +101,10 @@ module ClientExtensions =
         with
         interface IReturns<Channel>
 
-    /// Channel commands that do not have a return type are combined in one union 
+    /// Channels command that do not have a return type are combined in one union 
     /// to simplify host processing. Don't use these constructors, use Channel.[name]
     /// instead.
-    type ChannelCommands = 
+    type ChannelsCommand = 
         | Hangup of channelId: string * reason: string option
         | ContinueInDialplan of ContinueInDialplan
         | Redirect of channelId: string * endpoint: string
@@ -127,8 +123,8 @@ module ClientExtensions =
         | SetChannelVar of channelId: string * variable: string * value: string option
     
     [<AbstractClass; Sealed>]
-    type Channel() = 
-
+    type Channels() = 
+        static member List() = List
         static member Originate(endpoint, ?extension, ?context, ?priority, ?label, ?app, ?appArgs, ?callerId, ?timeout, ?variables, ?channelId, ?otherChannelId, ?originator) =
             {
                 endpoint = endpoint
