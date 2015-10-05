@@ -283,7 +283,6 @@ module Tracing =
         let private dateTime (dt: DateTime) = 
             // Inspired by ISO 8601, 
             // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
-
             dt
                 .ToLocalTime()
                 .ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
@@ -300,6 +299,10 @@ module Tracing =
 
         let private replace (pattern: string) (repl: string) (input: string) = 
             Regex.Replace(input, pattern, repl)
+
+        // tbd: trace formatting is broken. We need a proper formatter here! Probably Newtonsoft.Json with
+        // some F# extensions. The only requirement is that individual steps should be printed on one line, 
+        // or at least for most cases.
 
         let private postProcess (str: string) = 
             str 
