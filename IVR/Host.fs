@@ -37,7 +37,7 @@ module Host =
 
         member this.run ivr = 
 
-            let host = this.dispatch
+            let host = this.executeCommand
 
             let rec runLoop ivr = 
                 let event = queue.dequeue()
@@ -58,5 +58,8 @@ module Host =
             ivr
             |> start host
             |> next
+
+        member this.executeCommand cmd = 
+            obj()
             
     let newHost() = new Host()

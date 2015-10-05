@@ -14,7 +14,8 @@ open System
 
 type Event = obj
 type Command = obj
-type Host = Command -> unit
+type Response = obj
+type Host = Command -> Response
 
 exception Cancelled
 
@@ -343,6 +344,33 @@ module IVR =
             |> startAll h None []
             |> next h
 
+    //
+    // Sending and posting commands to the host.
+    //
+
+    /// Response type interface that is used to tag commands with.
+    type IExpectResponse<'result> = 
+        interface end
+
+    /// Synchronously send a command to a host and return its response.
+    let send (cmd: IExpectResponse<'r>) : 'r ivr = 
+        fun h ->
+            try
+                cmd
+                |> h
+                |> unbox 
+                |> Result |> Completed
+            with e ->
+                e |> Error |> Completed
+
+    /// Synchronously send a command to a host, but ignore its response.
+    let post cmd : unit ivr = 
+        fun (h:Host) ->
+            try
+                cmd |> h |> Operators.ignore
+                () |> Result |> Completed
+            with e ->
+                e |> Error |> Completed
 
     //
     // Simple computation expression to build sequential IVR processes
@@ -384,10 +412,7 @@ module IVR =
                 | Error e -> eh e
                 | r -> fun _ -> r |> Completed)
 
-        member this.Yield (cmd: Command) : unit ivr =
-            fun h ->
-                h cmd
-                () |> Result |> Completed
+        member this.Yield (cmd: Command) : unit ivr = post cmd
 
         member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
@@ -397,7 +422,7 @@ module IVR =
             )
 
     let ivr<'result> = IVRBuilder<'result>()
-
+            
     //
     // Wait primitives
     //

@@ -23,12 +23,16 @@ type CancellationTracker() =
 type Event1 = Event1
 type Event2 = Event2
 
+type Command = Command of int
+    with 
+    interface IVR.IExpectResponse<string>
+
 [<TestFixture>]
 type IVRTests() =
 
-    let withoutHost = fun _ -> ()
-    let start ivr = IVR.start withoutHost ivr
-    let step ivr = IVR.step withoutHost ivr
+    let dummyHost = fun _ -> null
+    let start ivr = IVR.start dummyHost ivr
+    let step ivr = IVR.step dummyHost ivr
 
     //
     // Automatic cancellation of Active ivrs.
@@ -321,7 +325,7 @@ type IVRTests() =
         } 
 
         test
-        |> IVR.start queue.Enqueue
+        |> IVR.start (fun v -> queue.Enqueue v; null)
         |> ignore
 
         queue |> should equal [0]
@@ -337,7 +341,7 @@ type IVRTests() =
         } 
 
         test
-        |> IVR.start queue.Enqueue
+        |> IVR.start (fun c -> queue.Enqueue c; null)
         |> ignore
 
         queue |> should equal [0;1]
@@ -353,8 +357,8 @@ type IVRTests() =
         } 
 
         test
-        |> IVR.start queue.Enqueue
-        |> IVR.step queue.Enqueue Event1
+        |> IVR.start (fun c -> queue.Enqueue c; null)
+        |> IVR.step (fun c -> queue.Enqueue c; null) Event1
         |> ignore
 
         queue |> should equal [0;1]
@@ -371,8 +375,8 @@ type IVRTests() =
         } 
 
         test
-        |> IVR.start queue1.Enqueue
-        |> IVR.step queue2.Enqueue Event1
+        |> IVR.start (fun c -> queue1.Enqueue c; null)
+        |> IVR.step (fun c -> queue2.Enqueue c; null) Event1
         |> ignore
 
         queue1 |> should equal [0]
@@ -381,7 +385,7 @@ type IVRTests() =
     [<Test>]
     member this.``IVR.delay (simulated)``() = 
         let queue = Queue()
-        let host = queue.Enqueue
+        let host c = queue.Enqueue c; null
 
         let test = IVR.delay (TimeSpan(1, 0, 0))            
 
@@ -395,3 +399,21 @@ type IVRTests() =
         state 
         |> IVR.step host (IVR.DelayCompleted id)
         |> IVR.isCompleted |> should equal true
+
+    [<Test>]
+    member this.``computation expression syntax: Command with return type``() = 
+        let test = ivr {
+            let! r = IVR.send (Command 10)
+            return r
+            }
+
+        let host (c:obj) : obj =
+            match box c with
+            | :? Command -> "Hello"
+            | _ -> ""
+            |> box
+
+        test
+        |> IVR.start host
+        |> IVR.resultValue
+        |> should equal "Hello" 

@@ -15,12 +15,13 @@ module Tracing =
     /// A virtual StartEvent that describes the first initial (start) step of an IVR
     type StartEvent = StartEvent
 
-    /// Represents a trace of a command. A command can either return without a result or throw an exception.
-    type CommandTrace = { command: Command; error: exn option }
-
+    /// Represents a trace of a result, either a command invocation result, or the result of an IVR.
     type ResultTrace = 
         | Result of obj
         | Error of exn
+
+    /// Represents a trace of a command. A command can either return without a result or throw an exception.
+    type CommandTrace = { command: Command; result: ResultTrace }
 
     /// A step trace represents a trace for a single step of an IVR. 
     ///
@@ -119,10 +120,11 @@ module Tracing =
         let private traceCommands commands host =
             fun command ->
                 try
-                    host command
-                    commands := { command = command; error = None } :: !commands
+                    let r = host command
+                    commands := { command = command; result = Result r } :: !commands
+                    r
                 with e ->
-                    commands := { command = command; error = Some e } :: !commands
+                    commands := { command = command; result = Error e } :: !commands
                     reraise()
                     
         let traceResult state = 
@@ -225,7 +227,7 @@ module Tracing =
         let sessionInfo = trace |> fst |> snd
         let stepTraces = trace |> snd |> List.map snd
         let ivr = unbox sessionInfo.param |> f
-        let host _ = ()
+        let host _ = null
         
         let rec next report stepTraces (state, commands) = 
             match stepTraces with

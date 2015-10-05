@@ -26,7 +26,7 @@ type TracingTests() =
         let traced = 
             ivr 
             |> Tracing.trace tracer
-        let host = fun _ -> ()
+        let host = fun _ -> null
 
         traced
         |> IVR.start host
@@ -58,7 +58,7 @@ type TracingTests() =
         let traced = 
             ivr 
             |> Tracing.trace tracer
-        let host = fun _ -> ()
+        let host = fun _ -> null
 
         traced
         |> IVR.start host
