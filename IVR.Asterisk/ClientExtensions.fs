@@ -117,7 +117,7 @@ module ClientExtensions =
         | Hold of channelId: string
         | Unhold of channelId: string
         | StartMOH of channelId: string * mohClass: string option
-        | StopMOH of channelId: string * mohClass: string option
+        | StopMOH of channelId: string
         | StartSilence of channelId: string
         | StopSilence of channelId: string
         | SetChannelVar of channelId: string * variable: string * value: string option

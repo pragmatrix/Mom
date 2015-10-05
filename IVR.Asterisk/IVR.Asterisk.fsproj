@@ -51,8 +51,8 @@
   <ItemGroup>
     <Compile Include="IVR.fs" />
     <Compile Include="Client.fs" />
-    <Compile Include="ChannelExtensions.fs" />
     <Compile Include="ClientExtensions.fs" />
+    <Compile Include="ChannelExtensions.fs" />
     <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
