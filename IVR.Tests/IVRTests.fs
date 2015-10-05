@@ -25,7 +25,7 @@ type Event2 = Event2
 
 type Command = Command of int
     with 
-    interface IVR.IExpectResponse<string>
+    interface IVR.IReturns<string>
 
 [<TestFixture>]
 type IVRTests() =

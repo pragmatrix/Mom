@@ -208,8 +208,17 @@ module Tracing =
         | Result = 0x4
 
     type StepTraceReport = StepTraceReport of StepTraceDiff * StepTrace * StepTrace 
-        
-    type ReplayReport = StepTraceReport list
+        with
+        member this.Diff = this |> fun (StepTraceReport (diff, _, _)) -> diff
+
+    type ReplayReport = ReplayReport of StepTraceReport list
+        with 
+        member this.steps = this |> fun (ReplayReport steps) -> steps
+        member this.incidents = 
+            this.steps
+            |> Seq.filter (fun step -> step.Diff <> StepTraceDiff.None)
+        member this.isEmpty =
+            this.incidents |> Seq.isEmpty
 
     let private diffStepTrace (expected: StepTrace) (actual: StepTrace) = 
         let none = StepTraceDiff.None
@@ -247,7 +256,9 @@ module Tracing =
         
         ivr 
         |> Helper.startAndTraceCommands host 
-        |> next [] stepTraces |> List.rev
+        |> next [] stepTraces 
+        |> List.rev 
+        |> ReplayReport
 
 
     /// Module to convert traces into a human comprehensible format.

@@ -349,11 +349,11 @@ module IVR =
     //
 
     /// Response type interface that is used to tag commands with.
-    type IExpectResponse<'result> = 
+    type IReturns<'result> = 
         interface end
 
     /// Synchronously send a command to a host and return its response.
-    let send (cmd: IExpectResponse<'r>) : 'r ivr = 
+    let send (cmd: IReturns<'r>) : 'r ivr = 
         fun h ->
             try
                 cmd

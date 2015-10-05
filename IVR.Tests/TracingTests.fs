@@ -1,11 +1,16 @@
 ﻿namespace IVR.Tests
 
 open IVR
-
-open NUnit.Framework
 open Tracing
 
+open NUnit.Framework
+open FsUnit
+
 type TraceEvent1 = TraceEvent1 of int
+
+type ConvertIntToStr = ConvertIntToStr of int
+    with
+    interface IVR.IReturns<string>
 
 [<TestFixture>]
 type TracingTests() = 
@@ -23,6 +28,7 @@ type TracingTests() =
         let sessionInfo = Tracing.sessionInfo "" 0L null
         let mutable trace = None
         let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
+
         let traced = 
             ivr 
             |> Tracing.trace tracer
@@ -36,11 +42,12 @@ type TracingTests() =
         let trace = trace.Value
         trace
         |> Format.trace
-        |> Seq.iter (fun s -> printfn "%s" s)
+        |> Seq.iter (printfn "%s")
 
         trace
         |> Tracing.replay (fun _ -> ivr)
-        |> Seq.iter (fun d -> printfn "%A" d)
+        |> fun r -> r.steps
+        |> Seq.iter (printfn "%A")
 
 
     [<Test>]
@@ -69,5 +76,42 @@ type TracingTests() =
         
         trace
         |> Tracing.replay (fun _ -> ivr)
-        |> Seq.iter (fun d -> printfn "%A" d)
+        |> (fun r -> r.steps)
+        |> Seq.iter (printfn "%A")
+
+    [<Test>]
+    member this.replayHandlesCommandResponses() = 
+        let host (cmd: obj) : obj =
+            match cmd with
+            | :? ConvertIntToStr as ci ->
+                let (ConvertIntToStr i) = ci
+                i.ToString() |> box
+            | _ -> failwith "internal error"
+
+        let ivr = ivr {
+            return! IVR.send (ConvertIntToStr 10)
+        }
+
+        // tbd: prettify tracing APIs for common cases and tests! This is ugly as ....!
+
+        let sessionInfo = Tracing.sessionInfo "" 0L null
+        let mutable trace = None
+        let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
+        
+        let traced = ivr |> Tracing.trace tracer
+
+        IVR.start host traced
+        |> IVR.result
+        |> should equal ("10" |> IVR.Result)
+
+        trace.Value
+        |> Format.trace
+        |> Seq.iter (printfn "%s")
+
+        let report = 
+            trace.Value
+            |> Tracing.replay (fun _ -> ivr)
+        
+        report.incidents |> Seq.iter (printfn "%A")
+        report.isEmpty |> should equal true
 
