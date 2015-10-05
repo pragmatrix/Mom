@@ -258,7 +258,10 @@ module Tracing =
         let private dateTime (dt: DateTime) = 
             // Inspired by ISO 8601, 
             // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
-            dt.ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
+
+            dt
+                .ToLocalTime()
+                .ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
 
         let private timeSpan (ts: TimeSpan) = 
             let ms = ts.TotalSeconds
