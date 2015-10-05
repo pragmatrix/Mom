@@ -145,6 +145,19 @@ module Tracing =
                 let host = traceCommands commands host
                 IVR.step host event ivr, !commands |> List.rev
 
+        let replayHost commandTraces = 
+            let mutable todo = commandTraces
+            fun cmd ->
+                match todo with
+                | [] -> failwith "replay host: no more command traces"
+                | cmdt::rest ->
+                todo <- rest
+                if (cmd <> cmdt.command) then
+                    failwith "replay host: command differs, ignoring result"
+                match cmdt.result with
+                | Result r -> r
+                | Error e -> raise e
+
     /// Register a tracer for tracing a declared IVR. Whenever the declared IVR is run, the tracer will receive
     /// a full trace of the ivr in realtime.
 
@@ -236,7 +249,6 @@ module Tracing =
         let sessionInfo = trace |> fst |> snd
         let stepTraces = trace |> snd |> List.map snd
         let ivr = unbox sessionInfo.param |> f
-        let host _ = null
         
         let rec next report stepTraces (state, commands) = 
             match stepTraces with
@@ -250,12 +262,14 @@ module Tracing =
             match rest with
             | [] -> report // premature end
             | nextStep :: _ ->
+
+            let replayHost = Helper.replayHost nextStep.commands 
             state
-            |> Helper.stepAndTraceCommands host nextStep.event 
+            |> Helper.stepAndTraceCommands replayHost nextStep.event 
             |> next report rest
         
         ivr 
-        |> Helper.startAndTraceCommands host 
+        |> Helper.startAndTraceCommands (stepTraces |> List.head |> (fun st -> st.commands) |> Helper.replayHost)
         |> next [] stepTraces 
         |> List.rev 
         |> ReplayReport

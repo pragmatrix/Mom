@@ -80,7 +80,7 @@ type TracingTests() =
         |> Seq.iter (printfn "%A")
 
     [<Test>]
-    member this.replayHandlesCommandResponses() = 
+    member this.replayReplaysCommandResponses() = 
         let host (cmd: obj) : obj =
             match cmd with
             | :? ConvertIntToStr as ci ->
