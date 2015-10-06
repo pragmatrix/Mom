@@ -5,7 +5,7 @@ open AsterNET.ARI
 open AsterNET.ARI.Models
 open IVR
 
-module ClientExtensions = 
+module Commands = 
 
     open IVR
 
@@ -255,5 +255,5 @@ module ClientExtensions =
                 snoopId = snoopId
             }
 
-[<assembly:AutoOpen("IVR.Asterisk.ClientExtensions")>]
+[<assembly:AutoOpen("IVR.Asterisk.Commands")>]
 do ()

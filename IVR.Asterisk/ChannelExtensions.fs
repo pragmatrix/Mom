@@ -2,11 +2,11 @@
 
 open AsterNET.ARI.Models
 open IVR
-
-open ClientExtensions
+open Commands
 
 module ChannelExtensions =
-        
+    
+            
     type Channel with
 
         member inline private this.waitFor< ^e when ^e : (member Channel : Channel)>() =
@@ -83,7 +83,7 @@ module ChannelExtensions =
         member this.snoop(app, ?spy, ?whisper, ?appArgs, ?snoopId) = 
             Channels.SnoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
 
-        /// Plays a media, and waits for the PlaybackFinishedEvent
+        /// An IVR that plays a media, and waits for the PlaybackFinishedEvent
         member this.play'(media, ?lang, ?offsetms, ?skipms) : unit ivr= 
             ivr {
                 let! playback = 

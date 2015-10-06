@@ -36,7 +36,7 @@ module Client =
             let connection = this.connect(queue.enqueue)
             new ARIConnectionWithQueue(queue, (connection :> IDisposable).Dispose)
 
-        member this.connect(f : ARIClientEvent -> unit) =
+        member this.connect(eventReceiver : ARIClientEvent -> unit) : ARIConnection =
             
             this.EventDispatchingStrategy <- EventDispatchingStrategy.DedicatedThread
 
@@ -47,7 +47,7 @@ module Client =
                 | _ -> ()
 
             let unhandledEvent _ event = 
-                event |> ARIEvent |> f
+                event |> ARIEvent |> eventReceiver
 
             let eventHandler = UnhandledEventHandler unhandledEvent
 
@@ -74,7 +74,7 @@ module Client =
             try
                 match connectionQueue.dequeue() with
                 | Connected -> 
-                    let connectedHandler = AriClient.ConnectionStateChangedHandler(connectionStateChanged f)
+                    let connectedHandler = AriClient.ConnectionStateChangedHandler(connectionStateChanged eventReceiver)
                     this.OnConnectionStateChanged.AddHandler connectedHandler
 
                     let cleanup() = 
@@ -89,14 +89,13 @@ module Client =
             finally
                 this.OnConnectionStateChanged.RemoveHandler connectionHandler
 
-        // connect and deliver all events to the IVR host.
+        /// Connect and deliver all events from ARI to the IVR runtime.
+        member this.connectWithRuntime(runtime: IVR.Runtime.Runtime) = 
 
-        member this.connectWithRuntime(host: IVR.Runtime.Runtime) = 
-
-            let deliverARIEventToHost event = 
+            let deliverARIEventToRuntime event = 
                 match event with
-                | ARIEvent e -> host.dispatch e
-                | Disconnected -> (host :> IDisposable).Dispose()
-                | _ -> failwith "unexpected ARI event: %A" event
+                | ARIEvent e -> runtime.dispatch e
+                | Disconnected -> (runtime :> IDisposable).Dispose()
+                | _ -> failwithf "unexpected ARI event: %A" event
 
-            this.connect(deliverARIEventToHost)
+            this.connect(deliverARIEventToRuntime)

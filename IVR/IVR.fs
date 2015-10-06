@@ -352,7 +352,7 @@ module IVR =
     type IReturns<'result> = 
         interface end
 
-    /// Synchronously send a command to a host and return its response.
+    /// An IVR that synchronously sends a command to a host and returns its response.
     let send (cmd: IReturns<'r>) : 'r ivr = 
         fun h ->
             try
@@ -363,7 +363,7 @@ module IVR =
             with e ->
                 e |> Error |> Completed
 
-    /// Synchronously send a command to a host, but ignore its response.
+    /// An IVR that Synchronously sends a command to a host, but ignores its response.
     let post cmd : unit ivr = 
         fun (h:Host) ->
             try
