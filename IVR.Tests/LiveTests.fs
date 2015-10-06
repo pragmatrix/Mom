@@ -10,6 +10,7 @@ open IVR.Asterisk.Client
 
 open AsterNET.ARI
 open AsterNET.ARI.Models
+open System.IO
 
 
 (*
@@ -172,6 +173,8 @@ type LiveTests() =
         
         runtime.run tracingDistributor
         |> ignore
+
+        printfn "Trace size: %d" (FileInfo(traceFN).Length)
 
         let trace = Tracers.readFileTrace traceFN
 
