@@ -105,35 +105,29 @@ type LiveTests() =
         let host = IVR.Host.newHost()
 
         let delay = IVR.delay
-        let ring = client.ring
-        let answer = client.answer
-        let hangup = client.hangup
-        let play id media = client.play(id, media)
 
         use connection = client.connectWithHost(host)
         
         let channelIVR (channel: Channel) = 
             ivr {
-                let id = channel.Id
-
-                ring id
+                yield channel.ring()
                 do! delay (2 .seconds)
-                answer id
+                yield channel.answer()
                 do! delay (1 .seconds)
-                do! play id "sound:tt-weasels"
-                hangup id
+                do! channel.play' "sound:tt-weasels" 
+                yield channel.hangup()
             }
 
         let hangupOn1 (channel: Channel) = 
             ivr {
-                do! channel.waitFor '1'
-                hangup channel.Id
+                do! channel.waitForKey '1'
+                yield channel.hangup()
             }
                         
         let handleHangupRequestByHangingUp (channel : Channel) = 
             ivr {
                 do! channel.waitForHangupRequest() |> IVR.ignore
-                hangup channel.Id
+                yield channel.hangup()
             }
 
         let rec distributor() = 

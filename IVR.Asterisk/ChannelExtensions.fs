@@ -83,5 +83,14 @@ module ChannelExtensions =
         member this.snoop(app, ?spy, ?whisper, ?appArgs, ?snoopId) = 
             Channels.SnoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
 
+        /// Plays a media, and waits for the PlaybackFinishedEvent
+        member this.play'(media, ?lang, ?offsetms, ?skipms) : unit ivr= 
+            ivr {
+                let! playback = 
+                    this.play(media, ?lang = lang, ?offsetms = offsetms, ?skipms = skipms)
+                    |> IVR.send
+                do! IVR.waitForPlaybackFinished(playback.Id)
+            }
+
 [<assembly:AutoOpen("IVR.Asterisk.ChannelExtensions")>]
 do ()

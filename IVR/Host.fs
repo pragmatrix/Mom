@@ -18,18 +18,18 @@ module Host =
 
     type Host() = 
 
-        let queue = SynchronizedQueue<obj>();
+        let eventQueue = SynchronizedQueue<Event>();
 
         interface IDisposable with
             member this.Dispose() = this.cancel()
 
         member this.dispatch event = 
-            queue.enqueue event
+            eventQueue.enqueue event
 
         member private this.cancel() = 
             this.dispatch CancelIVR
 
-        member this.serviceCommand (sc : SystemCommand) = 
+        member this.processSystemCommand (sc : SystemCommand) = 
             match sc with
             | Delay (id, timespan) ->
                 let callback _ = this.dispatch (IVR.DelayCompleted id)
@@ -40,7 +40,7 @@ module Host =
             let host = this.executeCommand
 
             let rec runLoop ivr = 
-                let event = queue.dequeue()
+                let event = eventQueue.dequeue()
                 match event with
                 | :? CancelIVR -> 
                     cancel host ivr

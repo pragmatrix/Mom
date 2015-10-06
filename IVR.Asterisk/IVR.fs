@@ -1,4 +1,6 @@
-﻿namespace IVR
+﻿namespace IVR.Asterisk
+
+open IVR
 
 open System
 open AsterNET.ARI

@@ -255,20 +255,5 @@ module ClientExtensions =
                 snoopId = snoopId
             }
 
-    type AriClient with
-        
-        member this.hangup(channelId, ?reason) = this.Channels.Hangup(channelId, optstr reason) 
-        member this.answer(channelId) = this.Channels.Answer(channelId)
-        member this.ring(channelId) = this.Channels.Ring(channelId)
-        member this.ringStop(channelId) = this.Channels.RingStop(channelId)
-        member this.beginPlay(channelId, media, ?lang, ?offsetms, ?skipms, ?playbackId) =
-            this.Channels.Play(channelId, media, optstr lang, optint offsetms, optint skipms, optstr playbackId)
-
-        member this.play(channelId, media, ?lang : string, ?offsetms, ?skipms, ?playbackId) =
-            let playback = this.beginPlay(channelId, media, ?lang = lang, ?offsetms = offsetms, ?skipms = skipms, ?playbackId = playbackId)
-            IVR.waitFor' (fun (e: PlaybackFinishedEvent) -> e.Playback.Id = playback.Id)
-        member this.record(channelId, name, format, ?maxDurationSeconds) =
-            this.Channels.Record(channelId, name, format, optint maxDurationSeconds)
-
 [<assembly:AutoOpen("IVR.Asterisk.ClientExtensions")>]
 do ()
