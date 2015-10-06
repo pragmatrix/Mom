@@ -473,21 +473,19 @@ module IVR =
         wait' f
 
     //
-    // IVR System Services
+    // IVR System Commands & Events
     //
 
-    type SystemCommand = 
-        | Delay of Id * TimeSpan
+    type Delay = Delay of TimeSpan
+        with
+        interface IReturns<Id>
 
     type SystemEvent = 
         | DelayCompleted of Id
 
-    let private delayIdGenerator = Ids.newGenerator()
-
     let delay (ts: TimeSpan) =
         ivr {
-            let id = delayIdGenerator.generateId()
-            yield Delay (id, ts)
+            let! id = Delay ts |> send
             do! waitFor' (fun (DelayCompleted id') -> id' = id)
         }
 

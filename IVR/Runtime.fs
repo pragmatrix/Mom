@@ -9,7 +9,7 @@ open IVR
 module Runtime =
 
     //
-    // The ivr runtime.
+    // The IVR runtime.
     // 
 
     // predefined runtime events
@@ -20,8 +20,12 @@ module Runtime =
 
         let eventQueue = SynchronizedQueue<Event>();
 
+        let delayIdGenerator = Ids.newGenerator()
+
         interface IDisposable with
             member this.Dispose() = this.cancel()
+
+
 
         /// Asynchronously schedules an event to the runtime.
         member this.scheduleEvent (event : Event) = 
@@ -56,16 +60,13 @@ module Runtime =
 
         member this.executeCommand cmd = 
             match cmd with
-            | :? SystemCommand as sc ->
-                sc |> this.processSystemCommand
-            | _ ->
-                cmd |> host
+            | :? Delay as d -> this.delay d
+            | _ -> cmd |> host
 
-        member this.processSystemCommand (sc : SystemCommand) = 
-            match sc with
-            | Delay (id, timespan) ->
-                let callback _ = this.scheduleEvent (IVR.DelayCompleted id)
-                new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
-                null
+        member this.delay (Delay timespan) = 
+            let id = delayIdGenerator.generateId()
+            let callback _ = this.scheduleEvent (IVR.DelayCompleted id)
+            new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
+            id |> box
             
     let newRuntime host = new Runtime(host)

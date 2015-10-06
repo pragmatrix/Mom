@@ -385,20 +385,18 @@ type IVRTests() =
 
     [<Test>]
     member this.``IVR.delay (simulated)``() = 
-        let queue = Queue()
-        let host c = queue.Enqueue c; null
+
+        let host c = 
+            c |> should equal (IVR.Delay (TimeSpan(1, 0, 0)))
+            1L |> box // return the 64 bit id of the Delay
 
         let test = IVR.delay (TimeSpan(1, 0, 0))            
 
         let state = 
             test |> IVR.start host 
             
-        let sc = queue.Dequeue()
-        match unbox sc with
-        | IVR.Delay (id, ts) ->
-
         state 
-        |> IVR.step host (IVR.DelayCompleted id)
+        |> IVR.step host (IVR.DelayCompleted 1L)
         |> IVR.isCompleted |> should equal true
 
     [<Test>]
