@@ -8,6 +8,8 @@ open AsterNET.ARI.Middleware
 
 open IVR.Threading
 
+open Commands
+
 module Client = 
 
     type ARIClientEvent =
@@ -90,12 +92,21 @@ module Client =
                 this.OnConnectionStateChanged.RemoveHandler connectionHandler
 
         /// Connect and deliver all events from ARI to the IVR runtime.
-        member this.connectWithRuntime(runtime: IVR.Runtime.Runtime) = 
+        member this.connect(runtime: IVR.Runtime.Runtime) = 
 
             let deliverARIEventToRuntime event = 
                 match event with
-                | ARIEvent e -> runtime.dispatch e
+                | ARIEvent e -> e |> runtime.scheduleEvent
+                // not sure about this, shouldn't have an IVR a chance to process a
+                // disconnected event, instead of being cancelled spontaneously.
                 | Disconnected -> (runtime :> IDisposable).Dispose()
                 | _ -> failwithf "unexpected ARI event: %A" event
 
             this.connect(deliverARIEventToRuntime)
+
+        member this.host (cmd: Command) : Response = 
+            match cmd with
+            | :? IDispatch<Actions.IChannelsActions> as d -> 
+                d.dispatch this.Channels
+            | _ -> failwithf "Unsupported command: %A" cmd
+

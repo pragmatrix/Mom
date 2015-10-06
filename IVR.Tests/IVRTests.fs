@@ -300,7 +300,8 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event1) -> true)
         }
 
-        let runtime = Runtime.newRuntime()
+        let host _ = null
+        let runtime = Runtime.newRuntime host
 
         async {
             try

@@ -16,24 +16,19 @@ module Runtime =
 
     type private CancelIVR = CancelIVR
 
-    type Runtime() = 
+    type Runtime(host: Host) = 
 
         let eventQueue = SynchronizedQueue<Event>();
 
         interface IDisposable with
             member this.Dispose() = this.cancel()
 
-        member this.dispatch event = 
+        /// Asynchronously schedules an event to the runtime.
+        member this.scheduleEvent (event : Event) = 
             eventQueue.enqueue event
 
         member private this.cancel() = 
-            this.dispatch CancelIVR
-
-        member this.processSystemCommand (sc : SystemCommand) = 
-            match sc with
-            | Delay (id, timespan) ->
-                let callback _ = this.dispatch (IVR.DelayCompleted id)
-                new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
+            this.scheduleEvent CancelIVR
 
         member this.run ivr = 
 
@@ -60,6 +55,17 @@ module Runtime =
             |> next
 
         member this.executeCommand cmd = 
-            obj()
+            match cmd with
+            | :? SystemCommand as sc ->
+                sc |> this.processSystemCommand
+            | _ ->
+                cmd |> host
+
+        member this.processSystemCommand (sc : SystemCommand) = 
+            match sc with
+            | Delay (id, timespan) ->
+                let callback _ = this.scheduleEvent (IVR.DelayCompleted id)
+                new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
+                null
             
-    let newRuntime() = new Runtime()
+    let newRuntime host = new Runtime(host)
