@@ -153,7 +153,7 @@ module Tracing =
                 | cmdt::rest ->
                 todo <- rest
                 if (cmd <> cmdt.command) then
-                    failwith "replay host: command differs, ignoring result"
+                    failwithf "replay host: command differs, ignoring result, expected: %A, actual %A" cmdt.command cmd
                 match cmdt.result with
                 | Result r -> r
                 | Error e -> raise e

@@ -1,6 +1,7 @@
 ﻿namespace IVR.Tests
 
-open System
+open NUnit.Framework
+open FsUnit
 
 open IVR
 
@@ -10,7 +11,6 @@ open IVR.Asterisk.Client
 open AsterNET.ARI
 open AsterNET.ARI.Models
 
-open NUnit.Framework
 
 (*
     Live Tests run with a full active ARI client in real time.
@@ -96,24 +96,13 @@ type LiveTests() =
                 System.Diagnostics.Debug.WriteLine(sprintf "secondary msg: %A" msg)
             | _ -> ()
 
-    [<Test>]
-    member this.parallelIVRBlocks() = 
-
-        // this is a simple call flow that shows how to combine IVR blocks in parallel.
-
-        use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
-        let runtime = IVR.Runtime.newRuntime(client.host)
-
-        let delay = IVR.delay
-
-        use connection = client.connect(runtime)
-        
+    member this.createTestIVR() = 
         let channelIVR (channel: Channel) = 
             ivr {
                 yield channel.ring()
-                do! delay (2 .seconds)
+                do! IVR.delay (2 .seconds)
                 yield channel.answer()
-                do! delay (1 .seconds)
+                do! IVR.delay (1 .seconds)
                 do! channel.play' "sound:tt-weasels" 
                 yield channel.hangup()
             }
@@ -148,6 +137,52 @@ type LiveTests() =
                     |> IVR.ignore
             }
 
+        distributor
+
+
+    [<Test>]
+    member this.simpleTestIVR() = 
+
+        // this is a simple call flow that shows how to combine IVR blocks in parallel.
+
+        use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
+        let runtime = IVR.Runtime.newRuntime(client.host)
+
+        use connection = client.connect(runtime)
+        
+        let distributor = this.createTestIVR()
         runtime.run (distributor())
         |> ignore
+
+
+    [<Test>]
+    member this.simpleTestIVRTraceRoundtrip() = 
+        
+        let distributor = this.createTestIVR()
+        let traceFN = "simpleTestIVR.trace"
+        
+        let sessionInfo = Tracing.sessionInfo "" 0L null
+        let fileTracer = Tracers.fileTracer traceFN sessionInfo
+        let tracingDistributor = Tracing.trace fileTracer (distributor())
+
+        use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
+        let runtime = IVR.Runtime.newRuntime(client.host)
+
+        use connection = client.connect(runtime)
+        
+        runtime.run tracingDistributor
+        |> ignore
+
+        let trace = Tracers.readFileTrace traceFN
+
+        let report = 
+            trace
+            |> Tracing.replay distributor
+
+        report.incidents |> Seq.iter (printfn "%A")
+        report.isEmpty |> should equal true
+
+
+
+        
 
