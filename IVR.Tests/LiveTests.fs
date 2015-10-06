@@ -102,11 +102,11 @@ type LiveTests() =
         // this is a simple call flow that shows how to combine IVR blocks in parallel.
 
         use client = new AriClient(Configuration.endpoint, Configuration.applicationName)
-        let host = IVR.Host.newHost()
+        let runtime = IVR.Runtime.newRuntime()
 
         let delay = IVR.delay
 
-        use connection = client.connectWithHost(host)
+        use connection = client.connectWithRuntime(runtime)
         
         let channelIVR (channel: Channel) = 
             ivr {
@@ -148,6 +148,6 @@ type LiveTests() =
                     |> IVR.ignore
             }
 
-        host.run (distributor())
+        runtime.run (distributor())
         |> ignore
 

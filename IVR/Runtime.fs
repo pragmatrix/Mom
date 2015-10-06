@@ -6,17 +6,17 @@ open Threading
 open IVR
 
 [<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
-module Host =
+module Runtime =
 
     //
-    // The ivr host, where all events are being dispatched
+    // The ivr runtime.
     // 
 
-    // predefined host events
+    // predefined runtime events
 
     type private CancelIVR = CancelIVR
 
-    type Host() = 
+    type Runtime() = 
 
         let eventQueue = SynchronizedQueue<Event>();
 
@@ -62,4 +62,4 @@ module Host =
         member this.executeCommand cmd = 
             obj()
             
-    let newHost() = new Host()
+    let newRuntime() = new Runtime()

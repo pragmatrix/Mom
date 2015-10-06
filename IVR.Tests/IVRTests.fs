@@ -300,18 +300,18 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event1) -> true)
         }
 
-        let host = Host.newHost()
+        let runtime = Runtime.newRuntime()
 
         async {
             try
-                host.run ivr |> ignore
+                runtime.run ivr |> ignore
             with Cancelled ->
                 ()
         } |> Async.Start
 
-        (host :> IDisposable).Dispose();
+        (runtime :> IDisposable).Dispose();
 
-        // wait a while... tbd: this makes this test brittle and should be fixed
+        // wait a while... tbd: this makes this test brittle
         Async.Sleep(100) |> Async.RunSynchronously
 
         ct.disposed |> should equal true
