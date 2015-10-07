@@ -378,7 +378,6 @@ module IVR =
 
     type IVRBuilder<'result>() = 
         member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 ivr) : 'r2 ivr = 
-
             ivr
             |> continueWith (
                 function 
@@ -420,6 +419,22 @@ module IVR =
                 | Error e -> fun _ -> e |> Error |> Completed
                 | _ -> ivr2
             )
+    
+        // http://fsharpforfunandprofit.com/posts/computation-expressions-builder-part6/
+
+        // While can be implemented in terms of Zero() and Bind()
+        member this.While(guard: unit -> bool, body: unit ivr) : unit ivr =
+            if not (guard()) then
+                this.Zero()
+            else
+                this.Bind(body, fun () ->
+                    this.While(guard, body))
+
+        // For with Using(), While(), and Delay().
+        member this.For(sequence: seq<'a>, body: 'a -> unit ivr) : unit ivr =
+            this.Using(sequence.GetEnumerator(), fun enum ->
+                this.While(enum.MoveNext,
+                    this.Delay(fun () -> body enum.Current)))
 
     let ivr<'result> = IVRBuilder<'result>()
             

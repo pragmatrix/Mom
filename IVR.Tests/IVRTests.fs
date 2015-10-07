@@ -415,4 +415,46 @@ type IVRTests() =
         test
         |> IVR.start host
         |> IVR.resultValue
-        |> should equal "Hello" 
+        |> should equal "Hello"
+        
+    [<Test>]
+    member this.``computation expression: While``() = 
+        let test = ivr {
+            let mutable f = 0
+            while f<3 do
+                do! IVR.waitFor' (fun Event1 -> true)
+                f <- f + 1
+            return f
+        }
+
+        let host _ = null
+        test
+        |> IVR.start host
+        |> IVR.step host Event1
+        |> IVR.step host Event1
+        |> IVR.step host Event1
+        |> IVR.result
+        |> should equal (Result 3) 
+
+    [<Test>]
+    member this.``computation expression: For``() = 
+        let test = ivr {
+            for _ in [0..2] do
+                do! IVR.waitFor' (fun Event1 -> true)
+        }
+
+        let host _ = null
+        test
+        |> IVR.start host
+        |> IVR.step host Event1
+        |> IVR.step host Event1
+        |> IVR.step host Event1
+        |> IVR.result
+        |> should equal (Result ()) 
+
+
+
+
+
+
+     
