@@ -377,41 +377,41 @@ module IVR =
     //
 
     type IVRBuilder<'result>() = 
-        member this.Bind(ivr: 'r ivr, cont: 'r -> 'r2 ivr) : 'r2 ivr = 
+        member this.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
             ivr
             |> continueWith (
                 function 
-                | Result r -> cont r
+                | Result r -> body r
                 | Error err -> 
                     fun _ -> err |> Error |> Completed)
 
-        member this.Return v = fun _ -> v |> Result |> Completed
+        member this.Return(v: 'r) : 'r ivr = fun _ -> v |> Result |> Completed
 
-        member this.ReturnFrom ivr = ivr
+        member this.ReturnFrom(ivr : 'r ivr) = ivr
 
-        member this.Delay (f : unit -> 'r ivr) : 'r ivr =
+        member this.Delay(f : unit -> 'r ivr) : 'r ivr =
             fun h ->
                 f()
                 |> start h
               
-        member this.Zero () = 
+        member this.Zero () : unit ivr = 
             fun _ -> () |> Result |> Completed
 
         member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
             body disposable
             |> whenCompleted disposable.Dispose
 
-        member this.TryFinally (ivr: 'r ivr, f: unit -> unit) : 'r ivr =
+        member this.TryFinally(ivr: 'r ivr, f: unit -> unit) : 'r ivr =
             ivr
             |> whenCompleted f
 
-        member this.TryWith (ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
+        member this.TryWith(ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
             ivr
             |> continueWith (function
                 | Error e -> eh e
                 | r -> fun _ -> r |> Completed)
 
-        member this.Yield (cmd: Command) : unit ivr = post cmd
+        member this.Yield(cmd: Command) : unit ivr = post cmd
 
         member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
@@ -495,14 +495,67 @@ module IVR =
         with
         interface IReturns<Id>
 
-    type SystemEvent = 
-        | DelayCompleted of Id
+    type DelayCompleted = DelayCompleted of Id
 
     let delay (ts: TimeSpan) =
         ivr {
             let! id = Delay ts |> send
             do! waitFor' (fun (DelayCompleted id') -> id' = id)
         }
+
+    //
+    // Async interopability
+    //
+
+    let fromResult(result: Result<'r>) = 
+        fun _ ->
+            result |> Completed
+
+    // As long we don't support asynchronous runtimes, async computations are scheduled on
+    // the threadpool by default.
+
+    type IAsyncComputation = 
+        abstract member run : (Result<obj> -> unit) -> unit
+
+    type AsyncComputation<'r>(computation: Async<'r>) = 
+        interface IAsyncComputation with
+            /// Run the asynchronous computation on a threadpool thread and post 
+            /// its result to the receiver.
+            member this.run(receiver : Result<obj> -> unit) : unit = 
+                async {
+                    try
+                        let! r = computation
+                        r |> box |> Result |> receiver
+                    with e ->
+                        e |> Error |> receiver
+                } |> Async.Start
+
+        interface IReturns<Id>
+
+    type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: Result<obj>
+
+    /// Waits for an F# asynchronous computation.
+    let await (computation: Async<'r>) : 'r ivr = 
+        ivr {
+            let! id = AsyncComputation(computation) |> send
+            let! result = 
+                waitFor(
+                    fun (AsyncComputationCompleted (id', result)) -> 
+                        if id' = id then Some result else None)
+            return! fromResult (result.map unbox)
+        }
+
+#if false
+
+    // Direct integration of async computations inside IVR computation expressions seems
+    // to impair the type inferencer somewhat. So we use IVR.async for now.
+
+    type IVRBuilder<'result> with
+        member this.Bind(computation: Async<'r>, body: 'r -> 'r2 ivr) : 'r2 ivr = 
+            let ivr = async computation
+            this.Bind(ivr, body)
+
+#endif
 
     //
     // TPL naming scheme

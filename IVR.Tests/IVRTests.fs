@@ -451,10 +451,4 @@ type IVRTests() =
         |> IVR.step host Event1
         |> IVR.result
         |> should equal (Result ()) 
-
-
-
-
-
-
      

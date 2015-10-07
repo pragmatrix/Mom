@@ -21,11 +21,10 @@ module Runtime =
         let eventQueue = SynchronizedQueue<Event>();
 
         let delayIdGenerator = Ids.newGenerator()
+        let asyncIdGenerator = Ids.newGenerator()
 
         interface IDisposable with
             member this.Dispose() = this.cancel()
-
-
 
         /// Asynchronously schedules an event to the runtime.
         member this.scheduleEvent (event : Event) = 
@@ -61,12 +60,20 @@ module Runtime =
         member this.executeCommand cmd = 
             match cmd with
             | :? Delay as d -> this.delay d
+            | :? IAsyncComputation as ac -> this.asyncComputation ac
             | _ -> cmd |> host
 
-        member this.delay (Delay timespan) = 
+        member this.delay(Delay timespan) = 
             let id = delayIdGenerator.generateId()
             let callback _ = this.scheduleEvent (IVR.DelayCompleted id)
             new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
             id |> box
             
+        member this.asyncComputation(ac: IAsyncComputation) = 
+            let id = asyncIdGenerator.generateId()
+            ac.run(fun r ->
+                this.scheduleEvent (IVR.AsyncComputationCompleted(id, r))
+                )
+            id |> box
+
     let newRuntime host = new Runtime(host)

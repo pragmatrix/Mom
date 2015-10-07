@@ -1,0 +1,28 @@
+﻿namespace IVR.Tests
+
+open IVR
+
+open NUnit.Framework
+open FsUnit
+
+[<TestFixture>]
+type RuntimeTests() = 
+
+    [<Test>]
+    member this.``async can be used in ivrs``() = 
+
+        let waitAndReturn10 = async {
+            do! Async.Sleep(1)
+            return 10
+        }
+        
+        let test = ivr {
+            let! v = IVR.await waitAndReturn10
+            return v
+        }
+
+        let host _ = null
+
+        let runtime = IVR.Runtime.newRuntime(host)
+        let result = runtime.run test
+        result |> should equal (Some 10)
