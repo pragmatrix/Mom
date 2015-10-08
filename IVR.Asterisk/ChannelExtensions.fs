@@ -2,7 +2,6 @@
 
 open AsterNET.ARI.Models
 open IVR
-open Commands
 
 module ChannelExtensions =
     

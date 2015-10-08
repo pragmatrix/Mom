@@ -8,8 +8,6 @@ open AsterNET.ARI.Middleware
 
 open IVR.Threading
 
-open Commands
-
 module Client = 
 
     type ARIClientEvent =
