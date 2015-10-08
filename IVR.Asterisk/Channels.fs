@@ -1,37 +1,13 @@
 ﻿namespace IVR.Asterisk
 
 open System
-open AsterNET.ARI
-open AsterNET.ARI.Middleware
-open AsterNET.ARI.Models
-open AsterNET.ARI.Actions
-open IVR
 open System.Collections.Generic
 
-[<AutoOpen>]
-module private Helper =
-    let inline opts (o: string option) = 
-        match o with
-        | Some s -> s
-        | None -> null
+open IVR
 
-    let inline opt (i: 'i option) = 
-        match i with
-        | Some i -> Nullable(i)
-        | None -> Nullable()
+open AsterNET.ARI.Models
+open AsterNET.ARI.Actions
 
-    let inline optvars (i: ('a * 'b) list option ) = 
-        match i with
-        | None -> null
-        | Some l -> l |> List.map KeyValuePair |> List
-
-    type TimeSpan with
-        static member toms(ts: TimeSpan) = 
-            ts.TotalMilliseconds |> int
-        static member tosec(ts: TimeSpan) =
-            ts.TotalSeconds |> int
-
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Channels =
 
     type IChannelsCommand<'r> =
@@ -80,36 +56,6 @@ module Channels =
             | Timeout ts -> ts.TotalSeconds |> int
             | NoTimeout -> -1
 
-    type IfExists =
-        | Fail = 0
-        | Overwrite = 1
-        | Append = 2
-
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module IfExists =
-        let tos = 
-            function 
-            | IfExists.Fail -> "fail"
-            | IfExists.Overwrite -> "overwrite"
-            | IfExists.Append -> "append"
-            | v -> failwithf "invalid IfExists: %A" v
-
-    type TerminateOn = 
-        | None = 0
-        | Any = 1
-        | Star = 2
-        | Hash = 3
-
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module TerminateOn =
-        let tos = 
-            function
-            | TerminateOn.None -> "none"
-            | TerminateOn.Any -> "any"
-            | TerminateOn.Star -> "*"
-            | TerminateOn.Hash -> "#"
-            | v -> failwithf "invalid TerminateOn: %A" v
-
     type AudioDirection = 
         | None = 0
         | Both = 1
@@ -129,7 +75,8 @@ module Channels =
     type List = List with
         interface IChannelsCommand<Channel list> with
             member this.dispatch channels = 
-                channels.List() |> Seq.toList |> box
+                channels.List() |> Seq.toList 
+                |> box
 
     type Originate = { 
         endpoint:string
@@ -158,7 +105,7 @@ module Channels =
                     opts this.appArgs, 
                     opts this.callerId, 
                     this.timeout |> Option.map Timeout.toi |> opt, 
-                    optvars this.variables, 
+                    this.variables |> optvars,
                     opts this.channelId, 
                     opts this.otherChannelId, 
                     opts this.originator) 
@@ -202,28 +149,32 @@ module Channels =
         interface IChannelsCommand with
             member this.dispatch channels =     
                 let (Redirect (channelId, endpoint)) = this
-                channels.Redirect(channelId, endpoint) |> box
+                channels.Redirect(channelId, endpoint) 
+                |> box
 
     type Answer = Answer of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Answer channelId) = this
-                channels.Answer(channelId) |> box
+                channels.Answer(channelId) 
+                |> box
 
     type Ring = Ring of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Ring channelId) = this
-                channels.Ring(channelId) |> box
+                channels.Ring(channelId) 
+                |> box
 
     type RingStop = RingStop of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (RingStop channelId) = this
-                channels.RingStop(channelId) |> box
+                channels.RingStop(channelId) 
+                |> box
 
     type SendDTMF = {
         channelId: string
@@ -241,63 +192,72 @@ module Channels =
                     this.before |> Option.map TimeSpan.toms |> opt,
                     this.between |> Option.map TimeSpan.toms |> opt,
                     this.duration |> Option.map TimeSpan.toms |> opt,
-                    this.after |> Option.map TimeSpan.toms |> opt) |> box
+                    this.after |> Option.map TimeSpan.toms |> opt) 
+                |> box
 
     type Mute = Mute of channelId: string * direction: MuteDirection option
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Mute (channelId, direction)) = this
-                channels.Mute(channelId, direction |> Option.map MuteDirection.tos |> opts) |> box
+                channels.Mute(channelId, direction |> Option.map MuteDirection.tos |> opts) 
+                |> box
 
     type Unmute = Unmute of channelId: string * direction: MuteDirection option
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Unmute (channelId, direction)) = this
-                channels.Unmute(channelId, direction |> Option.map MuteDirection.tos |> opts) |> box
+                channels.Unmute(channelId, direction |> Option.map MuteDirection.tos |> opts) 
+                |> box
 
     type Hold = Hold of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Hold channelId) = this
-                channels.Hold(channelId) |> box
+                channels.Hold(channelId) 
+                |> box
 
     type Unhold = Unhold of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Unhold channelId) = this
-                channels.Unhold(channelId) |> box
+                channels.Unhold(channelId) 
+                |> box
 
     type StartMOH = StartMOH of channelId: string * mohClass: string option
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (StartMOH (channelId, mohClass)) = this
-                channels.StartMoh(channelId, opts mohClass) |> box
+                channels.StartMoh(channelId, opts mohClass) 
+                |> box
 
     type StopMOH = StopMOH of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (StopMOH channelId) = this
-                channels.StopMoh(channelId) |> box
+                channels.StopMoh(channelId) 
+                |> box
 
     type StartSilence = StartSilence of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (StartSilence channelId) = this
-                channels.StartSilence(channelId) |> box
+                channels.StartSilence(channelId) 
+                |> box
 
     type StopSilence = StopSilence of channelId: string
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (StopSilence channelId) = this
-                channels.StopSilence(channelId) |> box
+                channels.StopSilence(channelId) 
+                |> box
 
     type Play = {
         channelId: string
@@ -315,7 +275,8 @@ module Channels =
                     opts this.lang,
                     this.offset |> Option.map TimeSpan.toms |> opt,
                     this.skip |> Option.map TimeSpan.toms |> opt,
-                    opts this.playbackId) |> box
+                    opts this.playbackId) 
+                |> box
 
     type Record = {
         channelId: string
@@ -337,7 +298,8 @@ module Channels =
                     this.maxSilence |> Option.map TimeSpan.tosec |> opt,
                     this.ifExists |> Option.map IfExists.tos |> opts,
                     opt this.beep,
-                    this.terminateOn |> Option.map TerminateOn.tos |> opts) |> box
+                    this.terminateOn |> Option.map TerminateOn.tos |> opts)
+               |> box
 
     type GetChannelVar = GetChannelVar of channelId: string * variable: string
         with
@@ -351,7 +313,8 @@ module Channels =
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (SetChannelVar (channelId, variable, value)) = this
-                channels.SetChannelVar(channelId, variable, opts value) |> box
+                channels.SetChannelVar(channelId, variable, opts value)
+                |> box
 
     type SnoopChannel = {
         channelId: string
@@ -369,7 +332,8 @@ module Channels =
                     this.spy |> Option.map AudioDirection.tos |> opts,
                     this.whisper |> Option.map AudioDirection.tos |> opts,
                     opts this.appArgs,
-                    opts this.snoopId) |> box
+                    opts this.snoopId) 
+                |> box
     
     [<AbstractClass; Sealed>]
     type Channels() = 
@@ -393,22 +357,6 @@ module Channels =
         static member Get(channelId) = Get channelId
         static member Hangup(channelId, ?reason) = 
             Hangup (channelId, ?reason = reason)
-        static member OriginateWithId(endpoint, channelId, ?extension, ?context, ?priority, ?label, ?app, ?appArgs, ?callerId, ?timeout, ?variables, ?otherChannelId, ?originator) =
-            {
-                endpoint = endpoint
-                extension = extension
-                context = context
-                priority = priority
-                label = label
-                app = app
-                appArgs = appArgs
-                callerId = callerId
-                timeout = timeout
-                variables = variables
-                channelId = channelId
-                otherChannelId = otherChannelId
-                originator = originator
-            }
         static member ContinueInDialplan(channelId, ?context, ?extension, ?priority, ?label) =
             {
                 ContinueInDialplan.channelId = channelId
@@ -461,15 +409,6 @@ module Channels =
                 skip = skip
                 playbackId = playbackId
             }
-        static member PlayWithId(channelId, playbackId, media, ?lang, ?offset, ?skip) =
-            {
-                Play.channelId = channelId
-                media = media
-                lang = lang
-                offset = offset
-                skip = skip
-                playbackId = playbackId
-            }
         static member Record(channelId, name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
             {
                 Record.channelId = channelId
@@ -494,12 +433,4 @@ module Channels =
                 appArgs = appArgs
                 snoopId = snoopId
             }
-        static member SnoopChannelWithId(channelId, snoopId, app, ?spy, ?whisper, ?appArgs) = 
-            {
-                SnoopChannel.channelId = channelId
-                app = app
-                spy = spy
-                whisper = whisper
-                appArgs = appArgs
-                snoopId = snoopId
-            }
+

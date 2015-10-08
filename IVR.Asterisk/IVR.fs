@@ -5,6 +5,7 @@ open IVR
 open System
 open AsterNET.ARI
 open AsterNET.ARI.Models
+open System.Collections.Generic
 
 module IVR =
     let waitForStasisStart() = 
@@ -15,3 +16,62 @@ module IVR =
 
     type IDispatch<'i> =
         abstract member dispatch : 'i -> Response
+
+    let inline opts (o: string option) = 
+        match o with
+        | Some s -> s
+        | None -> null
+
+    let inline opt (i: 'i option) = 
+        match i with
+        | Some i -> Nullable(i)
+        | None -> Nullable()
+
+    let inline optvars (i: ('a * 'b) list option ) = 
+        match i with
+        | None -> null
+        | Some l -> l |> List.map KeyValuePair |> List
+
+    type TimeSpan with
+        static member toms(ts: TimeSpan) = 
+            ts.TotalMilliseconds |> int
+        static member tosec(ts: TimeSpan) =
+            ts.TotalSeconds |> int
+
+    /// Comma separated strings
+    let inline css (strings: string list) =
+        String.Join(",", strings |> List.toArray)
+
+    //
+    // Shared
+    //
+
+    type IfExists =
+        | Fail = 0
+        | Overwrite = 1
+        | Append = 2
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module IfExists =
+        let tos = 
+            function 
+            | IfExists.Fail -> "fail"
+            | IfExists.Overwrite -> "overwrite"
+            | IfExists.Append -> "append"
+            | v -> failwithf "invalid IfExists: %A" v
+
+    type TerminateOn = 
+        | None = 0
+        | Any = 1
+        | Star = 2
+        | Hash = 3
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module TerminateOn =
+        let tos = 
+            function
+            | TerminateOn.None -> "none"
+            | TerminateOn.Any -> "any"
+            | TerminateOn.Star -> "*"
+            | TerminateOn.Hash -> "#"
+            | v -> failwithf "invalid TerminateOn: %A" v

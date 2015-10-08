@@ -51,7 +51,11 @@
   <ItemGroup>
     <Compile Include="IVR.fs" />
     <Compile Include="Applications.fs" />
+    <Compile Include="Asterisk.fs" />
+    <Compile Include="Bridges.fs" />
     <Compile Include="Channels.fs" />
+    <Compile Include="DeviceStates.fs" />
+    <Compile Include="Endpoints.fs" />
     <Compile Include="Client.fs" />
     <Compile Include="ChannelExtensions.fs" />
     <Content Include="app.config" />
