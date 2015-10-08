@@ -29,6 +29,97 @@ module Commands =
 
     open IVR
 
+    type HangupReason =
+        | Normal = 0
+        | Busy = 1
+        | Congestion = 2
+        | NoAnswer = 3
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module HangupReason =
+        let tos = 
+            function
+            | HangupReason.Normal -> "normal"
+            | HangupReason.Busy -> "busy"
+            | HangupReason.Congestion -> "congestion"
+            | HangupReason.NoAnswer -> "no_answer"
+            | v -> failwithf "invalid HangupReason: %A" v
+
+    type MuteDirection = 
+        | Both = 0
+        | In = 1
+        | Out = 2
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module MuteDirection = 
+        let tos =
+            function
+            | MuteDirection.In -> "in"
+            | MuteDirection.Out -> "out"
+            | MuteDirection.Both -> "both"
+            | v -> failwithf "invalid MuteDirection: %A" v
+
+    type Timeout = 
+        | Timeout of TimeSpan
+        | NoTimeout
+        with
+        static member toi = 
+            function 
+            | Timeout ts -> ts.TotalSeconds |> int
+            | NoTimeout -> -1
+
+    type IfExists =
+        | Fail = 0
+        | Overwrite = 1
+        | Append = 2
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module IfExists =
+        let tos = 
+            function 
+            | IfExists.Fail -> "fail"
+            | IfExists.Overwrite -> "overwrite"
+            | IfExists.Append -> "append"
+            | v -> failwithf "invalid IfExists: %A" v
+
+    type TerminateOn = 
+        | None = 0
+        | Any = 1
+        | Star = 2
+        | Hash = 3
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module TerminateOn =
+        let tos = 
+            function
+            | TerminateOn.None -> "none"
+            | TerminateOn.Any -> "any"
+            | TerminateOn.Star -> "*"
+            | TerminateOn.Hash -> "#"
+            | v -> failwithf "invalid TerminateOn: %A" v
+
+    type AudioDirection = 
+        | None = 0
+        | Both = 1
+        | Out = 2
+        | In = 3
+
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+    module AudioDirection = 
+        let tos = 
+            function 
+            | AudioDirection.None -> "none"
+            | AudioDirection.Both -> "both"
+            | AudioDirection.Out -> "out"
+            | AudioDirection.In -> "in"
+            | v -> failwithf "invalid AudioDirection: %A" v
+
+    type TimeSpan with
+        static member toms(ts: TimeSpan) = 
+            ts.TotalMilliseconds |> int
+        static member tosec(ts: TimeSpan) =
+            ts.TotalSeconds |> int
+
     type IDispatch<'i> =
         abstract member dispatch : 'i -> Response
 
@@ -53,7 +144,7 @@ module Commands =
         app: string option
         appArgs: string option
         callerId: string option
-        timeout: int option
+        timeout: Timeout option
         variables: (string * string) list option
         channelId: string option
         otherChannelId: string option
@@ -70,7 +161,7 @@ module Commands =
                     opts this.app, 
                     opts this.appArgs, 
                     opts this.callerId, 
-                    opt this.timeout, 
+                    this.timeout |> Option.map Timeout.toi |> opt, 
                     optvars this.variables, 
                     opts this.channelId, 
                     opts this.otherChannelId, 
@@ -84,11 +175,12 @@ module Commands =
                 channels.Get(channelId)
                 |> box
 
-    type Hangup = Hangup of channelId: string * reason: string option 
+    type Hangup = Hangup of channelId: string * reason: HangupReason option 
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Hangup (channelId, reason)) = this
+                let reason = reason |> Option.map HangupReason.tos
                 channels.Hangup(channelId, opts reason)
                 |> box
 
@@ -140,34 +232,34 @@ module Commands =
     type SendDTMF = {
         channelId: string
         dtmf: string
-        before: int option
-        between: int option
-        duration: int option
-        after: int option
+        before: TimeSpan option
+        between: TimeSpan option
+        duration: TimeSpan option
+        after: TimeSpan option
         } with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 channels.SendDTMF(
                     this.channelId,
                     this.dtmf,
-                    opt this.before,
-                    opt this.between,
-                    opt this.duration,
-                    opt this.after) |> box
+                    this.before |> Option.map TimeSpan.toms |> opt,
+                    this.between |> Option.map TimeSpan.toms |> opt,
+                    this.duration |> Option.map TimeSpan.toms |> opt,
+                    this.after |> Option.map TimeSpan.toms |> opt) |> box
 
-    type Mute = Mute of channelId: string * direction: string option
+    type Mute = Mute of channelId: string * direction: MuteDirection option
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Mute (channelId, direction)) = this
-                channels.Mute(channelId, opts direction) |> box
+                channels.Mute(channelId, direction |> Option.map MuteDirection.tos |> opts) |> box
 
-    type Unmute = Unmute of channelId: string * direction: string option
+    type Unmute = Unmute of channelId: string * direction: MuteDirection option
         with
         interface IChannelsCommand with
             member this.dispatch channels = 
                 let (Unmute (channelId, direction)) = this
-                channels.Unmute(channelId, opts direction) |> box
+                channels.Unmute(channelId, direction |> Option.map MuteDirection.tos |> opts) |> box
 
     type Hold = Hold of channelId: string
         with
@@ -213,31 +305,31 @@ module Commands =
 
     type Play = {
         channelId: string
-        media: string
+        media: Uri
         lang: string option
-        offsetms: int option
-        skipms: int option
+        offset: TimeSpan option
+        skip: TimeSpan option
         playbackId: string option
         } with 
         interface IChannelsCommand<Playback> with
             member this.dispatch channels = 
                 channels.Play(
                     this.channelId,
-                    this.media,
+                    this.media.ToString(),
                     opts this.lang,
-                    opt this.offsetms,
-                    opt this.skipms,
+                    this.offset |> Option.map TimeSpan.toms |> opt,
+                    this.skip |> Option.map TimeSpan.toms |> opt,
                     opts this.playbackId) |> box
 
     type Record = {
         channelId: string
         name: string
         format: string
-        maxDurationSeconds: int option
-        maxSilenceSeconds: int option
-        ifExists: string option
+        maxDuration: TimeSpan option
+        maxSilence: TimeSpan option
+        ifExists: IfExists option
         beep: bool option
-        terminateOn: string option
+        terminateOn: TerminateOn option
         } with 
         interface IChannelsCommand<LiveRecording> with
             member this.dispatch channels = 
@@ -245,11 +337,11 @@ module Commands =
                     this.channelId,
                     this.name,
                     this.format,
-                    opt this.maxDurationSeconds,
-                    opt this.maxSilenceSeconds,
-                    opts this.ifExists,
+                    this.maxDuration |> Option.map TimeSpan.tosec |> opt,
+                    this.maxSilence |> Option.map TimeSpan.tosec |> opt,
+                    this.ifExists |> Option.map IfExists.tos |> opts,
                     opt this.beep,
-                    opts this.terminateOn) |> box
+                    this.terminateOn |> Option.map TerminateOn.tos |> opts) |> box
 
     type GetChannelVar = GetChannelVar of channelId: string * variable: string
         with
@@ -268,8 +360,8 @@ module Commands =
     type SnoopChannel = {
         channelId: string
         app: string
-        spy: string option
-        whisper: string option
+        spy: AudioDirection option
+        whisper: AudioDirection option
         appArgs: string option
         snoopId: string option 
         } with
@@ -278,8 +370,8 @@ module Commands =
                 channels.SnoopChannel(
                     this.channelId,
                     this.app,
-                    opts this.spy,
-                    opts this.whisper,
+                    this.spy |> Option.map AudioDirection.tos |> opts,
+                    this.whisper |> Option.map AudioDirection.tos |> opts,
                     opts this.appArgs,
                     opts this.snoopId) |> box
     
@@ -366,31 +458,31 @@ module Commands =
         static member StopSilence(channelId) =
             StopSilence channelId
 
-        static member Play(channelId, media, ?lang, ?offsetms, ?skipms, ?playbackId) =
+        static member Play(channelId, media, ?lang, ?offset, ?skip, ?playbackId) =
             {
                 Play.channelId = channelId
                 media = media
                 lang = lang
-                offsetms = offsetms
-                skipms = skipms
+                offset = offset
+                skip = skip
                 playbackId = playbackId
             }
-        static member PlayWithId(channelId, playbackId, media, ?lang, ?offsetms, ?skipms) =
+        static member PlayWithId(channelId, playbackId, media, ?lang, ?offset, ?skip) =
             {
                 Play.channelId = channelId
                 media = media
                 lang = lang
-                offsetms = offsetms
-                skipms = skipms
+                offset = offset
+                skip = skip
                 playbackId = playbackId
             }
-        static member Record(channelId, name, format, ?maxDurationSeconds, ?maxSilenceSeconds, ?ifExists, ?beep, ?terminateOn) =
+        static member Record(channelId, name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
             {
                 Record.channelId = channelId
                 name = name
                 format = format
-                maxDurationSeconds = maxDurationSeconds
-                maxSilenceSeconds = maxSilenceSeconds
+                maxDuration = maxDuration
+                maxSilence = maxSilence
                 ifExists = ifExists
                 beep = beep
                 terminateOn = terminateOn

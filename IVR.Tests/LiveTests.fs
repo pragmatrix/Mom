@@ -10,6 +10,8 @@ open IVR.Asterisk.Client
 
 open AsterNET.ARI
 open AsterNET.ARI.Models
+
+open System
 open System.IO
 
 
@@ -104,7 +106,7 @@ type LiveTests() =
                 do! IVR.delay (2 .seconds)
                 yield channel.answer()
                 do! IVR.delay (1 .seconds)
-                do! channel.play' "sound:tt-weasels" 
+                do! channel.play' (Uri("sound:tt-weasels"))
                 yield channel.hangup()
             }
 

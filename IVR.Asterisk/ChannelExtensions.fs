@@ -6,6 +6,7 @@ open Commands
 
 module ChannelExtensions =
     
+    // https://wiki.asterisk.org/wiki/display/AST/Asterisk+13+Channels+REST+API#Asterisk13ChannelsRESTAPI-list
             
     type Channel with
 
@@ -35,7 +36,7 @@ module ChannelExtensions =
 
         member this.waitForKey (key: char) = 
             ivr {
-                let! (e:ChannelDtmfReceivedEvent) = this.waitForDTMFReceived()
+                let! e = this.waitForDTMFReceived()
                 if e.Digit.[0] <> key then
                     return! this.waitForKey key
                 else 
@@ -72,10 +73,10 @@ module ChannelExtensions =
             Channels.StartSilence(this.Id)
         member this.stopSilence() = 
             Channels.StopSilence(this.Id)
-        member this.play(media, ?lang, ?offsetms, ?skipms, ?playbackId) = 
-            Channels.Play(this.Id, media, ?lang = lang, ?offsetms = offsetms, ?skipms = skipms, ?playbackId = playbackId)
-        member this.record(name, format, ?maxDurationSeconds, ?maxSilenceSeconds, ?ifExists, ?beep, ?terminateOn) =
-            Channels.Record(this.Id, name, format, ?maxDurationSeconds = maxDurationSeconds, ?maxSilenceSeconds = maxSilenceSeconds, ?ifExists = ifExists, ?beep = beep, ?terminateOn = terminateOn)
+        member this.play(media, ?lang, ?offset, ?skip, ?playbackId) = 
+            Channels.Play(this.Id, media, ?lang = lang, ?offset = offset, ?skip = skip, ?playbackId = playbackId)
+        member this.record(name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
+            Channels.Record(this.Id, name, format, ?maxDuration = maxDuration, ?maxSilence = maxSilence, ?ifExists = ifExists, ?beep = beep, ?terminateOn = terminateOn)
         member this.getVar(variable) = 
             Channels.GetChannelVar(this.Id, variable)
         member this.setVar(variable, ?value) = 
@@ -84,10 +85,10 @@ module ChannelExtensions =
             Channels.SnoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
 
         /// An IVR that plays a media, and waits for the PlaybackFinishedEvent
-        member this.play'(media, ?lang, ?offsetms, ?skipms) : unit ivr= 
+        member this.play'(media, ?lang, ?offset, ?skip) : unit ivr= 
             ivr {
                 let! playback = 
-                    this.play(media, ?lang = lang, ?offsetms = offsetms, ?skipms = skipms)
+                    this.play(media, ?lang = lang, ?offset = offset, ?skip = skip)
                     |> IVR.send
                 do! IVR.waitForPlaybackFinished(playback.Id)
             }
