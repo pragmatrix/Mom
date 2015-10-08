@@ -12,3 +12,6 @@ module IVR =
 
     let waitForPlaybackFinished(playbackId: string) = 
         IVR.waitFor' (fun (e: PlaybackFinishedEvent) -> e.Playback.Id = playbackId)
+
+    type IDispatch<'i> =
+        abstract member dispatch : 'i -> Response

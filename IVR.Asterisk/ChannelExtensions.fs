@@ -3,6 +3,8 @@
 open AsterNET.ARI.Models
 open IVR
 
+open Channels
+
 module ChannelExtensions =
     
     // https://wiki.asterisk.org/wiki/display/AST/Asterisk+13+Channels+REST+API#Asterisk13ChannelsRESTAPI-list

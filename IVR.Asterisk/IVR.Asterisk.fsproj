@@ -50,6 +50,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="IVR.fs" />
+    <Compile Include="Applications.fs" />
     <Compile Include="Channels.fs" />
     <Compile Include="Client.fs" />
     <Compile Include="ChannelExtensions.fs" />
