@@ -56,6 +56,11 @@
     <Compile Include="Channels.fs" />
     <Compile Include="DeviceStates.fs" />
     <Compile Include="Endpoints.fs" />
+    <Compile Include="Events.fs" />
+    <Compile Include="Mailboxes.fs" />
+    <Compile Include="Playbacks.fs" />
+    <Compile Include="Recordings.fs" />
+    <Compile Include="Sounds.fs" />
     <Compile Include="Client.fs" />
     <Compile Include="ChannelExtensions.fs" />
     <Content Include="app.config" />
