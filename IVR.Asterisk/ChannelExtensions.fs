@@ -34,6 +34,10 @@ module ChannelExtensions =
         member this.waitForTalkingStarted() = this.waitFor<ChannelTalkingStartedEvent>()
         member this.waitForUserEvent() = this.waitFor<ChannelUsereventEvent>()
         member this.waitForVarsetEvent() = this.waitFor<ChannelVarsetEvent>()
+        // 13.5
+        member this.waitForChannelHold() = this.waitFor<ChannelHoldEvent>()
+        member this.waitForChannelUnholdEvent() = this.waitFor<ChannelUnholdEvent>()
+
 
         member this.waitForKey (key: char) = 
             ivr {

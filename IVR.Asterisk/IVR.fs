@@ -3,6 +3,7 @@
 open IVR
 
 open System
+open System.Linq
 open AsterNET.ARI
 open AsterNET.ARI.Models
 open System.Collections.Generic
@@ -17,10 +18,12 @@ module IVR =
     type IDispatch<'i> =
         abstract member dispatch : 'i -> Response
 
-    let inline opts (o: string option) = 
-        match o with
-        | Some s -> s
+    let inline optref (r: 'a option) = 
+        match r with
+        | Some r -> r
         | None -> null
+
+    let inline opts (o: string option) = optref o
 
     let inline opt (i: 'i option) = 
         match i with
@@ -28,9 +31,9 @@ module IVR =
         | None -> Nullable()
 
     let inline optvars (i: ('a * 'b) list option ) = 
-        match i with
-        | None -> null
-        | Some l -> l |> List.map KeyValuePair |> List
+        i
+        |> Option.map (fun l -> l.ToDictionary(fst, snd)) 
+        |> optref
 
     type TimeSpan with
         static member toms(ts: TimeSpan) = 

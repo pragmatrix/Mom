@@ -1,6 +1,7 @@
 ﻿namespace IVR.Asterisk
 
 open System
+open System.Linq
 open System.Collections.Generic
 
 open IVR
@@ -105,7 +106,7 @@ module Channels =
                     opts this.appArgs, 
                     opts this.callerId, 
                     this.timeout |> Option.map Timeout.toi |> opt, 
-                    this.variables |> optvars,
+                    optvars this.variables,
                     opts this.channelId, 
                     opts this.otherChannelId, 
                     opts this.originator) 
