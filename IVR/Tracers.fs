@@ -34,7 +34,7 @@ module Tracers =
             let stepF = stopWatch.Elapsed, step
             stepReceiver stepF
 
-    /// Receives traces, collects them all, and finishes up by writing them to the trace reference.
+    /// Receives traces, collects them all, and finishes up by writing them to the trace receiver.
     let traceReceiver (traceReceiver: Trace -> unit) = 
         fun (header: TraceHeader) ->
             let mutable steps = []

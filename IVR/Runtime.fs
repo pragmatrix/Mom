@@ -5,7 +5,7 @@ open Threading
 
 open IVR
 
-[<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Runtime =
 
     //
