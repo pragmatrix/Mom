@@ -14,7 +14,6 @@ open AsterNET.ARI.Models
 open System
 open System.IO
 
-
 (*
     Live Tests run with a full active ARI client in real time.
 
