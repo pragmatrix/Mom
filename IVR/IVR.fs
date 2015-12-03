@@ -363,7 +363,7 @@ module IVR =
             with e ->
                 e |> Error |> Completed
 
-    /// An IVR that Synchronously sends a command to a host, but ignores its response.
+    /// An IVR that synchronously sends a command to a host, but ignores its response.
     let post cmd : unit ivr = 
         fun (h:Host) ->
             try
