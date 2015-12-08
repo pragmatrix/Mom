@@ -256,6 +256,97 @@ type IVRTests() =
         x |> should equal true
 
     [<Test>]
+    member this.``computation expression: finally handler with ivr is called``() = 
+        let mutable x = false
+
+        let finallyIVR = ivr { x <- true }
+
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun Event1 -> true)
+                return 10
+            finally
+                finallyIVR
+            }
+
+        test
+        |> start
+        |> step Event1
+        |> ignore
+
+        x |> should equal true
+
+    [<Test>]
+    member this.``computation expression: finally handler with ivr is called when an exception happens``() = 
+        let mutable x = false
+
+        let finallyIVR = ivr { x <- true }
+
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun Event1 -> true)
+                failwith "Nooooo"
+                return 10
+            finally
+                finallyIVR
+            }
+
+        test
+        |> start
+        |> step Event1
+        |> ignore
+
+        x |> should equal true
+
+    [<Test>]
+    member this.``computation expression: finally crashes``() = 
+        let test = ivr {
+            try
+                return 10
+            finally
+                failwith "Nooo"
+                ()
+            }
+
+        test
+        |> start
+        |> IVR.isError
+        |> should equal true
+        
+    [<Test>]
+    member this.``computation expression: finally ivr crashes``() = 
+        let test = ivr {
+            try
+                return 10
+            finally
+                ivr { 
+                    failwith "Nooo"
+                }
+            }
+
+        test
+        |> start
+        |> IVR.isError
+        |> should equal true
+        
+    [<Test>]
+    member this.``computation expression: finally ivr crashes outside the ivr``() = 
+        let test = ivr {
+            try
+                return 10
+            finally
+                failwith "Nooo"
+                ivr { 
+                    return ()
+                }
+            }
+
+        test
+        |> start
+        |> IVR.isError
+        |> should equal true
+        
+    [<Test>]
     member this.``computation expression: handle exception at startup time``() =
         let mutable x = false
 
@@ -291,6 +382,32 @@ type IVRTests() =
         |> IVR.result
         |> should equal (Result 1)
 
+    [<Test>]
+    member this.``computation expression: handle exception in exception handler after wait``() =
+        let mutable x = false
+
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun Event1 -> true)
+                failwith "Nooooo"
+                return 0
+            with e ->
+                failwith "AGAIN"
+                return 1
+        }
+
+        let res = 
+            test
+            |> start
+            |> step Event1
+        
+        res |> IVR.isError |> should be True
+
+        res 
+        |> IVR.result       
+        |> sprintf "%A"
+        |> should contain "AGAIN"
+        
     [<Test>]
     member this.``host properly cancels its ivr if it gets disposed asynchronously``() =
         let ct = new CancellationTracker()

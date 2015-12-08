@@ -389,7 +389,7 @@ module IVR =
 
         member this.ReturnFrom(ivr : 'r ivr) = ivr
 
-        member this.Delay(f : unit -> 'r ivr) : 'r ivr =
+        member this.Delay(f : unit -> 'r ivr) : 'r ivr = 
             fun h ->
                 f()
                 |> start h
@@ -400,6 +400,21 @@ module IVR =
         member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
             body disposable
             |> whenCompleted disposable.Dispose
+
+        member this.TryFinally(ivr: 'r ivr, f: unit -> unit ivr) : 'r ivr =
+            let finallyBlock res =
+
+                let afterFinally finallyResult _ =
+                    match finallyResult with
+                    | Error e -> e |> Error |> Completed
+                    | _ -> res |> Completed
+
+                // note: f is already delayed, so we can run it in place.
+                f() 
+                |> continueWith afterFinally
+
+            ivr
+            |> continueWith finallyBlock
 
         member this.TryFinally(ivr: 'r ivr, f: unit -> unit) : 'r ivr =
             ivr
