@@ -22,6 +22,7 @@ type CancellationTracker() =
 
 type Event1 = Event1
 type Event2 = Event2
+type Event3 = Event3
 
 type Command = Command of int
     with 
@@ -129,6 +130,59 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
+    member this.``par': right ivr is cancelled after left completes and its finally handler is called``() = 
+        let mutable finallyCalled = false
+
+        let left = ivr {
+            do! IVR.waitFor' (fun Event1 -> true)
+        }
+
+        let right = ivr {
+            try
+                do! IVR.waitFor' (fun Event2 -> true)
+            finally
+                finallyCalled <- true
+        }
+
+        let test = IVR.par' left right
+        let started = start test
+        step Event1 started |> ignore
+        finallyCalled |> should equal true
+
+    [<Test>]
+    member this.``par': right ivr is cancelled after left completes and its finally ivr is run``() = 
+        let mutable finallyCalled = false
+
+        let leftResult = 1
+        let rightResult = 2
+
+        let left = ivr {
+            do! IVR.waitFor' (fun Event1 -> true)
+            return leftResult
+        }
+
+        let right = ivr {
+            try
+                do! IVR.waitFor' (fun Event2 -> true)
+                return rightResult
+            finally
+                ivr {
+                    do! IVR.waitFor' (fun Event3 -> true)
+                    finallyCalled <- true
+                }
+        }
+
+        let test = IVR.par' left right
+        let result = 
+            test
+            |> start 
+            |> step Event1
+            |> step Event3
+            
+        result |> should equal (Choice<_,_>.Choice1Of2 leftResult)
+        finallyCalled |> should equal true
+
+    [<Test>]
     member this.``par': left ivr is cancelled after right completes``() = 
         let ct = new CancellationTracker()
 
@@ -200,6 +254,54 @@ type IVRTests() =
         let started = start r
         step Event1 started |> ignore
         ct.disposed |> should equal true
+
+    [<Test>]
+    member this.``lpar': cancellation is done in reversed order specified``() = 
+
+        let mutable finallyTracker = []
+
+        let a = ivr {
+            try
+                do! IVR.waitFor' (fun (Event1) -> true)
+            finally
+                finallyTracker <- finallyTracker @ ['a']
+            }
+
+        let b = ivr {
+            try
+                do! IVR.waitFor' (fun (Event1) -> true)
+            finally
+                finallyTracker <- finallyTracker @ ['b']
+            }
+
+        let c = ivr {
+            try
+                do! IVR.waitFor' (fun (Event2) -> true)
+            finally
+                finallyTracker <- finallyTracker @ ['c']
+            }
+
+        let d = ivr {
+            try
+                do! IVR.waitFor' (fun (Event1) -> true)
+            finally
+                finallyTracker <- finallyTracker @ ['d']
+            }
+
+        let e = ivr {
+            try
+                do! IVR.waitFor' (fun (Event1) -> true)
+            finally
+                finallyTracker <- finallyTracker @ ['e']
+            }
+
+        let r = IVR.lpar' [a;b;c;d;e]
+        start r 
+        |> step Event2
+        |> ignore
+
+        finallyTracker 
+        |> should equal ['c';'e';'d';'b';'a']
 
     [<Test>]
     member this.``computation expression: try finally handler is run on a regular completion``() =

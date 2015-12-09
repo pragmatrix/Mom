@@ -250,6 +250,10 @@ module IVR =
 
     let lpar' (ivrs: 'r ivr list) : 'r ivr =
 
+        // Note: when an ivr finishes, all the running ones are canceled in the reversed 
+        // order they were originally specified in the list 
+        // (independent of how many of them already received the current event)!
+
         let rec startAll h res active ivrs = 
             match res with
             | Some _ -> res, []
@@ -261,8 +265,6 @@ module IVR =
                 |> start h
                 |> function
                 | Completed r -> 
-                    // cancel all the running ones in reversed order 
-                    // (which is how they stored until returned)
                     active |> List.iter (cancel h)
                     Some r, []
                 | Active _ as ivr -> 
@@ -279,10 +281,10 @@ module IVR =
                 |> step h e
                 |> function
                 | Completed r ->
-                    // cancel all the running ones in reversed order
-                    // and the future ones (also in reversed order)
-                    active |> List.iter (cancel h)
+                    // cancel all the running ones in the reversed order they were
+                    // originally specified!
                     todo |> List.rev |> List.iter (cancel h)
+                    active |> List.iter (cancel h)
                     Some r, []
                 | Active _ as ivr ->
                     stepAll h e None (ivr::active) todo
