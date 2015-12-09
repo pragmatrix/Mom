@@ -19,6 +19,7 @@ type Host = Command -> Response
 
 exception Cancelled
 
+[<NoComparison>]
 type Result<'result> =
     | Result of 'result
     | Error of Exception
@@ -27,11 +28,11 @@ type Result<'result> =
         | Error e -> Error e
         | Result r -> Result (f r)
 
-type IVRState<'result> = 
-    | Active of (Event -> 'result ivr)
+[<NoComparison;NoEquality>]
+type 'result ivr = 
+    | Inactive of (Host -> 'result ivr)
+    | Active of (Event -> Host -> 'result ivr)
     | Completed of Result<'result>
-
-and 'result ivr = Host -> IVRState<'result>
 
 module TimeSpanExtensions =
 
@@ -52,24 +53,29 @@ module IVR =
 
     /// Start up an ivr.
     let start host ivr = 
-        try
-            ivr host
-        with e ->
-            e |> Error |> Completed
+        match ivr with
+        | Inactive f -> 
+            try
+                f host
+            with e ->
+                e |> Error |> Completed
+        | _ -> failwithf "IVR.start: ivr not inactive: %A" ivr
 
-    /// Continue an active ivr with one event.
-    let step h e ivr = 
+    /// Continue an ivr with one event.
+    let rec step h e ivr = 
         match ivr with
         // may be we should start it here, too?
         //> no: delays are not supported, once an IVR starts, subsequential
         //> IVRs do have to be started before stepping through
 
-        | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
         | Active f -> 
             try
                 f e h
             with e ->
                 e |> Error |> Completed
+       
+        | Inactive _ -> failwithf "IVR.step: ivr is inactive"
+        | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
 
     /// Step an active ivr, otherwise do nothing.
     let private stepWhenActive h e ivr = 
@@ -126,14 +132,19 @@ module IVR =
                 |> Active
             | Completed r -> 
                 f r |> start h
+            | Inactive _ ->
+                failwithf "IVR.continueWith, ivr is inactive: %A" state
 
         fun h ->
             ivr |> start h |> next h
+        |> Inactive
 
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
     let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
-        let f (r: Result<'a>) = fun _ -> r.map f |> Completed
+        let f (r: Result<'a>) = 
+            fun _ -> r.map f |> Completed
+            |> Inactive
         continueWith f ivr
 
     /// Ignores the ivr's result type.
@@ -141,7 +152,7 @@ module IVR =
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
-        continueWith (fun r -> f(); fun _ -> r |> Completed)
+        continueWith (fun r -> f(); (fun _ -> r |> Completed) |> Inactive)
 
     /// Returns the result of a completed ivr.
     let result ivr = 
@@ -159,18 +170,20 @@ module IVR =
     /// The event that is sent to an active IVR when it gets cancelled. The only accepted return state is Cancelled.
     type Cancel = Cancel
 
-    /// Cancels the ivr. For now it is expected that the ivr immediately returns the Cancelled state.
-    let cancel h ivr = 
+    /// Tries to cancels the ivr. This actually sends a Cancel event to the ivr, but otherwise
+    /// does nothing. The ivr is responsible to react on Cancel events (for example every wait function does that).
+    /// Also note that ivrs can continue after cancellation was successful. For example finally
+    /// handlers can run ivrs.
+    /// If an ivr is completed, the result is overwritten (freed indirectly) with a Cancelled error,
+    /// but an error is not, to avoid shadowing the error.
+    /// If an ivr is Inactive, it is also converted to Cancelled error, to prevent anyone else
+    /// from activating it and to free the code behind the activation function.
+    let tryCancel h ivr = 
         match ivr with
         | Active _ -> 
-            let r = ivr |> step h Cancel
-            match r with
-            | IsCancelled -> ()
-            | _ -> failwithf "IVR.cancel: cancellation unhandled: %A" r
-        | _ -> failwith "IVR.cancel: ivr is not active"
-
-    let cancelIfActive h ivr = 
-        if isActive ivr then cancel h ivr
+            ivr |> step h Cancel
+        | Completed (Error _) -> ivr
+        | _ -> Cancelled |> Error |> Completed
 
     //
     // IVR Combinators
@@ -178,15 +191,16 @@ module IVR =
 
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
     /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
-    /// that error.
+    /// that error and all other ivrs are cancelled.
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
         // Cancellation is always in reverse order!
-        let cancelAllActive h ivrs = 
+        let cancelAll h ivrs = 
             ivrs
             |> List.rev 
-            |> List.iter (cancelIfActive h)
+            |> List.map (tryCancel h)
+            |> List.rev
 
         let rec active ivrs e h =
             ivrs
@@ -204,11 +218,12 @@ module IVR =
 
             match anyError, anyActive with
             | true, _ -> 
-                cancelAllActive h ivrs
+                ivrs
+                |> cancelAll h
                 // return the first error, but since we step them all in parallel, multiple 
                 // errors may be found, and we should accumulate them.
                 // (better would be to change the semantic to only step one at a time and terminate on the first error seen)
-                ivrs |> List.find (isError) |> error |> Error |> Completed
+                |> List.find (isError) |> error |> Error |> Completed
             | false, true -> active ivrs |> Active
             | false, false ->
                 ivrs
@@ -217,7 +232,8 @@ module IVR =
                 |> Completed
 
         fun h -> next h (List.map (start h) ivrs)
-
+        |> Inactive
+    
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
     /// (cancellation or exception),
@@ -238,67 +254,61 @@ module IVR =
             | [l;r] -> unbox l, unbox r 
             | _ -> failwith "internal error: here to keep the compiler happy")
 
-
     // specialized version of lpar that removes results from processing when
     // the return type is unit.
     // tbd
     // lpar_ 
 
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
-
+    /// Note that it may take an arbitrary number of time until the result is finally returned,
+    /// because ivrs may refuse to get cancelled.
     let lpar' (ivrs: 'r ivr list) : 'r ivr =
 
         // Note: when an ivr finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
         // (independent of how many of them already received the current event)!
-
-        let rec startAll h res active ivrs = 
-            match res with
-            | Some _ -> res, []
-            | _ ->
+        
+        let rec continueAll h f res active ivrs =
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-                ivr
-                |> start h
-                |> function
-                | Completed r -> 
-                    active |> List.iter (cancel h)
-                    Some r, []
-                | Active _ as ivr -> 
-                    startAll h None (ivr::active) todo
+            ivr
+            |> f h
+            |> function
+            | Completed r ->
+                match res with
+                | Some _ ->
+                    // already got a result, so we just forget the result and continue
+                    continueAll h f res active todo
+                | None ->
+                let todo = todo |> List.rev
+                let cancelList = todo @ active
+                let activeRemaining = 
+                    cancelList 
+                    |> List.map (tryCancel h) 
+                    |> List.filter isActive 
+                    |> List.rev 
+                Some r, activeRemaining
+            | Active _ as ivr ->
+                continueAll h f res (ivr::active) todo
+            | Inactive _ -> failwith "internal error"
 
-        let rec stepAll h e res active ivrs =
-            match res with
-            | Some _ -> res, []
-            | _ ->
-            match ivrs with
-            | [] -> res, (active |> List.rev)
-            | ivr::todo ->
-                ivr
-                |> step h e
-                |> function
-                | Completed r ->
-                    todo |> List.rev |> List.iter (cancel h)
-                    active |> List.iter (cancel h)
-                    Some r, []
-                | Active _ as ivr ->
-                    stepAll h e None (ivr::active) todo
-
-        let rec active ivrs e h = 
+        let rec active ivrs res e h = 
             ivrs 
-            |> stepAll h e None []
-            |> next h
+            |> continueAll h (fun h -> step h e) res []
+            |> next
            
-        and next h (result, ivrs) = 
-            match result with
-            | Some r -> r |> Completed
-            | None -> Active (active ivrs)
-
-        fun h ->
+        and next (result, ivrs) = 
+            match ivrs, result with
+            | [], Some r -> r |> Completed
+            | [], None -> failwith "IVR.lpar': internal error: no active ivrs and no result"
+            | ivrs, res -> Active (active ivrs res)
+    
+        fun (h: Host) ->
             ivrs
-            |> startAll h None []
-            |> next h
+            |> continueAll h start None []
+            |> next
+        |> Inactive
 
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
@@ -327,7 +337,7 @@ module IVR =
 
     /// An IVR that synchronously sends a command to a host and returns its response.
     let send (cmd: IReturns<'r>) : 'r ivr = 
-        fun h ->
+        fun (h: Host) ->
             try
                 cmd
                 |> h
@@ -335,6 +345,7 @@ module IVR =
                 |> Result |> Completed
             with e ->
                 e |> Error |> Completed
+        |> Inactive
 
     /// An IVR that synchronously sends a command to a host, but ignores its response.
     let post cmd : unit ivr = 
@@ -344,6 +355,7 @@ module IVR =
                 () |> Result |> Completed
             with e ->
                 e |> Error |> Completed
+        |> Inactive
 
     //
     // Simple computation expression to build sequential IVR processes
@@ -356,9 +368,15 @@ module IVR =
                 function 
                 | Result r -> body r
                 | Error err -> 
-                    fun _ -> err |> Error |> Completed)
+                    // kinda sad that we need to delay here.
+                    fun _ -> err |> Error |> Completed
+                    |> Inactive)
 
-        member this.Return(v: 'r) : 'r ivr = fun _ -> v |> Result |> Completed
+        member this.Return(v: 'r) : 'r ivr = 
+            // tbd: this is probably delayed anyway, so we could return an
+            // active ivr here (but then start must handle ivrs with a result)
+            fun _ -> v |> Result |> Completed
+            |> Inactive
 
         member this.ReturnFrom(ivr : 'r ivr) = ivr
 
@@ -366,9 +384,11 @@ module IVR =
             fun h ->
                 f()
                 |> start h
+            |> Inactive
               
         member this.Zero () : unit ivr = 
             fun _ -> () |> Result |> Completed
+            |> Inactive
 
         member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
             body disposable
@@ -377,10 +397,12 @@ module IVR =
         member this.TryFinally(ivr: 'r ivr, f: unit -> unit ivr) : 'r ivr =
             let finallyBlock res =
 
-                let afterFinally finallyResult _ =
-                    match finallyResult with
-                    | Error e -> e |> Error |> Completed
-                    | _ -> res |> Completed
+                let afterFinally finallyResult =
+                    fun _ ->
+                        match finallyResult with
+                        | Error e -> e |> Error |> Completed
+                        | _ -> res |> Completed
+                    |> Inactive
 
                 // note: f is already delayed, so we can run it in place.
                 f() 
@@ -397,14 +419,14 @@ module IVR =
             ivr
             |> continueWith (function
                 | Error e -> eh e
-                | r -> fun _ -> r |> Completed)
+                | r -> (fun _ -> r |> Completed) |> Inactive)
 
         member this.Yield(cmd: Command) : unit ivr = post cmd
 
         member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
             |> continueWith (function
-                | Error e -> fun _ -> e |> Error |> Completed
+                | Error e -> (fun _ -> e |> Error |> Completed) |> Inactive
                 | _ -> ivr2
             )
     
@@ -443,6 +465,7 @@ module IVR =
 
         fun _ ->
             Active waiter
+        |> Inactive
 
     /// Waits for some event with a predicate that returns
     /// true or false
@@ -498,6 +521,7 @@ module IVR =
     let fromResult(result: Result<'r>) = 
         fun _ ->
             result |> Completed
+        |> Inactive
 
     // As long we don't support asynchronous runtimes, async computations are scheduled on
     // the threadpool by default.
@@ -520,6 +544,7 @@ module IVR =
 
         interface IReturns<Id>
 
+    [<NoComparison>]
     type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: Result<obj>
 
     /// Waits for an F# asynchronous computation.

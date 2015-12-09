@@ -16,11 +16,13 @@ module Tracing =
     type StartEvent = StartEvent
 
     /// Represents a trace of a result, either a command invocation result, or the result of an IVR.
+    [<NoComparison>]
     type ResultTrace = 
         | Result of obj
         | Error of exn
 
     /// Represents a trace of a command. A command can either return without a result or throw an exception.
+    [<NoComparison>]
     type CommandTrace = { command: Command; result: ResultTrace }
 
     /// A step trace represents a trace for a single step of an IVR. 
@@ -29,6 +31,7 @@ module Tracing =
     /// event is set to StartupEvent for the first step.
     /// result is set for the last step.
 
+    [<NoComparison>]
     type StepTrace = { event: Event; commands: CommandTrace list; result: ResultTrace option }
         with
         member this.hasResult = this.result.IsSome
@@ -37,6 +40,7 @@ module Tracing =
     type SessionTracer = StepTrace -> unit
     
     /// Describes the an IVR tracing session.
+    [<NoComparison>]
     type SessionInfo = { name: Name; id: Id; param: obj }
 
     /// Creates a new SessionInfo record with a name, an id and a parameterization. 
@@ -132,6 +136,7 @@ module Tracing =
             | Active _ -> None
             | Completed (IVR.Result r) -> Result r |> Some
             | Completed (IVR.Error e) -> Error e |> Some
+            | Inactive _ -> failwith "internal error, tried to retrieve a trace result from an inactive ivr"
 
         let startAndTraceCommands =
             fun host ivr ->
@@ -179,8 +184,11 @@ module Tracing =
                 | Active _ ->
                     fun e h -> state |> Helper.stepAndTraceCommands h e |> next e
                     |> Active
+                | Inactive _ ->
+                    failwith "internal error state transition from active to inactive observed"
 
             ivr |> Helper.startAndTraceCommands host |> next StartEvent
+        |> Inactive
 
     /// For an IVR to be eligible for tracing by a registered tracer, it must be declared. 
     ///
@@ -220,10 +228,12 @@ module Tracing =
         | Commands = 0x2 
         | Result = 0x4
 
+    [<NoComparison>]
     type StepTraceReport = StepTraceReport of StepTraceDiff * StepTrace * StepTrace 
         with
         member this.Diff = this |> fun (StepTraceReport (diff, _, _)) -> diff
 
+    [<NoComparison>]
     type ReplayReport = ReplayReport of StepTraceReport list
         with 
         member this.steps = this |> fun (ReplayReport steps) -> steps
@@ -280,12 +290,11 @@ module Tracing =
 
         open System.Text.RegularExpressions
 
-        let private dateTime (dt: DateTime) = 
+        let private dateTime (dt: DateTime) =
             // Inspired by ISO 8601, 
             // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
-            dt
-                .ToLocalTime()
-                .ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
+            let localTime = dt.ToLocalTime()
+            localTime.ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
 
         let private timeSpan (ts: TimeSpan) = 
             let ms = ts.TotalSeconds
@@ -293,8 +302,10 @@ module Tracing =
 
         // sprintf requires the following types to be public!
         /// Internally used for formatting purposes only, do not use!
+        [<NoComparison>]
         type Header = { time: string; name: Name; id: Id; param: obj }
         /// Internally used for formatting purposes only, do not use!
+        [<NoComparison>]
         type Step = { offset: string; event: Event; commands: CommandTrace list; result: ResultTrace option }
 
         let private replace (pattern: string) (repl: string) (input: string) = 

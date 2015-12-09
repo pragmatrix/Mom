@@ -40,18 +40,16 @@ module Runtime =
             let rec runLoop ivr = 
                 let event = eventQueue.dequeue()
                 match event with
-                | :? CancelIVR -> 
-                    cancel host ivr
-                    raise Cancelled
-                | event ->
-                let ivr' = step host event ivr
-                next ivr'
+                | :? CancelIVR -> tryCancel host ivr
+                | event -> step host event ivr
+                |> next 
 
             and next ivr =
                 match ivr with
                 | Completed (Result r) -> Some r
                 | Completed (Error e) -> raise e
                 | Active _ -> runLoop ivr
+                | Inactive _ -> failwith "internal error, state transition of an ivr from active -> inactive"
 
             ivr
             |> start host

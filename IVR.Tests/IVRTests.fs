@@ -179,7 +179,9 @@ type IVRTests() =
             |> step Event1
             |> step Event3
             
-        result |> should equal (Choice<_,_>.Choice1Of2 leftResult)
+        result 
+        |> IVR.resultValue 
+        |> should equal (Choice<int,int>.Choice1Of2 leftResult)
         finallyCalled |> should equal true
 
     [<Test>]
