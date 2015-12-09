@@ -435,8 +435,8 @@ module IVR =
     /// An IVR that waits for some event given a function that returns (Some result) or None.
 
     let wait f =
-        let rec waiter e _ =  
-            match box e with
+        let rec waiter (e: Event) _ =  
+            match e with
             | :? Cancel -> Cancelled |> Error |> Completed
             | _ ->
             match f e with
