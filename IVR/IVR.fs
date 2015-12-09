@@ -281,8 +281,6 @@ module IVR =
                 |> step h e
                 |> function
                 | Completed r ->
-                    // cancel all the running ones in the reversed order they were
-                    // originally specified!
                     todo |> List.rev |> List.iter (cancel h)
                     active |> List.iter (cancel h)
                     Some r, []
