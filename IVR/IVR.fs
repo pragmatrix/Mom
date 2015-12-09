@@ -22,11 +22,10 @@ exception Cancelled
 type Result<'result> =
     | Result of 'result
     | Error of Exception
-    with 
-        member this.map f =
-            match this with
-            | Error e -> Error e
-            | Result r -> Result (f r)
+    member this.map f =
+        match this with
+        | Error e -> Error e
+        | Result r -> Result (f r)
 
 type IVRState<'result> = 
     | Active of (Event -> IVR<'result>)
@@ -133,7 +132,8 @@ module IVR =
         fun h ->
             ivr |> start h |> next h
 
-    /// Maps the ivr's result.
+    /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
+    /// into the IVR category.
     let map (f: 'a -> 'b) (ivr: IVR<'a>) : IVR<'b> = 
         let f (r: Result<'a>) = fun _ -> r.map f |> Completed
         continueWith f ivr
@@ -246,48 +246,6 @@ module IVR =
     // tbd
     // lpar_ 
 
-    /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
-    /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
-    /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
-    
-    let par' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<Choice<'r1, 'r2>> =
-
-        let rec loop ivr1 ivr2 e h = 
-
-            match ivr1, ivr2 with
-            | Active _, Active _ -> 
-                ivr1
-                |> step h e
-                |> function
-                | Completed r1 -> 
-                    cancel h ivr2
-                    r1.map Choice1Of2 |> Completed
-                | ivr1 ->
-                ivr2 
-                |> step h e
-                |> function
-                | Completed r2 -> 
-                    cancel h ivr1
-                    r2.map Choice2Of2 |> Completed
-                | ivr2 ->
-                    loop ivr1 ivr2 |> Active
-            | _ -> failwithf "IVR.par': unexpected %A, %A" ivr1 ivr2
-
-        fun h -> 
-            ivr1
-            |> start h
-            |> function
-            | Completed r1 -> r1.map Choice1Of2 |> Completed
-            | ivr1 ->
-            ivr2 
-            |> start h
-            |> function
-            | Completed r2 ->
-                cancel h ivr1 
-                r2.map Choice2Of2 |> Completed
-            | ivr2 ->
-                loop ivr1 ivr2 |> Active
-
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
 
     let lpar' (ivrs: 'r ivr list) : 'r ivr =
@@ -343,6 +301,23 @@ module IVR =
             ivrs
             |> startAll h None []
             |> next h
+
+    /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
+    /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
+    /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
+    let par' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<Choice<'r1, 'r2>> =
+
+        let ivr1 = ivr1 |> map Choice<_,_>.Choice1Of2
+        let ivr2 = ivr2 |> map Choice<_,_>.Choice2Of2
+        lpar' [ivr1; ivr2]
+
+    /// Runs three ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
+    let par'' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) (ivr3: IVR<'r3>) : IVR<Choice<'r1, 'r2, 'r3>> =
+
+        let ivr1 = ivr1 |> map Choice<_,_,_>.Choice1Of3
+        let ivr2 = ivr2 |> map Choice<_,_,_>.Choice2Of3
+        let ivr3 = ivr3 |> map Choice<_,_,_>.Choice3Of3
+        lpar' [ivr1; ivr2; ivr3]
 
     //
     // Sending and posting commands to the host.
