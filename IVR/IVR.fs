@@ -28,12 +28,10 @@ type Result<'result> =
         | Result r -> Result (f r)
 
 type IVRState<'result> = 
-    | Active of (Event -> IVR<'result>)
+    | Active of (Event -> 'result ivr)
     | Completed of Result<'result>
 
-and IVR<'result> = Host -> IVRState<'result>
-
-type 'result ivr = IVR<'result>
+and 'result ivr = Host -> IVRState<'result>
 
 module TimeSpanExtensions =
 
@@ -119,7 +117,7 @@ module IVR =
     //
 
     /// Continues the ivr with a followup ivr (Monad bind).
-    let continueWith (f : Result<'a> -> IVR<'b>) (ivr: IVR<'a>) : IVR<'b> =
+    let continueWith (f : Result<'a> -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
 
         let rec next h state = 
             match state with
@@ -134,7 +132,7 @@ module IVR =
 
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
-    let map (f: 'a -> 'b) (ivr: IVR<'a>) : IVR<'b> = 
+    let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
         let f (r: Result<'a>) = fun _ -> r.map f |> Completed
         continueWith f ivr
 
@@ -229,7 +227,7 @@ module IVR =
     /// could lead to leaks in nested parallel ivrs of which the result
     /// is never processed.
 
-    let par (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<'r1 * 'r2> =
+    let par (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
 
         // we implement par in terms of lpar so that we avoid
         // the maintainance of two semantics
@@ -305,14 +303,14 @@ module IVR =
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
     /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
-    let par' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) : IVR<Choice<'r1, 'r2>> =
+    let par' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : Choice<'r1, 'r2> ivr =
 
         let ivr1 = ivr1 |> map Choice<_,_>.Choice1Of2
         let ivr2 = ivr2 |> map Choice<_,_>.Choice2Of2
         lpar' [ivr1; ivr2]
 
     /// Runs three ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
-    let par'' (ivr1 : IVR<'r1>) (ivr2 : IVR<'r2>) (ivr3: IVR<'r3>) : IVR<Choice<'r1, 'r2, 'r3>> =
+    let par'' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) (ivr3: 'r3 ivr) : Choice<'r1, 'r2, 'r3> ivr =
 
         let ivr1 = ivr1 |> map Choice<_,_,_>.Choice1Of3
         let ivr2 = ivr2 |> map Choice<_,_,_>.Choice2Of3

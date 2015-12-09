@@ -245,7 +245,7 @@ module Tracing =
         StepTraceReport (diff, expected, actual)
 
     /// Replay a trace to an IVR and return a report.
-    let replay (f: 'param -> IVR<'r>) (trace: Trace) : ReplayReport = 
+    let replay (f: 'param -> 'r ivr) (trace: Trace) : ReplayReport = 
         let sessionInfo = trace |> fst |> snd
         let stepTraces = trace |> snd |> List.map snd
         let ivr = unbox sessionInfo.param |> f
