@@ -241,31 +241,6 @@ module IVR =
             |> arbiter
         |> Inactive
     
-    /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
-    /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
-    /// (cancellation or exception),
-    /// the resulting ivr is ended immediately.
-
-    /// Note that par retains the result of the completed ivr, which
-    /// could lead to leaks in nested parallel ivrs of which the result
-    /// is never processed.
-
-    let par (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
-
-        // we implement par in terms of lpar so that we avoid
-        // the maintainance of two semantics
-
-        [map box ivr1; map box ivr2] 
-        |> lpar
-        |> map (function 
-            | [l;r] -> unbox l, unbox r 
-            | _ -> failwith "internal error: here to keep the compiler happy")
-
-    // specialized version of lpar that removes results from processing when
-    // the return type is unit.
-    // tbd
-    // lpar_ 
-
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
     /// Note that it may take an arbitrary number of time until the result is finally returned,
     /// because ivrs may refuse to get cancelled.
@@ -305,16 +280,41 @@ module IVR =
             |> arbiter
            
         and arbiter (result, ivrs) = 
-            match ivrs, result with
-            | [], Some r -> r |> Completed
-            | [], None -> failwith "IVR.lpar': internal error: no active ivrs and no result"
-            | ivrs, res -> Active (active ivrs res)
+            match result, ivrs with
+            | Some r, [] -> r |> Completed
+            | None, [] -> failwith "IVR.lpar': internal error: no active ivrs and no result"
+            | res, ivrs -> Active (active ivrs res)
     
         fun (h: Host) ->
             ivrs
             |> stepAll h start None []
             |> arbiter
         |> Inactive
+
+    /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
+    /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
+    /// (cancellation or exception),
+    /// the resulting ivr is ended immediately.
+
+    /// Note that par retains the result of the completed ivr, which
+    /// could lead to leaks in nested parallel ivrs of which the result
+    /// is never processed.
+
+    let par (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
+
+        // we implement par in terms of lpar so that we avoid
+        // the maintainance of two semantics
+
+        [map box ivr1; map box ivr2] 
+        |> lpar
+        |> map (function 
+            | [l;r] -> unbox l, unbox r 
+            | _ -> failwith "internal error: here to keep the compiler happy")
+
+    // specialized version of lpar that removes results from processing when
+    // the return type is unit.
+    // tbd
+    // lpar_ 
 
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
