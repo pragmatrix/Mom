@@ -183,6 +183,20 @@ module IVR =
     // IVR Combinators
     //
 
+    // Cancels a pair of ivr lists in the reversed specified order while in the process of 
+    // processing a step for all parallel ivrs.
+    // active are the ones that where already processed (in the reversed order specified).
+    // todo are the ones that have not yet processed for this round (in the specified order).
+    // Returns the ivrs that stay active after the cancellation was sent.
+
+    let private parCancel h active todo = 
+        let todo = todo |> List.rev
+        let cancelList = todo @ active
+        cancelList 
+        |> List.map (tryCancel h) 
+        |> List.filter isActive 
+        |> List.rev         
+
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
     /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
     /// that error and all other ivrs are cancelled.
@@ -201,16 +215,9 @@ module IVR =
                     // already got an error, so we can just forget this one and continue
                     stepAll h stepF error active todo
                 | None ->
-                // we do have an error from now on, so we can remove all inactive and
-                // completed ivrs from the list after cancelling
-                let todo = todo |> List.rev
-                let cancelList = todo @ active
-                let activeRemaining = 
-                    cancelList 
-                    |> List.map (tryCancel h) 
-                    |> List.filter isActive 
-                    |> List.rev 
-                Some e, activeRemaining
+                    // we do have an error from now on, so we can remove all inactive and
+                    // completed ivrs from the list after cancelling
+                    Some e, parCancel h active todo
             | Completed _ ->
                 // consume Completed results if we do have an error.
                 let active = 
@@ -262,14 +269,7 @@ module IVR =
                     // already got a result, so we just forget the result and continue
                     stepAll h stepF res active todo
                 | None ->
-                let todo = todo |> List.rev
-                let cancelList = todo @ active
-                let activeRemaining = 
-                    cancelList 
-                    |> List.map (tryCancel h) 
-                    |> List.filter isActive 
-                    |> List.rev 
-                Some r, activeRemaining
+                    Some r, parCancel h active todo
             | Active _ ->
                 stepAll h stepF res (ivr::active) todo
             | Inactive _ -> failwith "internal error"
