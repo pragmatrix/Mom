@@ -189,17 +189,17 @@ module IVR =
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
         
-        let rec stepAll h f error active ivrs =
+        let rec stepAll h stepF error active ivrs =
             match ivrs with
             | [] -> error, active |> List.rev
             | ivr::todo ->
-            let ivr = ivr |> f h
+            let ivr = ivr |> stepF h
             match ivr with
             | Completed (Error e) ->
                 match error with
                 | Some _ ->
                     // already got an error, so we can just forget this one and continue
-                    stepAll h f error active todo
+                    stepAll h stepF error active todo
                 | None ->
                 // we do have an error from now on, so we can remove all inactive and
                 // completed ivrs from the list after cancelling
@@ -217,9 +217,9 @@ module IVR =
                     match error with
                     | Some _ -> active
                     | None -> ivr::active
-                stepAll h f error active todo
+                stepAll h stepF error active todo
             | Inactive _ -> failwith "internal error"
-            | Active _ -> stepAll h f error (ivr::active) todo
+            | Active _ -> stepAll h stepF error (ivr::active) todo
         
         let rec active ivrs error e h = 
             ivrs 
@@ -275,17 +275,17 @@ module IVR =
         // order they were originally specified in the list 
         // (independent of how many of them already received the current event)!
         
-        let rec stepAll h f res active ivrs =
+        let rec stepAll h stepF res active ivrs =
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-            let ivr = ivr |> f h
+            let ivr = ivr |> stepF h
             match ivr with
             | Completed r ->
                 match res with
                 | Some _ ->
                     // already got a result, so we just forget the result and continue
-                    stepAll h f res active todo
+                    stepAll h stepF res active todo
                 | None ->
                 let todo = todo |> List.rev
                 let cancelList = todo @ active
@@ -296,7 +296,7 @@ module IVR =
                     |> List.rev 
                 Some r, activeRemaining
             | Active _ ->
-                stepAll h f res (ivr::active) todo
+                stepAll h stepF res (ivr::active) todo
             | Inactive _ -> failwith "internal error"
 
         let rec active ivrs res e h = 
