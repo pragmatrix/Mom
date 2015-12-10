@@ -196,6 +196,75 @@ module IVR =
         |> List.filter isActive 
         |> List.rev         
 
+
+    let private parCancel' h active todo = 
+        let cancelIVRs ivrs = ivrs |> List.map(tryCancel h) |> List.filter isActive
+        let todo = todo |> List.rev |> cancelIVRs |> List.rev
+        let active = active |> cancelIVRs
+        (active, todo)
+
+    /// A generic algorithm for parallel running IVRs.
+    /// The field. 
+    /// Basically, all ivrs are processed in parallel, and as soon an ivr is
+    /// completed, the arbiter is asked what to do.
+    /// Note that the arbiter does not get to be asked again, as soon it cancels all the other ivrs and 
+    /// sets a result.
+
+    [<NoComparison;NoEquality>]
+    type ArbiterDecision<'r> = 
+        /// Cancel all remaining IVRs and set the result to the Arbiter's state
+        | CancelField
+        | AddToField of 'r ivr list
+
+    type Arbiter<'state, 'r> = 'state -> Result<'r> -> ('state * ArbiterDecision<'r>)
+
+    let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
+        
+        let rec stepAll h stepF ((cancelling, state) as s) active ivrs =
+            match ivrs with
+            | [] -> s, active |> List.rev
+            | ivr::todo ->
+            let ivr = ivr |> stepF h
+            match ivr with
+            | Inactive _ -> failwith "internal error"
+            | Active _ -> stepAll h stepF s (ivr::active) todo
+            | Completed r ->
+            if cancelling then
+                // already cancelling, so we can ignore this result.
+                stepAll h stepF s active todo
+            else
+            // ask the arbiter what to do next
+            let state, decision = arbiter state r
+            match decision with
+            | CancelField -> (true, state), parCancel h active todo
+            | AddToField newIVRs ->
+            // start all new IVRs before putting them on the field.
+            let (cancelling, state), newIVRs = newIVRs |> stepAll h start (false, state) []
+            if cancelling then
+                let (active, todo) = parCancel' h active todo
+                (true, state), ([active |> List.rev; newIVRs; todo] |> List.collect id)
+            else
+            // embed by prepending them to the list of already processed IVRs
+            // (don't use the current step function on the new ones)
+            let active = (newIVRs |> List.rev) @ active
+            stepAll h stepF (false, state) active todo
+           
+        and next ((_, state) as s, ivrs) = 
+            match ivrs with
+            | [] -> state |> Value |> Completed
+            | _ -> active ivrs s |> Active
+
+        and active ivrs s e h = 
+            ivrs 
+            |> stepAll h (fun h -> step h e) s []
+            |> next
+    
+        fun (h: Host) ->
+            ivrs
+            |> stepAll h start (false, initial) []
+            |> next
+        |> Inactive
+
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
     /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
     /// that error and all other ivrs are cancelled.
