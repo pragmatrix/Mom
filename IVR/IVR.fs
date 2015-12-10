@@ -76,12 +76,6 @@ module IVR =
        
         | Inactive _ -> failwithf "IVR.step: ivr is inactive"
         | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
-
-    /// Step an active ivr, otherwise do nothing.
-    let private stepWhenActive h e ivr = 
-        match ivr with 
-        | Active _ -> step h e ivr
-        | _ -> ivr
         
     /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
@@ -194,44 +188,58 @@ module IVR =
     /// that error and all other ivrs are cancelled.
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
-
-        // Cancellation is always in reverse order!
-        let cancelAll h ivrs = 
-            ivrs
-            |> List.rev 
-            |> List.map (tryCancel h)
-            |> List.rev
-
-        let rec active ivrs e h =
-            ivrs
-            |> List.map (stepWhenActive h e)
-            |> next h
-            
-        and next h ivrs = 
-            let anyError = 
-                ivrs
-                |> List.exists (isError)
-
-            let anyActive = 
-                ivrs
-                |> List.exists (isActive)
-
-            match anyError, anyActive with
-            | true, _ -> 
-                ivrs
-                |> cancelAll h
-                // return the first error, but since we step them all in parallel, multiple 
-                // errors may be found, and we should accumulate them.
-                // (better would be to change the semantic to only step one at a time and terminate on the first error seen)
-                |> List.find (isError) |> error |> Error |> Completed
-            | false, true -> active ivrs |> Active
-            | false, false ->
-                ivrs
+        
+        let rec continueAll h f error active ivrs =
+            match ivrs with
+            | [] -> error, active |> List.rev
+            | ivr::todo ->
+            let ivr = ivr |> f h
+            ivr
+            |> function
+            | Completed (Error e) ->
+                match error with
+                | Some _ ->
+                    // already got an error, so we can just forget this one and continue
+                    continueAll h f error active todo
+                | None ->
+                // we do have an error from now on, so we can remove all inactive and
+                // completed ivrs from the list after cancelling
+                let todo = todo |> List.rev
+                let cancelList = todo @ active
+                let activeRemaining = 
+                    cancelList 
+                    |> List.map (tryCancel h) 
+                    |> List.filter isActive 
+                    |> List.rev 
+                Some e, activeRemaining
+            | Completed _ ->
+                // consume Completed results if we do have an error.
+                let active = 
+                    match error with
+                    | Some _ -> active
+                    | None -> ivr::active
+                continueAll h f error active todo
+            | Inactive _ -> failwith "internal error"
+            | Active _ -> continueAll h f error (ivr::active) todo
+        
+        let rec active ivrs error e h = 
+            ivrs 
+            |> continueAll h (fun h -> step h e) error []
+            |> next
+           
+        and next (error, ivrs) = 
+            match error, ivrs with
+            | Some e, [] -> e |> Error |> Completed
+            | None, ivrs when ivrs |> List.forall isCompleted ->
+                ivrs 
                 |> List.map resultValue
-                |> Result
-                |> Completed
-
-        fun h -> next h (List.map (start h) ivrs)
+                |> Result |> Completed
+            | _ -> active ivrs error |> Active
+    
+        fun (h: Host) ->
+            ivrs
+            |> continueAll h start None []
+            |> next
         |> Inactive
     
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
@@ -272,9 +280,8 @@ module IVR =
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
-            ivr
-            |> f h
-            |> function
+            let ivr = ivr |> f h
+            match ivr with
             | Completed r ->
                 match res with
                 | Some _ ->
@@ -289,7 +296,7 @@ module IVR =
                     |> List.filter isActive 
                     |> List.rev 
                 Some r, activeRemaining
-            | Active _ as ivr ->
+            | Active _ ->
                 continueAll h f res (ivr::active) todo
             | Inactive _ -> failwith "internal error"
 
