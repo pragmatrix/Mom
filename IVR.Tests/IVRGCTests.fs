@@ -17,10 +17,8 @@ type IVRGCTests() =
         // interestingly, the "Generate Tail Calls" option does 
         // not have an effect
 
-        let waitF = fun _ -> true
-
         let rec endlessLoop() = ivr {
-            do! IVR.wait' waitF
+            do! IVR.wait' (fun _ -> true)
             return! endlessLoop()
             }
 
