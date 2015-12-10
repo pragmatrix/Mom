@@ -102,7 +102,7 @@ type TracingTests() =
 
         IVR.start host traced
         |> IVR.result
-        |> should equal ("10" |> IVR.Result)
+        |> should equal ("10" |> IVR.Value)
 
         trace.Value
         |> Format.trace

@@ -134,7 +134,7 @@ module Tracing =
         let traceResult state = 
             match state with
             | Active _ -> None
-            | Completed (IVR.Result r) -> Result r |> Some
+            | Completed (IVR.Value r) -> Result r |> Some
             | Completed (IVR.Error e) -> Error e |> Some
             | Inactive _ -> failwith "internal error, tried to retrieve a trace result from an inactive ivr"
 

@@ -21,12 +21,12 @@ exception Cancelled
 
 [<NoComparison>]
 type Result<'result> =
-    | Result of 'result
-    | Error of Exception
+    | Value of 'result
+    | Error of exn
     member this.map f =
         match this with
         | Error e -> Error e
-        | Result r -> Result (f r)
+        | Value r -> Value (f r)
 
 [<NoComparison;NoEquality>]
 type 'result ivr = 
@@ -157,7 +157,7 @@ module IVR =
     /// Returns the resulting value of a completed ivr.
     let resultValue ivr = 
         match ivr with
-        | Completed (Result r) -> r
+        | Completed (Value r) -> r
         | Completed _ -> failwithf "IVR.resultValue ivr has not been completed with a resulting value: %A" ivr
         | _ -> failwithf "IVR.resultValue: ivr is not completed: %A" ivr
 
@@ -233,7 +233,7 @@ module IVR =
             | None, ivrs when ivrs |> List.forall isCompleted ->
                 ivrs 
                 |> List.map resultValue
-                |> Result |> Completed
+                |> Value |> Completed
             | _ -> active ivrs error |> Active
     
         fun (h: Host) ->
@@ -349,7 +349,7 @@ module IVR =
                 cmd
                 |> h
                 |> unbox 
-                |> Result |> Completed
+                |> Value |> Completed
             with e ->
                 e |> Error |> Completed
         |> Inactive
@@ -359,7 +359,7 @@ module IVR =
         fun (h:Host) ->
             try
                 cmd |> h |> Operators.ignore
-                () |> Result |> Completed
+                () |> Value |> Completed
             with e ->
                 e |> Error |> Completed
         |> Inactive
@@ -373,7 +373,7 @@ module IVR =
             ivr
             |> continueWith (
                 function 
-                | Result r -> body r
+                | Value r -> body r
                 | Error err -> 
                     // kinda sad that we need to delay here.
                     fun _ -> err |> Error |> Completed
@@ -382,7 +382,7 @@ module IVR =
         member this.Return(v: 'r) : 'r ivr = 
             // tbd: this is probably delayed anyway, so we could return an
             // active ivr here (but then start must handle ivrs with a result)
-            fun _ -> v |> Result |> Completed
+            fun _ -> v |> Value |> Completed
             |> Inactive
 
         member this.ReturnFrom(ivr : 'r ivr) = ivr
@@ -394,7 +394,7 @@ module IVR =
             |> Inactive
               
         member this.Zero () : unit ivr = 
-            fun _ -> () |> Result |> Completed
+            fun _ -> () |> Value |> Completed
             |> Inactive
 
         member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
@@ -467,7 +467,7 @@ module IVR =
             | :? Cancel -> Cancelled |> Error |> Completed
             | _ ->
             match f e with
-            | Some r -> r |> Result |> Completed
+            | Some r -> r |> Value |> Completed
             | None -> Active waiter
 
         fun _ ->
@@ -544,7 +544,7 @@ module IVR =
                 async {
                     try
                         let! r = computation
-                        r |> box |> Result |> receiver
+                        r |> box |> Value |> receiver
                     with e ->
                         e |> Error |> receiver
                 } |> Async.Start

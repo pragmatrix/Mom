@@ -17,12 +17,16 @@ type IVRGCTests() =
         // interestingly, the "Generate Tail Calls" option does 
         // not have an effect
 
+        let waitF = fun _ -> true
+
         let rec endlessLoop() = ivr {
-            do! IVR.wait' (fun _ -> true)
+            do! IVR.wait' waitF
             return! endlessLoop()
             }
 
-        let ivr = IVR.start (fun _ -> null) (endlessLoop())
+        let host = fun _ -> null
+
+        let ivr = IVR.start host (endlessLoop())
 
         let count = 10000000
         let memTraces = count / 10000
@@ -38,7 +42,7 @@ type IVRGCTests() =
                 GC.Collect()
                 let totalMem = GC.GetTotalMemory(true)
                 array.[cnt / memTrace] <- totalMem
-            stepLoop (IVR.step (fun _ -> null) null ivr) (cnt+1)
+            stepLoop (IVR.step host null ivr) (cnt+1)
 
         stepLoop ivr 0
 

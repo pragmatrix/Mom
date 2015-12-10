@@ -46,7 +46,7 @@ module Runtime =
 
             and next ivr =
                 match ivr with
-                | Completed (Result r) -> Some r
+                | Completed (Value r) -> Some r
                 | Completed (Error e) -> raise e
                 | Active _ -> runLoop ivr
                 | Inactive _ -> failwith "internal error, state transition of an ivr from active -> inactive"

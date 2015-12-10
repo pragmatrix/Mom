@@ -465,7 +465,7 @@ type IVRTests() =
         test
         |> start
         |> IVR.result
-        |> should equal (Result 1)
+        |> should equal (Value 1)
 
     [<Test>]
     member this.``computation expression: handle exception at runtime``() =
@@ -484,7 +484,7 @@ type IVRTests() =
         |> start
         |> step Event1
         |> IVR.result
-        |> should equal (Result 1)
+        |> should equal (Value 1)
 
     [<Test>]
     member this.``computation expression: handle exception in exception handler after wait``() =
@@ -655,7 +655,7 @@ type IVRTests() =
         |> IVR.step host Event1
         |> IVR.step host Event1
         |> IVR.result
-        |> should equal (Result 3) 
+        |> should equal (Value 3) 
 
     [<Test>]
     member this.``computation expression: For``() = 
@@ -671,5 +671,5 @@ type IVRTests() =
         |> IVR.step host Event1
         |> IVR.step host Event1
         |> IVR.result
-        |> should equal (Result ()) 
+        |> should equal (Value ()) 
      
