@@ -189,7 +189,7 @@ module IVR =
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
         
-        let rec continueAll h f error active ivrs =
+        let rec stepAll h f error active ivrs =
             match ivrs with
             | [] -> error, active |> List.rev
             | ivr::todo ->
@@ -199,7 +199,7 @@ module IVR =
                 match error with
                 | Some _ ->
                     // already got an error, so we can just forget this one and continue
-                    continueAll h f error active todo
+                    stepAll h f error active todo
                 | None ->
                 // we do have an error from now on, so we can remove all inactive and
                 // completed ivrs from the list after cancelling
@@ -217,16 +217,16 @@ module IVR =
                     match error with
                     | Some _ -> active
                     | None -> ivr::active
-                continueAll h f error active todo
+                stepAll h f error active todo
             | Inactive _ -> failwith "internal error"
-            | Active _ -> continueAll h f error (ivr::active) todo
+            | Active _ -> stepAll h f error (ivr::active) todo
         
         let rec active ivrs error e h = 
             ivrs 
-            |> continueAll h (fun h -> step h e) error []
-            |> next
+            |> stepAll h (fun h -> step h e) error []
+            |> arbiter
            
-        and next (error, ivrs) = 
+        and arbiter (error, ivrs) = 
             match error, ivrs with
             | Some e, [] -> e |> Error |> Completed
             | None, ivrs when ivrs |> List.forall isCompleted ->
@@ -237,8 +237,8 @@ module IVR =
     
         fun (h: Host) ->
             ivrs
-            |> continueAll h start None []
-            |> next
+            |> stepAll h start None []
+            |> arbiter
         |> Inactive
     
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
@@ -275,7 +275,7 @@ module IVR =
         // order they were originally specified in the list 
         // (independent of how many of them already received the current event)!
         
-        let rec continueAll h f res active ivrs =
+        let rec stepAll h f res active ivrs =
             match ivrs with
             | [] -> res, (active |> List.rev)
             | ivr::todo ->
@@ -285,7 +285,7 @@ module IVR =
                 match res with
                 | Some _ ->
                     // already got a result, so we just forget the result and continue
-                    continueAll h f res active todo
+                    stepAll h f res active todo
                 | None ->
                 let todo = todo |> List.rev
                 let cancelList = todo @ active
@@ -296,15 +296,15 @@ module IVR =
                     |> List.rev 
                 Some r, activeRemaining
             | Active _ ->
-                continueAll h f res (ivr::active) todo
+                stepAll h f res (ivr::active) todo
             | Inactive _ -> failwith "internal error"
 
         let rec active ivrs res e h = 
             ivrs 
-            |> continueAll h (fun h -> step h e) res []
-            |> next
+            |> stepAll h (fun h -> step h e) res []
+            |> arbiter
            
-        and next (result, ivrs) = 
+        and arbiter (result, ivrs) = 
             match ivrs, result with
             | [], Some r -> r |> Completed
             | [], None -> failwith "IVR.lpar': internal error: no active ivrs and no result"
@@ -312,8 +312,8 @@ module IVR =
     
         fun (h: Host) ->
             ivrs
-            |> continueAll h start None []
-            |> next
+            |> stepAll h start None []
+            |> arbiter
         |> Inactive
 
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
