@@ -191,8 +191,7 @@ module IVR =
 
     let private parCancel h active todo = 
         let todo = todo |> List.rev
-        let cancelList = todo @ active
-        cancelList 
+        todo @ active
         |> List.map (tryCancel h) 
         |> List.filter isActive 
         |> List.rev         
