@@ -194,8 +194,7 @@ module IVR =
             | [] -> error, active |> List.rev
             | ivr::todo ->
             let ivr = ivr |> f h
-            ivr
-            |> function
+            match ivr with
             | Completed (Error e) ->
                 match error with
                 | Some _ ->
