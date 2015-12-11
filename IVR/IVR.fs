@@ -211,21 +211,26 @@ module IVR =
 
     [<NoComparison;NoEquality>]
     type ArbiterDecision<'state, 'r> = 
-        /// Cancel all remaining IVRs and set the result to the field ivr
+        /// Cancel all remaining IVRs and set the result of the field ivr
         | CancelField of 'state result
         /// Continue the field with a new state and optionally add some new players / IVRs to it.
         /// Note: when the field does not contain any more active ivrs, the 'state is returned
-        /// as a final result of the filed ivr.
+        /// as a final result of the field ivr.
         | ContinueField of 'state * 'r ivr list
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
-    /// A generic algorithm for parallel running IVRs.
-    /// The field. 
-    /// Basically, all ivrs are processed in parallel, and as soon an ivr is
-    /// completed, the arbiter is asked what to do.
-    /// Note that the arbiter does not get to be asked again, as soon it cancels all the other ivrs and 
-    /// sets a result.
+    /// A generic algorithm for running IVRs in parallel.
+    /// The field:
+    /// All ivrs are processed in parallel, and as soon an ivr completes, the arbiter is asked what to do.
+    /// The arbiter can either decide to cancel the field and set a final result or
+    /// continue the field with a 
+    ///   an intermediate state/result
+    ///   and a number of new ivrs that put on the field.
+    /// Notes:
+    ///   The arbiter does not get to be asked again, as soon it cancels the field.
+    ///   When the arbiter throws an exception, it's equivalent to canceling the field with 
+    ///   that exception as an error result.
 
     let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
 
