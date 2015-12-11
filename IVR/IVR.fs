@@ -219,7 +219,20 @@ module IVR =
     type Arbiter<'state, 'r> = 'state -> Result<'r> -> ('state * ArbiterDecision<'r>)
 
     let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
-        
+
+        // we need to protect the arbiter and handle the case when it dies
+        let protectedArbiter state r = 
+            try
+                let state = 
+                    state 
+                    |> function 
+                    | Value v -> v 
+                    | Error e -> failwith "internal error"
+                let state, decision = arbiter state r
+                state |> Value, decision
+            with e ->
+                e |> Error, CancelField
+
         let rec stepAll h stepF ((cancelling, state) as s) active ivrs =
             match ivrs with
             | [] -> s, active |> List.rev
@@ -234,7 +247,7 @@ module IVR =
                 stepAll h stepF s active todo
             else
             // ask the arbiter what to do next
-            let state, decision = arbiter state r
+            let state, decision = protectedArbiter state r
             match decision with
             | CancelField -> (true, state), parCancel h active todo
             | AddToField newIVRs ->
@@ -251,7 +264,7 @@ module IVR =
            
         and next ((_, state) as s, ivrs) = 
             match ivrs with
-            | [] -> state |> Value |> Completed
+            | [] -> state |> Completed
             | _ -> active ivrs s |> Active
 
         and active ivrs s e h = 
@@ -261,7 +274,7 @@ module IVR =
     
         fun (h: Host) ->
             ivrs
-            |> stepAll h start (false, initial) []
+            |> stepAll h start (false, initial |> Value) []
             |> next
         |> Inactive
 
