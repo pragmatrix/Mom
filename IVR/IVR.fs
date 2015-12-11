@@ -292,6 +292,8 @@ module IVR =
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
 
+        // lpar can be implemented in terms of the field algorithm:
+
         // first attach indices
         let ivrs = ivrs |> List.mapi (fun i ivr -> ivr |> map (fun r -> i,r))
 
@@ -303,7 +305,7 @@ module IVR =
                 ContinueField (state, [])
             | Error r -> CancelField (Error r)
 
-        // result converts the map to a list.
+        // and last convert the map to a list.
         let mapToList m = 
             m 
             |> Map.toList
@@ -312,8 +314,6 @@ module IVR =
         ivrs 
         |> field arbiter Map.empty
         |> map mapToList
-
-
 
 #if false        
         let rec stepAll h stepF error active ivrs =
