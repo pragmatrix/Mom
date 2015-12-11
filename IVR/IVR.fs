@@ -20,11 +20,13 @@ type Host = Command -> Response
 exception Cancelled
 
 [<NoComparison>]
-type Result<'result> =
+type 'result result =
     | Value of 'result
     | Error of exn
-    member this.map f =
-        match this with
+
+module Result =
+    let map f r =
+        match r with
         | Error e -> Error e
         | Value r -> Value (f r)
 
@@ -32,7 +34,7 @@ type Result<'result> =
 type 'result ivr = 
     | Inactive of (Host -> 'result ivr)
     | Active of (Event -> Host -> 'result ivr)
-    | Completed of Result<'result>
+    | Completed of 'result result
 
 module TimeSpanExtensions =
 
@@ -117,7 +119,7 @@ module IVR =
     //
 
     /// Continues the ivr with a followup ivr (Monad bind).
-    let continueWith (f : Result<'a> -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
+    let continueWith (f : 'a result -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
 
         let rec next h state = 
             match state with
@@ -136,8 +138,8 @@ module IVR =
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
     let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
-        let f (r: Result<'a>) = 
-            fun _ -> r.map f |> Completed
+        let f (r: 'a result) = 
+            fun _ -> r |> Result.map f |> Completed
             |> Inactive
         continueWith f ivr
 
@@ -208,13 +210,15 @@ module IVR =
     //
 
     [<NoComparison;NoEquality>]
-    type ArbiterDecision<'r> = 
-        /// Cancel all remaining IVRs and set the result to the Arbiter's state
-        | CancelField
-        /// Continue the field and optionally add some new players / IVRs to it.
-        | ContinueField of 'r ivr list
+    type ArbiterDecision<'state, 'r> = 
+        /// Cancel all remaining IVRs and set the result to the field ivr
+        | CancelField of 'state result
+        /// Continue the field with a new state and optionally add some new players / IVRs to it.
+        /// Note: when the field does not contain any more active ivrs, the 'state is returned
+        /// as a final result of the filed ivr.
+        | ContinueField of 'state * 'r ivr list
 
-    type Arbiter<'state, 'r> = 'state -> Result<'r> -> ('state * ArbiterDecision<'r>)
+    type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
     /// A generic algorithm for parallel running IVRs.
     /// The field. 
@@ -233,10 +237,9 @@ module IVR =
                 | Value v -> v 
                 | Error e -> failwithf "internal error: %A" e
             try
-                let state, decision = arbiter state r
-                state |> Value, decision
+                arbiter state r
             with e ->
-                e |> Error, CancelField
+                CancelField (e |> Error)
 
         let rec stepAll h stepF ((cancelling, state) as s) active ivrs =
             match ivrs with
@@ -252,12 +255,12 @@ module IVR =
                 stepAll h stepF s active todo
             else
             // ask the arbiter what to do next
-            let state, decision = protectedArbiter state r
+            let decision = protectedArbiter state r
             match decision with
-            | CancelField -> (true, state), parCancel h active todo
-            | ContinueField newIVRs ->
+            | CancelField state -> (true, state), parCancel h active todo
+            | ContinueField (state, newIVRs) ->
             // start all new IVRs before putting them on the field.
-            let (cancelling, state), newIVRs = newIVRs |> stepAll h start (false, state) []
+            let (cancelling, state), newIVRs = newIVRs |> stepAll h start (false, state |> Value) []
             if cancelling then
                 let active, todo = parCancel' h active todo
                 (true, state), [active |> List.rev; newIVRs; todo] |> List.collect id
@@ -288,7 +291,31 @@ module IVR =
     /// that error and all other ivrs are cancelled.
 
     let lpar (ivrs: 'r ivr list) : 'r list ivr = 
-        
+
+        // first attach indices
+        let ivrs = ivrs |> List.mapi (fun i ivr -> ivr |> map (fun r -> i,r))
+
+        // arbiter collects the results in a map
+        let arbiter state (r: (int * 'r) result) = 
+            match r with
+            | Value (i, r) -> 
+                let state = state |> Map.add i r
+                ContinueField (state, [])
+            | Error r -> CancelField (Error r)
+
+        // result converts the map to a list.
+        let mapToList m = 
+            m 
+            |> Map.toList
+            |> List.map snd
+
+        ivrs 
+        |> field arbiter Map.empty
+        |> map mapToList
+
+
+
+#if false        
         let rec stepAll h stepF error active ivrs =
             match ivrs with
             | [] -> error, active |> List.rev
@@ -333,6 +360,7 @@ module IVR =
             |> stepAll h start None []
             |> arbiter
         |> Inactive
+#endif
     
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
     /// Note that it may take an arbitrary number of time until the result is finally returned,
@@ -342,7 +370,11 @@ module IVR =
         // Note: when an ivr finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
         // (independent of how many of them already received the current event)!
-        
+
+        let arbiter _ = CancelField
+        field arbiter Unchecked.defaultof<'r> ivrs
+
+#if false
         let rec stepAll h stepF res active ivrs =
             match ivrs with
             | [] -> res, (active |> List.rev)
@@ -376,6 +408,7 @@ module IVR =
             |> stepAll h start None []
             |> arbiter
         |> Inactive
+#endif
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
@@ -610,7 +643,7 @@ module IVR =
     // Async interopability
     //
 
-    let fromResult(result: Result<'r>) = 
+    let fromResult(result: 'r result) = 
         fun _ ->
             result |> Completed
         |> Inactive
@@ -619,13 +652,13 @@ module IVR =
     // the threadpool by default.
 
     type IAsyncComputation = 
-        abstract member run : (Result<obj> -> unit) -> unit
+        abstract member run : (obj result -> unit) -> unit
 
     type AsyncComputation<'r>(computation: Async<'r>) = 
         interface IAsyncComputation with
             /// Run the asynchronous computation on a threadpool thread and post 
             /// its result to the receiver.
-            member this.run(receiver : Result<obj> -> unit) : unit = 
+            member this.run(receiver : obj result -> unit) : unit = 
                 async {
                     try
                         let! r = computation
@@ -637,7 +670,7 @@ module IVR =
         interface IReturns<Id>
 
     [<NoComparison>]
-    type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: Result<obj>
+    type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: obj result
 
     /// Waits for an F# asynchronous computation.
     let await (computation: Async<'r>) : 'r ivr = 
@@ -647,7 +680,7 @@ module IVR =
                 waitFor(
                     fun (AsyncComputationCompleted (id', result)) -> 
                         if id' = id then Some result else None)
-            return! fromResult (result.map unbox)
+            return! fromResult (result |> Result.map unbox)
         }
 
 #if false
