@@ -203,6 +203,19 @@ module IVR =
         let active = active |> cancelIVRs
         (active, todo)
 
+    //
+    // field
+    //
+
+    [<NoComparison;NoEquality>]
+    type ArbiterDecision<'r> = 
+        /// Cancel all remaining IVRs and set the result to the Arbiter's state
+        | CancelField
+        /// Continue the field and optionally add some new players / IVRs to it.
+        | ContinueField of 'r ivr list
+
+    type Arbiter<'state, 'r> = 'state -> Result<'r> -> ('state * ArbiterDecision<'r>)
+
     /// A generic algorithm for parallel running IVRs.
     /// The field. 
     /// Basically, all ivrs are processed in parallel, and as soon an ivr is
@@ -210,24 +223,16 @@ module IVR =
     /// Note that the arbiter does not get to be asked again, as soon it cancels all the other ivrs and 
     /// sets a result.
 
-    [<NoComparison;NoEquality>]
-    type ArbiterDecision<'r> = 
-        /// Cancel all remaining IVRs and set the result to the Arbiter's state
-        | CancelField
-        | AddToField of 'r ivr list
-
-    type Arbiter<'state, 'r> = 'state -> Result<'r> -> ('state * ArbiterDecision<'r>)
-
     let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
 
         // we need to protect the arbiter and handle the case when it dies
         let protectedArbiter state r = 
+            let state = 
+                state 
+                |> function 
+                | Value v -> v 
+                | Error e -> failwithf "internal error: %A" e
             try
-                let state = 
-                    state 
-                    |> function 
-                    | Value v -> v 
-                    | Error e -> failwith "internal error"
                 let state, decision = arbiter state r
                 state |> Value, decision
             with e ->
@@ -250,12 +255,12 @@ module IVR =
             let state, decision = protectedArbiter state r
             match decision with
             | CancelField -> (true, state), parCancel h active todo
-            | AddToField newIVRs ->
+            | ContinueField newIVRs ->
             // start all new IVRs before putting them on the field.
             let (cancelling, state), newIVRs = newIVRs |> stepAll h start (false, state) []
             if cancelling then
-                let (active, todo) = parCancel' h active todo
-                (true, state), ([active |> List.rev; newIVRs; todo] |> List.collect id)
+                let active, todo = parCancel' h active todo
+                (true, state), [active |> List.rev; newIVRs; todo] |> List.collect id
             else
             // embed by prepending them to the list of already processed IVRs
             // (don't use the current step function on the new ones)
