@@ -234,7 +234,7 @@ module IVR =
 
     let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
 
-        // we need to protect the arbiter and handle the case when it dies
+        // we need to protect the arbiter and handle its death
         let protectedArbiter state r = 
             let state = 
                 state 
@@ -268,11 +268,11 @@ module IVR =
             let (cancelling, state), newIVRs = newIVRs |> stepAll h start (false, state |> Value) []
             if cancelling then
                 let active, todo = parCancel' h active todo
-                (true, state), [active |> List.rev; newIVRs; todo] |> List.collect id
+                (true, state), [active |> List.rev; newIVRs; todo] |> List.flatten
             else
             // embed by prepending them to the list of already processed IVRs
             // (don't use the current step function on the new ones)
-            let active = (newIVRs |> List.rev) @ active
+            let active = active |> List.revAndPrepend newIVRs
             stepAll h stepF (false, state) active todo
            
         and next ((_, state) as s, ivrs) = 
@@ -290,6 +290,17 @@ module IVR =
             |> stepAll h start (false, initial |> Value) []
             |> next
         |> Inactive
+    
+    /// game is a simpler version of the field, in which errors automatically lead to
+    /// the cancellation of the game so that the game master does not need to handle them.
+
+    let game master (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
+        let arbiter state (r: 'r result) = 
+            match r with
+            | Error e -> CancelField (Error e)
+            | Value v -> master state v
+
+        field arbiter initial ivrs
 
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
     /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
@@ -319,53 +330,6 @@ module IVR =
         ivrs 
         |> field arbiter Map.empty
         |> map mapToList
-
-#if false        
-        let rec stepAll h stepF error active ivrs =
-            match ivrs with
-            | [] -> error, active |> List.rev
-            | ivr::todo ->
-            let ivr = ivr |> stepF h
-            match ivr with
-            | Completed (Error e) ->
-                match error with
-                | Some _ ->
-                    // already got an error, so we can just forget this one and continue
-                    stepAll h stepF error active todo
-                | None ->
-                    // we do have an error from now on, so we can remove all inactive and
-                    // completed ivrs from the list after cancelling
-                    Some e, parCancel h active todo
-            | Completed _ ->
-                // consume Completed results if we do have an error.
-                let active = 
-                    match error with
-                    | Some _ -> active
-                    | None -> ivr::active
-                stepAll h stepF error active todo
-            | Inactive _ -> failwith "internal error"
-            | Active _ -> stepAll h stepF error (ivr::active) todo
-        
-        let rec active ivrs error e h = 
-            ivrs 
-            |> stepAll h (fun h -> step h e) error []
-            |> arbiter
-           
-        and arbiter (error, ivrs) = 
-            match error, ivrs with
-            | Some e, [] -> e |> Error |> Completed
-            | None, ivrs when ivrs |> List.forall isCompleted ->
-                ivrs 
-                |> List.map resultValue
-                |> Value |> Completed
-            | _ -> active ivrs error |> Active
-    
-        fun (h: Host) ->
-            ivrs
-            |> stepAll h start None []
-            |> arbiter
-        |> Inactive
-#endif
     
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
     /// Note that it may take an arbitrary number of time until the result is finally returned,
@@ -378,42 +342,6 @@ module IVR =
 
         let arbiter _ = CancelField
         field arbiter Unchecked.defaultof<'r> ivrs
-
-#if false
-        let rec stepAll h stepF res active ivrs =
-            match ivrs with
-            | [] -> res, (active |> List.rev)
-            | ivr::todo ->
-            let ivr = ivr |> stepF h
-            match ivr with
-            | Completed r ->
-                match res with
-                | Some _ ->
-                    // already got a result, so we just forget the result and continue
-                    stepAll h stepF res active todo
-                | None ->
-                    Some r, parCancel h active todo
-            | Active _ ->
-                stepAll h stepF res (ivr::active) todo
-            | Inactive _ -> failwith "internal error"
-
-        let rec active ivrs res e h = 
-            ivrs 
-            |> stepAll h (fun h -> step h e) res []
-            |> arbiter
-           
-        and arbiter (result, ivrs) = 
-            match result, ivrs with
-            | Some r, [] -> r |> Completed
-            | None, [] -> failwith "IVR.lpar': internal error: no active ivrs and no result"
-            | res, ivrs -> Active (active ivrs res)
-    
-        fun (h: Host) ->
-            ivrs
-            |> stepAll h start None []
-            |> arbiter
-        |> Inactive
-#endif
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
