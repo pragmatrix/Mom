@@ -45,7 +45,13 @@ module TimeSpanExtensions =
     type Double with
         member this.seconds = TimeSpan.FromSeconds(this)
         member this.milliseconds = TimeSpan.FromMilliseconds(this)
-        
+
+module internal List =
+    let inline flatten l = List.collect id l
+    let rec revAndPrepend a l = 
+        match a with
+        | next :: rest -> revAndPrepend rest (next::l) 
+        | [] -> l        
 
 module IVR = 
 
