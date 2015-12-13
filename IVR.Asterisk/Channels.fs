@@ -1,8 +1,6 @@
 ﻿namespace IVR.Asterisk
 
 open System
-open System.Linq
-open System.Collections.Generic
 
 open IVR
 

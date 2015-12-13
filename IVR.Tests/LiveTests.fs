@@ -126,7 +126,7 @@ type LiveTests() =
                 let! startEvent = IVR.waitForStasisStart()
                 let channel = startEvent.Channel
                 let activeChannelIVR =
-                    IVR.waitAny [
+                    IVR.any [
                         channel.waitForStasisEnd() |> IVR.ignore
                         handleHangupRequestByHangingUp channel
                         channelIVR channel
@@ -135,7 +135,7 @@ type LiveTests() =
 
                 return! 
                     // IVR.waitAll [distributor(); activeChannelIVR]
-                    IVR.waitAll [activeChannelIVR]
+                    IVR.all [activeChannelIVR]
                     |> IVR.ignore
             }
 

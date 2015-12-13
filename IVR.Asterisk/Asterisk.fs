@@ -4,7 +4,6 @@ open IVR
 
 open AsterNET.ARI.Models
 open AsterNET.ARI.Actions
-open System.Linq
 
 module Asterisk =
     

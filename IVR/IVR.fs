@@ -312,7 +312,7 @@ module IVR =
     /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
     /// that error and all other ivrs are cancelled.
 
-    let lpar (ivrs: 'r ivr list) : 'r list ivr = 
+    let all (ivrs: 'r ivr list) : 'r list ivr = 
 
         // lpar can be implemented in terms of the field algorithm:
 
@@ -340,7 +340,7 @@ module IVR =
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
     /// Note that it may take an arbitrary number of time until the result is finally returned,
     /// because ivrs may refuse to get cancelled.
-    let lpar' (ivrs: 'r ivr list) : 'r ivr =
+    let any (ivrs: 'r ivr list) : 'r ivr =
 
         // Note: when an ivr finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
@@ -358,13 +358,13 @@ module IVR =
     /// could lead to leaks in nested parallel ivrs of which the result
     /// is never processed.
 
-    let par (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
+    let join (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
 
         // we implement par in terms of lpar so that we avoid
         // the maintainance of two semantics
 
         [map box ivr1; map box ivr2] 
-        |> lpar
+        |> all
         |> map (function 
             | [l;r] -> unbox l, unbox r 
             | _ -> failwith "internal error: here to keep the compiler happy")
@@ -377,19 +377,19 @@ module IVR =
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
     /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
-    let par' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : Choice<'r1, 'r2> ivr =
+    let first (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : Choice<'r1, 'r2> ivr =
 
         let ivr1 = ivr1 |> map Choice<_,_>.Choice1Of2
         let ivr2 = ivr2 |> map Choice<_,_>.Choice2Of2
-        lpar' [ivr1; ivr2]
+        any [ivr1; ivr2]
 
     /// Runs three ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
-    let par'' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) (ivr3: 'r3 ivr) : Choice<'r1, 'r2, 'r3> ivr =
+    let first' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) (ivr3: 'r3 ivr) : Choice<'r1, 'r2, 'r3> ivr =
 
         let ivr1 = ivr1 |> map Choice<_,_,_>.Choice1Of3
         let ivr2 = ivr2 |> map Choice<_,_,_>.Choice2Of3
         let ivr3 = ivr3 |> map Choice<_,_,_>.Choice3Of3
-        lpar' [ivr1; ivr2; ivr3]
+        any [ivr1; ivr2; ivr3]
 
     //
     // Sending and posting commands to the host.
@@ -572,6 +572,7 @@ module IVR =
 
     type DelayCompleted = DelayCompleted of Id
 
+    /// Wait for the given time span and continue then.
     let delay (ts: TimeSpan) =
         ivr {
             let! id = Delay ts |> send
@@ -633,16 +634,6 @@ module IVR =
             this.Bind(ivr, body)
 
 #endif
-
-    //
-    // TPL naming scheme
-    //
-
-    /// Wait for all ivrs to finish.
-    let waitAll ivrs = lpar ivrs
-
-    /// Wait for any one of the ivrs to finish.
-    let waitAny ivrs = lpar' ivrs 
 
 module BuilderExtensions = 
     let ivr<'r> = IVR.ivr<'r>

@@ -81,7 +81,7 @@ type IVRTests() =
             do! IVR.waitFor' (fun Event2 -> true)
         }
 
-        IVR.par left right
+        IVR.join left right
         |> start
         |> step Event1 
         |> IVR.isError
@@ -103,7 +103,7 @@ type IVRTests() =
             failwith "HellNo!"
         }
 
-        IVR.par left right
+        IVR.join left right
         |> start
         |> step Event2
         |> IVR.isError
@@ -124,7 +124,7 @@ type IVRTests() =
             do! IVR.waitFor' (fun Event2 -> true)
         }
 
-        let test = IVR.par' left right
+        let test = IVR.first left right
         let started = start test
         step Event1 started |> ignore
         ct.disposed |> should equal true
@@ -144,7 +144,7 @@ type IVRTests() =
                 finallyCalled <- true
         }
 
-        let test = IVR.par' left right
+        let test = IVR.first left right
         let started = start test
         step Event1 started |> ignore
         finallyCalled |> should equal true
@@ -172,7 +172,7 @@ type IVRTests() =
                 }
         }
 
-        let test = IVR.par' left right
+        let test = IVR.first left right
         let result = 
             test
             |> start 
@@ -197,7 +197,7 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event2) -> true)
         }
 
-        let test = IVR.par' left right
+        let test = IVR.first left right
         let started = start test
         step Event2 started |> ignore
         ct.disposed |> should equal true
@@ -216,7 +216,7 @@ type IVRTests() =
             return 0
         }
 
-        let test = IVR.par' left right
+        let test = IVR.first left right
         let started = start test
         IVR.isCompleted started |> should equal true
         ct.disposed |> should equal true
@@ -234,7 +234,7 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event2) -> true)
         }
 
-        let r = IVR.lpar' [left; right]
+        let r = IVR.any [left; right]
         let started = start r
         step Event2 started |> ignore
         ct.disposed |> should equal true
@@ -252,7 +252,7 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event2) -> true)
         }
 
-        let r = IVR.lpar' [left; right]
+        let r = IVR.any [left; right]
         let started = start r
         step Event1 started |> ignore
         ct.disposed |> should equal true
@@ -297,7 +297,7 @@ type IVRTests() =
                 finallyTracker <- finallyTracker @ ['e']
             }
 
-        let r = IVR.lpar' [a;b;c;d;e]
+        let r = IVR.any [a;b;c;d;e]
         start r 
         |> step Event2
         |> ignore
