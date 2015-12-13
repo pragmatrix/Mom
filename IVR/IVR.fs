@@ -143,14 +143,14 @@ module IVR =
 
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
-    let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
+    let lift (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
         let f (r: 'a result) = 
             fun _ -> r |> Result.map f |> Completed
             |> Inactive
         continueWith f ivr
 
     /// Ignores the ivr's result type.
-    let ignore ivr = ivr |> map ignore
+    let ignore ivr = ivr |> lift ignore
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
@@ -317,7 +317,7 @@ module IVR =
         // lpar can be implemented in terms of the field algorithm:
 
         // first attach indices
-        let ivrs = ivrs |> List.mapi (fun i ivr -> ivr |> map (fun r -> i,r))
+        let ivrs = ivrs |> List.mapi (fun i ivr -> ivr |> lift (fun r -> i,r))
 
         // arbiter collects the results in a map
         let arbiter state (r: (int * 'r) result) = 
@@ -335,7 +335,7 @@ module IVR =
 
         ivrs 
         |> field arbiter Map.empty
-        |> map mapToList
+        |> lift mapToList
     
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
     /// Note that it may take an arbitrary number of time until the result is finally returned,
@@ -363,9 +363,9 @@ module IVR =
         // we implement par in terms of lpar so that we avoid
         // the maintainance of two semantics
 
-        [map box ivr1; map box ivr2] 
+        [lift box ivr1; lift box ivr2] 
         |> all
-        |> map (function 
+        |> lift (function 
             | [l;r] -> unbox l, unbox r 
             | _ -> failwith "internal error: here to keep the compiler happy")
 
@@ -379,16 +379,16 @@ module IVR =
     /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
     let first (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : Choice<'r1, 'r2> ivr =
 
-        let ivr1 = ivr1 |> map Choice<_,_>.Choice1Of2
-        let ivr2 = ivr2 |> map Choice<_,_>.Choice2Of2
+        let ivr1 = ivr1 |> lift Choice<_,_>.Choice1Of2
+        let ivr2 = ivr2 |> lift Choice<_,_>.Choice2Of2
         any [ivr1; ivr2]
 
     /// Runs three ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     let first' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) (ivr3: 'r3 ivr) : Choice<'r1, 'r2, 'r3> ivr =
 
-        let ivr1 = ivr1 |> map Choice<_,_,_>.Choice1Of3
-        let ivr2 = ivr2 |> map Choice<_,_,_>.Choice2Of3
-        let ivr3 = ivr3 |> map Choice<_,_,_>.Choice3Of3
+        let ivr1 = ivr1 |> lift Choice<_,_,_>.Choice1Of3
+        let ivr2 = ivr2 |> lift Choice<_,_,_>.Choice2Of3
+        let ivr3 = ivr3 |> lift Choice<_,_,_>.Choice3Of3
         any [ivr1; ivr2; ivr3]
 
     //
