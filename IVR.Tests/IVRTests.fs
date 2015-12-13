@@ -222,7 +222,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.``lpar': first ivr is cancelled when the second one finishes first``() = 
+    member this.``any: first ivr is cancelled when the second one finishes first``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
@@ -240,7 +240,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.``lpar': second ivr is cancelled when the first one finishes first``() = 
+    member this.``any: second ivr is cancelled when the first one finishes first``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
@@ -258,7 +258,7 @@ type IVRTests() =
         ct.disposed |> should equal true
 
     [<Test>]
-    member this.``lpar': cancellation is done in reversed order specified``() = 
+    member this.``any: cancellation is done in reversed order specified``() = 
 
         let mutable finallyTracker = []
 

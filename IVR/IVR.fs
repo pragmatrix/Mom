@@ -191,6 +191,15 @@ module IVR =
     // IVR Combinators
     //
 
+    /// Maps a list of IVR's by applying the function f to each result.
+    let map (f: 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
+        let lf = lift f
+        ivrs |> List.map lf
+
+    let mapi (f: int -> 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
+        ivrs 
+        |> List.mapi (fun i -> f i |> lift)
+
     // Cancels a pair of ivr lists in the reversed specified order while in the process of 
     // processing a step for all parallel ivrs.
     // active are the ones that where already processed (in the reversed order specified).
@@ -314,11 +323,11 @@ module IVR =
 
     let all (ivrs: 'r ivr list) : 'r list ivr = 
 
-        // lpar can be implemented in terms of the field algorithm:
+        // all can be implemented in terms of the field algorithm:
 
         // first attach indices
-        let ivrs = ivrs |> List.mapi (fun i ivr -> ivr |> lift (fun r -> i,r))
-
+        let ivrs = ivrs |> mapi (fun i r -> i, r)
+        
         // arbiter collects the results in a map
         let arbiter state (r: (int * 'r) result) = 
             match r with
@@ -354,25 +363,19 @@ module IVR =
     /// (cancellation or exception),
     /// the resulting ivr is ended immediately.
 
-    /// Note that par retains the result of the completed ivr, which
+    /// Note that join retains the result of the first completed ivr, which
     /// could lead to leaks in nested parallel ivrs of which the result
     /// is never processed.
 
     let join (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
 
-        // we implement par in terms of lpar so that we avoid
-        // the maintainance of two semantics
+        // we implement join in terms of all
 
         [lift box ivr1; lift box ivr2] 
         |> all
         |> lift (function 
             | [l;r] -> unbox l, unbox r 
             | _ -> failwith "internal error: here to keep the compiler happy")
-
-    // specialized version of lpar that removes results from processing when
-    // the return type is unit.
-    // tbd
-    // lpar_ 
 
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
