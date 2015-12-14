@@ -51,6 +51,59 @@ type IVRTests() =
         start a |> IVR.resultValue |> should equal 0
         ct.disposed |> should equal true
 
+    [<Test>]
+    member this.disposableProcIsCalledAtStartupTime() = 
+
+        let mutable trace = []
+        let t x = 
+            trace <- x::trace
+
+        let x() = 
+            ivr {
+                t 0
+                return
+                    ivr { t 1 } |> IVR.asDisposable
+            }
+
+        let p = ivr {
+            use! __ = x()
+            t 2
+            return ()
+        }
+
+        p 
+        |> start
+        |> ignore
+
+        trace |> should equal [1;2;0]
+
+    [<Test>]
+    member this.disposableProcIsCalledAfterWait() = 
+
+        let mutable trace = []
+        let t x = 
+            trace <- x::trace
+
+        let x() = 
+            ivr {
+                t 0
+                do! IVR.waitFor' (fun (Event1) -> true)
+                return
+                    ivr { t 1 } |> IVR.asDisposable
+            }
+
+        let p = ivr {
+            use! __ = x()
+            t 2
+            return ()
+        }
+
+        p 
+        |> start
+        |> step Event1
+        |> ignore
+
+        trace |> should equal [1;2;0]
 
     [<Test>]
     member this.ivrIsCancelledInASequentialIVRSurroundingAWait() = 

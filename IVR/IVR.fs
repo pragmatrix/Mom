@@ -425,6 +425,16 @@ module IVR =
         |> Inactive
 
     //
+    // IDisposable, IVR style
+    //
+    // I am also introducing a new terminology here, the proc. A more generic term for
+    // IVR. proc = small process.
+
+    type IDisposableProc =
+        inherit IDisposable
+        abstract member DisposableProc : unit ivr
+
+    //
     // Simple computation expression to build sequential IVR processes
     //
 
@@ -457,9 +467,11 @@ module IVR =
             fun _ -> () |> Value |> Completed
             |> Inactive
 
-        member this.Using(disposable : 't, body : 't -> 'u ivr when 't :> IDisposable) : 'u ivr = 
-            body disposable
-            |> whenCompleted disposable.Dispose
+        member this.Using(disposable : 't, body : 't -> 'r ivr when 't :> IDisposable) : 'r ivr =
+            let body = body disposable
+            match box disposable with
+            | :? IDisposableProc as dp -> this.TryFinally(body, fun () -> dp.DisposableProc)
+            | _ -> this.TryFinally(body, disposable.Dispose)
 
         member this.TryFinally(ivr: 'r ivr, f: unit -> unit ivr) : 'r ivr =
             let finallyBlock res =
@@ -514,6 +526,17 @@ module IVR =
                     this.Delay(fun () -> body enum.Current)))
 
     let ivr<'result> = IVRBuilder<'result>()
+
+    //
+    // Construct an IDisposalbeProc from a unit ivr, so that this ivr can be used
+    // with F# use keyword inside a computation expression.
+
+    let asDisposable (ivr: unit ivr) =
+        { 
+            new IDisposableProc with
+                member __.Dispose() = ()
+                member x.DisposableProc = ivr
+        }
             
     //
     // Wait primitives
