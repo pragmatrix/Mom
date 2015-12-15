@@ -605,6 +605,15 @@ module IVR =
             do! waitFor' (fun (DelayCompleted id') -> id' = id)
         }
 
+    /// Deliver an event to the currently active processes.
+    [<NoComparison>]
+    type Schedule = Schedule of Event
+        with
+        member this.event = let (Schedule e) = this in e
+    
+    let schedule (e: Event) = 
+        e |> Schedule |> post
+
     //
     // Async interopability
     //

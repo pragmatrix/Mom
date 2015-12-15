@@ -54,9 +54,10 @@ module Runtime =
             ivr
             |> start host
             |> next
-
+        
         member this.executeCommand cmd = 
             match cmd with
+            | :? Schedule as s -> s.event |> this.scheduleEvent; () |> box
             | :? Delay as d -> this.delay d
             | :? IAsyncComputation as ac -> this.asyncComputation ac
             | _ -> cmd |> host
