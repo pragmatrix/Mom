@@ -17,6 +17,7 @@ module Runtime =
 
     type Runtime (host: Runtime -> Host) as this = 
 
+        // Partially apply the runtime to the host, so that hosts can initialize attached vars.
         let host = host this
 
         let eventQueue = SynchronizedQueue<Event>();
@@ -55,6 +56,8 @@ module Runtime =
     // A builder that supports the creation of runtimes and adding services to it.
     //
 
+    /// Defines a service. Note that a service's runtime is partially applied. This way the
+    /// service can associate its own instance variables with the Runtime.
     type Service = Runtime -> Command -> Response option
         
     [<NoComparison;NoEquality>]
@@ -69,6 +72,8 @@ module Runtime =
         { builder with
             services = service :: builder.services }
 
+    let private close builder = { builder with closed = true }
+
     let withHost (host: Host) builder = 
         if builder.closed then
             failwith "can not add a host to a closed builder"
@@ -76,20 +81,25 @@ module Runtime =
         let service _ command = 
             host command |> Some
 
-        builder |> withService service
+        builder 
+        |> withService service
+        |> close
 
     let create builder = 
 
-        let rec serviceHost (services: Service list) runtime command = 
-            match services with
-            | [] -> () |> box
-            | s::todo ->
-            match s runtime command with
-            | Some response -> response
-            | None -> serviceHost todo runtime command
-                    
         let services = builder.services |> List.rev
-        new Runtime (serviceHost services)
+
+        let serviceHost runtime =
+            // partially apply services
+            let services = services |> List.map ((|>) runtime)
+            fun (cmd: Command) ->
+                services
+                |> List.tryPick (fun s -> s cmd)
+                |> function 
+                | None -> failwithf "%A: command unhandled" cmd
+                | Some response -> response
+
+        new Runtime (serviceHost)
 
     //
     // Some predefined services that should be supported by every runtime.
@@ -126,6 +136,33 @@ module Runtime =
                         )
                     id |> box |> Some
                 | _ -> None
+
+        let disabled _ _ = None
+
+        [<NoComparison;NoEquality>]
+        type ServiceCrashResponse =
+            /// Return the response and continue the service that crashed
+            | ContinueService
+            /// Replace the service with a new one (use Service.empty to disable the service)
+            | ReplaceService of Service
+            
+        /// Disable the service that crashed
+        let DisableService = ReplaceService disabled
+
+        type ServiceCrashResponder = Runtime -> Command -> exn -> ServiceCrashResponse
+
+        let protect (responder: ServiceCrashResponder) (service: Service) : Service =
+            fun runtime ->
+                let mutable current = service
+                fun command ->
+                try
+                    service runtime command
+                with e ->
+                    let crashResponse = responder runtime command e
+                    match crashResponse with
+                    | ReplaceService service -> current <- service
+                    | ContinueService -> ()
+                    None
 
     /// Runtimes a default builder, that includes the services schedule, delay, and async.
     let defaultBuilder = 
