@@ -28,6 +28,20 @@ module Client =
         member this.nextEvent() = 
             queue.dequeue()
 
+    // Hack: don't see yet how to unify the following two:
+
+    let deliverARIEventToRuntimeQueue (queue : SynchronizedQueue<_>) event = 
+        match event with
+        | ARIEvent e -> e |> queue.enqueue
+        | Disconnected -> Runtime.CancelIVR |> queue.enqueue
+        | _ -> failwithf "unexpected ARI event: %A" event
+
+    let deliverARIEventToRuntime (runtime : Runtime.Runtime) event = 
+        match event with
+        | ARIEvent e -> e |> runtime.scheduleEvent
+        | Disconnected -> Runtime.CancelIVR |> runtime.scheduleEvent
+        | _ -> failwithf "unexpected ARI event: %A" event
+
     type AriClient with
 
         member this.connect() = 
@@ -91,20 +105,10 @@ module Client =
 
         /// Connect and deliver all events from ARI to the IVR runtime.
         member this.connect(runtime: IVR.Runtime.Runtime) = 
-
-            let deliverARIEventToRuntime event = 
-                match event with
-                | ARIEvent e -> e |> runtime.scheduleEvent
-                // not sure about this, shouldn't have an IVR a chance to process a
-                // disconnected event, instead of being cancelled spontaneously.
-                | Disconnected -> (runtime :> IDisposable).Dispose()
-                | _ -> failwithf "unexpected ARI event: %A" event
-
-            this.connect(deliverARIEventToRuntime)
+            this.connect(deliverARIEventToRuntime runtime)
 
         member this.host (cmd: Command) : Response = 
             match cmd with
             | :? IDispatch<Actions.IChannelsActions> as d -> 
                 d.dispatch this.Channels
             | _ -> failwithf "Unsupported command: %A" cmd
-

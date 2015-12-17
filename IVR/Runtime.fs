@@ -13,14 +13,14 @@ module Runtime =
 
     // predefined runtime events
 
-    type private CancelIVR = CancelIVR
+    /// This event can be sent to the Runtime to try to cancel the current IVR.
+    type CancelIVR = CancelIVR
 
-    type Runtime (host: Runtime -> Host) as this = 
+    /// This is the runtime that drives the IVR.
+    type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: Runtime -> Host) as this = 
 
         // Partially apply the runtime to the host, so that hosts can initialize attached vars.
         let host = host this
-
-        let eventQueue = SynchronizedQueue<Event>();
 
         interface IDisposable with
             member this.Dispose() = this.cancel()
@@ -62,11 +62,15 @@ module Runtime =
         
     [<NoComparison;NoEquality>]
     type Builder = {
+            queue: SynchronizedQueue<Event>
             services: Service list
             closed: bool
         }
 
-    let builder = { services = []; closed = false }
+    let builder = { queue = SynchronizedQueue<Event>(); services = []; closed = false }
+
+    let withQueue queue builder = 
+        { builder with queue = queue }
 
     let withService (service: Service) builder = 
         { builder with
@@ -99,7 +103,7 @@ module Runtime =
                 | None -> failwithf "%A: command unhandled" cmd
                 | Some response -> response
 
-        new Runtime (serviceHost)
+        new Runtime (builder.queue, serviceHost)
 
     //
     // Some predefined services that should be supported by every runtime.
