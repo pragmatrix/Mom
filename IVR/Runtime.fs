@@ -3,9 +3,8 @@
 open System
 open Threading
 
-open IVR
-
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+[<RequireQualifiedAccess>]
 module Runtime =
 
     //
@@ -37,8 +36,8 @@ module Runtime =
             let rec runLoop ivr = 
                 let event = eventQueue.dequeue()
                 match event with
-                | :? CancelIVR -> tryCancel host ivr
-                | event -> step host event ivr
+                | :? CancelIVR -> IVR.tryCancel host ivr
+                | event -> IVR.step host event ivr
                 |> next 
 
             and next ivr =
@@ -49,59 +48,67 @@ module Runtime =
                 | Inactive _ -> failwith "internal error, state transition of an ivr from active -> inactive"
 
             ivr
-            |> start host
+            |> IVR.start host
             |> next
 
     //
     // A builder that supports the creation of runtimes and adding services to it.
     //
 
-    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-    module Runtime =
+    type Service = Runtime -> Command -> Response option
         
-        type Service = Runtime -> Command -> Response option
-        
-        [<NoComparison;NoEquality>]
-        type Builder = {
-                services: Service list
-            }
+    [<NoComparison;NoEquality>]
+    type Builder = {
+            services: Service list
+            closed: bool
+        }
 
-        let builder = { services = [] }
+    let builder = { services = []; closed = false }
 
-        let service (service: Service) builder = 
-            { builder with
-                services = service :: builder.services }
+    let withService (service: Service) builder = 
+        { builder with
+            services = service :: builder.services }
 
-        let create builder = 
+    let withHost (host: Host) builder = 
+        if builder.closed then
+            failwith "can not add a host to a closed builder"
 
-            let rec serviceHost (services: Service list) runtime command = 
-                match services with
-                | [] -> () |> box
-                | s::todo ->
-                match s runtime command with
-                | Some response -> response
-                | None -> serviceHost todo runtime command
+        let service _ command = 
+            host command |> Some
+
+        builder |> withService service
+
+    let create builder = 
+
+        let rec serviceHost (services: Service list) runtime command = 
+            match services with
+            | [] -> () |> box
+            | s::todo ->
+            match s runtime command with
+            | Some response -> response
+            | None -> serviceHost todo runtime command
                     
-            let services = builder.services |> List.rev
-            new Runtime (serviceHost services)
+        let services = builder.services |> List.rev
+        new Runtime (serviceHost services)
 
     //
     // Some predefined services that should be supported by every runtime.
     //
 
+    [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Service = 
 
         let schedule (runtime: Runtime) (cmd: Command) = 
             match cmd with
-            | :? Schedule as s -> s.event |> runtime.scheduleEvent; () |> box |> Some
+            | :? IVR.Schedule as s -> s.event |> runtime.scheduleEvent; () |> box |> Some
             | _ -> None
 
         let delay (runtime: Runtime) =
             let delayIdGenerator = Ids.newGenerator()
             fun (cmd : Command) ->
                 match cmd with
-                | :? Delay as d -> 
-                    let (Delay timespan) = d
+                | :? IVR.Delay as d -> 
+                    let (IVR.Delay timespan) = d
                     let id = delayIdGenerator.generateId()
                     let callback _ = runtime.scheduleEvent (IVR.DelayCompleted id)
                     new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
@@ -112,7 +119,7 @@ module Runtime =
             let asyncIdGenerator = Ids.newGenerator()
             fun (cmd: Command) ->
                 match cmd with
-                | :? IAsyncComputation as ac -> 
+                | :? IVR.IAsyncComputation as ac -> 
                     let id = asyncIdGenerator.generateId()
                     ac.run(fun r ->
                         runtime.scheduleEvent (IVR.AsyncComputationCompleted(id, r))
@@ -122,15 +129,15 @@ module Runtime =
 
     /// Runtimes a default builder, that includes the services schedule, delay, and async.
     let defaultBuilder = 
-        Runtime.builder
-        |> Runtime.service Service.schedule
-        |> Runtime.service Service.delay
-        |> Runtime.service Service.async
+        builder
+        |> withService Service.schedule
+        |> withService Service.delay
+        |> withService Service.async
 
     /// Builds a default runtime that forwards all commands to the host. The runtime includes the
     /// services schedule, delay, and async.
     let newRuntime host = 
         defaultBuilder
-        |> Runtime.service (fun _ c -> host c |> Some)
-        |> Runtime.create
+        |> withHost host
+        |> create
     

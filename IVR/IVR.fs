@@ -53,6 +53,7 @@ module internal List =
         | next :: rest -> revAndPrepend rest (next::l) 
         | [] -> l        
 
+[<RequireQualifiedAccess>]
 module IVR = 
 
     // 
