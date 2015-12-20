@@ -144,14 +144,14 @@ module IVR =
 
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
-    let lift (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
+    let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
         let f (r: 'a result) = 
             fun _ -> r |> Result.map f |> Completed
             |> Inactive
         continueWith f ivr
-
+    
     /// Ignores the ivr's result type.
-    let ignore ivr = ivr |> lift ignore
+    let ignore ivr = ivr |> map ignore
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
@@ -193,13 +193,13 @@ module IVR =
     //
 
     /// Maps a list of IVR's by applying the function f to each result.
-    let map (f: 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
-        let lf = lift f
+    let internal lmap (f: 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
+        let lf = map f
         ivrs |> List.map lf
 
-    let mapi (f: int -> 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
+    let internal lmapi (f: int -> 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
         ivrs 
-        |> List.mapi (fun i -> f i |> lift)
+        |> List.mapi (fun i -> f i |> map)
 
     // Cancels a pair of ivr lists in the reversed specified order while in the process of 
     // processing a step for all parallel ivrs.
@@ -327,7 +327,7 @@ module IVR =
         // all can be implemented in terms of the field algorithm:
 
         // first attach indices
-        let ivrs = ivrs |> mapi (fun i r -> i, r)
+        let ivrs = ivrs |> lmapi (fun i r -> i, r)
         
         // arbiter collects the results in a map
         let arbiter state (r: (int * 'r) result) = 
@@ -345,7 +345,7 @@ module IVR =
 
         ivrs 
         |> field arbiter Map.empty
-        |> lift mapToList
+        |> map mapToList
     
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
     /// Note that it may take an arbitrary number of time until the result is finally returned,
@@ -372,9 +372,9 @@ module IVR =
 
         // we implement join in terms of all
 
-        [lift box ivr1; lift box ivr2] 
+        [map box ivr1; map box ivr2] 
         |> all
-        |> lift (function 
+        |> map (function 
             | [l;r] -> unbox l, unbox r 
             | _ -> failwith "internal error: here to keep the compiler happy")
 
@@ -383,16 +383,16 @@ module IVR =
     /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
     let first (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : Choice<'r1, 'r2> ivr =
 
-        let ivr1 = ivr1 |> lift Choice<_,_>.Choice1Of2
-        let ivr2 = ivr2 |> lift Choice<_,_>.Choice2Of2
+        let ivr1 = ivr1 |> map Choice<_,_>.Choice1Of2
+        let ivr2 = ivr2 |> map Choice<_,_>.Choice2Of2
         any [ivr1; ivr2]
 
     /// Runs three ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     let first' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) (ivr3: 'r3 ivr) : Choice<'r1, 'r2, 'r3> ivr =
 
-        let ivr1 = ivr1 |> lift Choice<_,_,_>.Choice1Of3
-        let ivr2 = ivr2 |> lift Choice<_,_,_>.Choice2Of3
-        let ivr3 = ivr3 |> lift Choice<_,_,_>.Choice3Of3
+        let ivr1 = ivr1 |> map Choice<_,_,_>.Choice1Of3
+        let ivr2 = ivr2 |> map Choice<_,_,_>.Choice2Of3
+        let ivr3 = ivr3 |> map Choice<_,_,_>.Choice3Of3
         any [ivr1; ivr2; ivr3]
 
     //
@@ -544,7 +544,6 @@ module IVR =
     //
 
     /// An IVR that waits for some event given a function that returns (Some result) or None.
-
     let wait f =
         let rec waiter (e: Event) _ =  
             match e with
@@ -560,7 +559,6 @@ module IVR =
 
     /// Waits for some event with a predicate that returns
     /// true or false
-
     let wait' predicate = 
         let f e = 
             let r = predicate e
@@ -571,7 +569,6 @@ module IVR =
         wait f
 
     /// Waits for an event of a type derived by a function passed in.
-
     let waitFor (f : 'e -> 'r option) = 
 
         let f (e : Event) = 
@@ -588,6 +585,9 @@ module IVR =
             | _ -> false
 
         wait' f
+
+    /// Waits forever.
+    let idle = wait' (fun _ -> false)
 
     //
     // IVR System Commands & Events
@@ -658,6 +658,12 @@ module IVR =
                         if id' = id then Some result else None)
             return! fromResult (result |> Result.map unbox)
         }
+
+/// Helpers for mapping values of IVR lists
+module IVRs = 
+    let map f ivrs = IVR.lmap
+    let mapi f ivrs = IVR.lmapi
+
 
 #if false
 
