@@ -7,16 +7,48 @@ open Channels
 
 module ChannelExtensions =
     
+    type ChannelState =
+        | Down
+        | Reserved
+        | OffHook
+        | Dialing
+        | Ring
+        | Ringing
+        | Up
+        | Busy
+        | DialingOffhook
+        | PreRing
+        | Unknown
+        with
+        // https://wiki.asterisk.org/wiki/display/AST/Asterisk+11+ManagerEvent_Newstate
+        static member parse str =
+            match str with
+            | "Down" -> Down
+            | "Rsrvd" -> Reserved
+            | "OffHook" -> OffHook
+            | "Dialing" -> Dialing
+            | "Ring" -> Ring
+            | "Ringing" -> Ringing
+            | "Up" -> Up
+            | "Busy" -> Busy
+            | "Dialing Offhook" -> DialingOffhook
+            | "Pre-ring" -> PreRing
+            | "Unknown" -> Unknown
+            | _ -> Unknown
+
     // https://wiki.asterisk.org/wiki/display/AST/Asterisk+13+Channels+REST+API#Asterisk13ChannelsRESTAPI-list
             
     type Channel with
 
-        member inline private this.waitFor< ^e when ^e : (member Channel : Channel)>() =
+        member inline private this.waitFor< ^e,'r when ^e : (member Channel : Channel)>(guard: ^e -> 'r option) =
             let f e =
                 let channel = (^e : (member Channel : Channel) (e))
-                if channel.Id = this.Id then Some e else None
+                if channel.Id = this.Id then guard e else None
 
             IVR.waitFor f
+
+        member inline private this.waitFor< ^e when ^e : (member Channel : Channel)>() : ^e ivr =
+            this.waitFor(Some)
 
         member this.waitForStasisEnd() = this.waitFor<StasisEndEvent>()
 
@@ -38,6 +70,9 @@ module ChannelExtensions =
         member this.waitForChannelHold() = this.waitFor<ChannelHoldEvent>()
         member this.waitForChannelUnholdEvent() = this.waitFor<ChannelUnholdEvent>()
 
+        /// Waits for a ChannelStateChangeEvent that changes to the given state.
+        member this.waitForChannelState(state: ChannelState) = 
+            this.waitFor<ChannelStateChangeEvent, _>(fun changeEvent -> if changeEvent.Channel.state = state then Some changeEvent else None)
 
         member this.waitForKey (key: char) = 
             ivr {
@@ -47,6 +82,8 @@ module ChannelExtensions =
                 else 
                     return ()
             }
+
+        member this.state = this.State |> ChannelState.parse
 
         member this.hangup(?reason) = 
             Channels.Hangup(this.Id, ?reason = reason)
