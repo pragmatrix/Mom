@@ -69,18 +69,18 @@ module Endpoints =
 
     [<AbstractClass;Sealed>]
     type Endpoints() =
-        static member List() =
+        static member list() =
             List
             |> IVR.send
-        static member SendMessage(receiver, sender, ?body, ?variables) =
+        static member sendMessage(receiver, sender, ?body, ?variables) =
             { SendMessage.receiver = receiver; sender = sender; body = body; variables = variables }
             |> IVR.post
-        static member ListByTech(tech) = 
+        static member listByTech(tech) = 
             ListByTech(tech)
             |> IVR.send
-        static member Get(tech, resource)  = 
+        static member get(tech, resource)  = 
             Get(tech, resource)
             |> IVR.send
-        static member SendMessageToEndpoint(tech, resource, sender, ?body, ?variables) = 
+        static member sendMessageToEndpoint(tech, resource, sender, ?body, ?variables) = 
             { SendMessageToEndpoint.tech = tech; resource = resource; sender = sender; body = body; variables = variables }
             |> IVR.post

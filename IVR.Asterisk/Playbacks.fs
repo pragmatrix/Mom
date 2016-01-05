@@ -59,13 +59,13 @@ module Playbacks =
 
     [<AbstractClass; Sealed>]
     type Playbacks() = 
-        static member Get(playbackId) = 
+        static member get(playbackId) = 
             Get playbackId
             |> IVR.send
-        static member Stop(playbackId) = 
+        static member stop(playbackId) = 
             Stop playbackId
             |> IVR.send
-        static member Control(playbackId, operation) = 
+        static member control(playbackId, operation) = 
             Control(playbackId, operation)
             |> IVR.post
 

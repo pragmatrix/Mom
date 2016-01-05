@@ -46,13 +46,13 @@ module Mailboxes =
 
     [<AbstractClass; Sealed>]
     type Mailboxes() = 
-        static member List() = 
+        static member list() = 
             List
             |> IVR.send
-        static member Get(mailboxName) = 
+        static member get(mailboxName) = 
             Get(mailboxName)
             |> IVR.send
-        static member Update(mailboxName, oldMessages, newMessages) = 
+        static member update(mailboxName, oldMessages, newMessages) = 
             { mailboxName = mailboxName; oldMessages = oldMessages; newMessages = newMessages }
             |> IVR.post
 

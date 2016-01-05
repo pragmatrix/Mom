@@ -108,36 +108,36 @@ module Asterisk =
 
     [<AbstractClass; Sealed>]
     type Asterisk() =
-        static member GetObject(configClass, objectType, id) = 
+        static member getObject(configClass, objectType, id) = 
             { GetObject.configClass = configClass; objectType = objectType; id = id }
             |> IVR.send
-        static member UpdateObject(configClass, objectType, id, ?fields) = 
+        static member updateObject(configClass, objectType, id, ?fields) = 
             { UpdateObject.configClass = configClass; objectType = objectType; id = id; fields = fields }
             |> IVR.send
 
-        static member DeleteObject(configClass, objectType, id) = 
+        static member deleteObject(configClass, objectType, id) = 
             { DeleteObject.configClass = configClass; objectType = objectType; id = id }
             |> IVR.post
 
-        static member GetInfo(?only) = 
+        static member getInfo(?only) = 
             GetInfo only
             |> IVR.send
         
-        static member ListModules() = 
+        static member listModules() = 
             ListModules |> IVR.send
-        static member GetModule(moduleName) = 
+        static member getModule(moduleName) = 
             GetModule(moduleName) |> IVR.send
-        static member LoadModule(moduleName) = 
+        static member loadModule(moduleName) = 
             LoadModule(moduleName) |> IVR.post
-        static member UnloadModule(moduleName) = 
+        static member unloadModule(moduleName) = 
             UnloadModule(moduleName) |> IVR.post
-        static member ReloadMoudle(moduleName) = 
+        static member reloadMoudle(moduleName) = 
             ReloadModule(moduleName) |> IVR.post
 
-        static member GetGlobalVar(variable) = 
+        static member getGlobalVar(variable) = 
             GetGlobalVar variable
             |> IVR.send
-        static member SetGlobalVar(variable, ?value) = 
+        static member setGlobalVar(variable, ?value) = 
             SetGlobalVar(variable, value)
             |> IVR.post
 

@@ -30,10 +30,10 @@ module Sounds =
 
     [<AbstractClass; Sealed>]
     type Sounds() = 
-        member this.List(?lang, ?format) = 
+        member this.list(?lang, ?format) = 
             List(lang, format)
             |> IVR.send
-        member this.Get(soundId) = 
+        member this.get(soundId) = 
             Get(soundId)
             |> IVR.send
         

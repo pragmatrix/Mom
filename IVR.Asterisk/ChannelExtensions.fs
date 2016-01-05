@@ -86,45 +86,45 @@ module ChannelExtensions =
         member this.state = this.State |> ChannelState.parse
 
         member this.hangup(?reason) = 
-            Channels.Channels.Hangup(this.Id, ?reason = reason)
+            Channels.Channels.hangup(this.Id, ?reason = reason)
         member this.continueInDialplan(?context, ?extension, ?priority, ?label) =
-            Channels.Channels.ContinueInDialplan(this.Id, ?context = context, ?extension = extension, ?priority = priority, ?label = label)
+            Channels.Channels.continueInDialplan(this.Id, ?context = context, ?extension = extension, ?priority = priority, ?label = label)
         member this.redirect(endpoint) = 
-            Channels.Channels.Redirect(this.Id, endpoint)
+            Channels.Channels.redirect(this.Id, endpoint)
         member this.answer() = 
-            Channels.Channels.Answer(this.Id)
+            Channels.Channels.answer(this.Id)
         member this.ring() = 
-            Channels.Channels.Ring(this.Id)
+            Channels.Channels.ring(this.Id)
         member this.ringStop() = 
-            Channels.Channels.RingStop(this.Id)
+            Channels.Channels.ringStop(this.Id)
         member this.sendDTMF(dtmf, ?before, ?between, ?duration, ?after) = 
-            Channels.Channels.SendDTMF(this.Id, dtmf, ?before = before, ?between = between, ?duration = duration, ?after = after)
+            Channels.Channels.sendDTMF(this.Id, dtmf, ?before = before, ?between = between, ?duration = duration, ?after = after)
         member this.mute(?direction) =
-            Channels.Channels.Mute(this.Id, ?direction = direction)
+            Channels.Channels.mute(this.Id, ?direction = direction)
         member this.unmute(?direction) = 
-            Channels.Channels.Unmute(this.Id, ?direction = direction)
+            Channels.Channels.unmute(this.Id, ?direction = direction)
         member this.hold() = 
-            Channels.Channels.Hold(this.Id)
+            Channels.Channels.hold(this.Id)
         member this.unhold() = 
-            Channels.Channels.Unhold(this.Id)
+            Channels.Channels.unhold(this.Id)
         member this.startMOH(?mohClass) =
-            Channels.Channels.StartMOH(this.Id, ?mohClass = mohClass)
+            Channels.Channels.startMOH(this.Id, ?mohClass = mohClass)
         member this.stopMOH() = 
-            Channels.Channels.StopMOH(this.Id)
+            Channels.Channels.stopMOH(this.Id)
         member this.startSilence() = 
-            Channels.Channels.StartSilence(this.Id)
+            Channels.Channels.startSilence(this.Id)
         member this.stopSilence() = 
-            Channels.Channels.StopSilence(this.Id)
+            Channels.Channels.stopSilence(this.Id)
         member this.play(media, ?lang, ?offset, ?skip, ?playbackId) = 
-            Channels.Channels.Play(this.Id, media, ?lang = lang, ?offset = offset, ?skip = skip, ?playbackId = playbackId)
+            Channels.Channels.play(this.Id, media, ?lang = lang, ?offset = offset, ?skip = skip, ?playbackId = playbackId)
         member this.record(name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
-            Channels.Channels.Record(this.Id, name, format, ?maxDuration = maxDuration, ?maxSilence = maxSilence, ?ifExists = ifExists, ?beep = beep, ?terminateOn = terminateOn)
+            Channels.Channels.record(this.Id, name, format, ?maxDuration = maxDuration, ?maxSilence = maxSilence, ?ifExists = ifExists, ?beep = beep, ?terminateOn = terminateOn)
         member this.getVar(variable) = 
-            Channels.Channels.GetChannelVar(this.Id, variable)
+            Channels.Channels.getChannelVar(this.Id, variable)
         member this.setVar(variable, ?value) = 
-            Channels.Channels.SetChannelVar(this.Id, variable, ?value = value)
+            Channels.Channels.getChannelVar(this.Id, variable, ?value = value)
         member this.snoop(app, ?spy, ?whisper, ?appArgs, ?snoopId) = 
-            Channels.Channels.SnoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
+            Channels.Channels.snoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
 
         /// An IVR that plays a media, and waits for the PlaybackFinishedEvent
         member this.play'(media, ?lang, ?offset, ?skip) : unit ivr= 

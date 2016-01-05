@@ -34,10 +34,10 @@ module Events =
 
     [<AbstractClass; Sealed>]
     type Events() =
-        static member EventWebSocket(app: string) =
+        static member eventWebSocket(app: string) =
             EventWebSocket app
             |> IVR.send
 
-        static member UserEvent(eventName, application, ?source, ?variables) = 
+        static member userEvent(eventName, application, ?source, ?variables) = 
             { eventName = eventName; application = application; source = source; variables = variables }
             |> IVR.post

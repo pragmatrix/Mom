@@ -92,37 +92,37 @@ module Recordings =
     
     [<AbstractClass;Sealed>]
     type Recordings() =
-        static member ListStored() =
+        static member listStored() =
             ListStored
             |> IVR.send
-        static member GetStored(recordingName) = 
+        static member getStored(recordingName) = 
             GetStored(recordingName)
             |> IVR.send
-        static member DeleteStored(recordingName) = 
+        static member deleteStored(recordingName) = 
             DeleteStored(recordingName)
             |> IVR.post
-        static member CopyStored(recordingName, destinationRecordingName) = 
+        static member copyStored(recordingName, destinationRecordingName) = 
             CopyStored(recordingName, destinationRecordingName)
             |> IVR.send
-        static member GetLive(recordingName) =
+        static member getLive(recordingName) =
             GetLive(recordingName)
             |> IVR.send
-        static member Cancel(recordingName) = 
+        static member cancel(recordingName) = 
             Cancel(recordingName)
             |> IVR.post
-        static member Stop(recordingName) = 
+        static member stop(recordingName) = 
             Stop(recordingName)
             |> IVR.post
-        static member Pause(recordingName) = 
+        static member pause(recordingName) = 
             Pause(recordingName)
             |> IVR.post
-        static member Unpause(recordingName) =
+        static member unpause(recordingName) =
             Unpause(recordingName)
             |> IVR.post
-        static member Mute(recordingName) = 
+        static member mute(recordingName) = 
             Mute(recordingName)
             |> IVR.post
-        static member Unmute(recordingName) = 
+        static member unmute(recordingName) = 
             Unmute(recordingName)
             |> IVR.post
 
