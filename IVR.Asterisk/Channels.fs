@@ -258,6 +258,7 @@ module Channels =
                 channels.StopSilence(channelId) 
                 |> box
 
+    [<NoComparison>]
     type Play = {
         channelId: string
         media: Uri

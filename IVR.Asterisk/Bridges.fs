@@ -103,6 +103,7 @@ module Bridges =
                 bridges.StopMoh(bridgeId)
                 |> box
 
+    [<NoComparison>]
     type Play = {
         bridgeId: string
         media: Uri

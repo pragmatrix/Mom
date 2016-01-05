@@ -10,6 +10,7 @@ open IVR.Threading
 
 module Client = 
 
+    [<NoComparison>]
     type ARIClientEvent =
         | ARIEvent of obj
         | Connected
@@ -98,7 +99,7 @@ module Client =
                     new ARIConnection(cleanup)
 
                 | _ ->
-                    failwithf "failed to connect to ARI, connection state is %s" (this.ConnectionState.ToString())
+                    failwithf "failed to connect to ARI, connection state is %s" (string this.ConnectionState)
 
             finally
                 this.OnConnectionStateChanged.RemoveHandler connectionHandler
