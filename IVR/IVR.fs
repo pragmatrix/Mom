@@ -234,6 +234,9 @@ module IVR =
         /// as a final result of the field ivr.
         | ContinueField of 'state * 'r ivr list
 
+    let cancelField r = CancelField r
+    let continueField state ivrs = ContinueField(state, ivrs)
+
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
     /// A generic algorithm for running IVRs in parallel.
@@ -313,7 +316,7 @@ module IVR =
     let game master (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
         let arbiter state (r: 'r result) = 
             match r with
-            | Error e -> CancelField (Error e)
+            | Error e -> cancelField (Error e)
             | Value v -> master state v
 
         field arbiter initial ivrs
@@ -334,8 +337,8 @@ module IVR =
             match r with
             | Value (i, r) -> 
                 let state = state |> Map.add i r
-                ContinueField (state, [])
-            | Error r -> CancelField (Error r)
+                continueField state []
+            | Error r -> cancelField (Error r)
 
         // and last convert the map to a list.
         let mapToList m = 
@@ -356,7 +359,7 @@ module IVR =
         // order they were originally specified in the list 
         // (independent of how many of them already received the current event)!
 
-        let arbiter _ = CancelField
+        let arbiter _ = cancelField
         field arbiter Unchecked.defaultof<'r> ivrs
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
