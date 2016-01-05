@@ -36,9 +36,17 @@ module ChannelExtensions =
             | "Unknown" -> Unknown
             | _ -> Unknown
 
+
+    /// Id of the Asterisk Channel
+    type ChannelId = ChannelId of string
+        with
+        member this.value = let (ChannelId v) = this in v
+
     // https://wiki.asterisk.org/wiki/display/AST/Asterisk+13+Channels+REST+API#Asterisk13ChannelsRESTAPI-list
             
     type Channel with
+
+        member this.id = this.Id |> ChannelId
 
         member inline private this.waitFor< ^e,'r when ^e : (member Channel : Channel)>(guard: ^e -> 'r option) =
             let f e =
