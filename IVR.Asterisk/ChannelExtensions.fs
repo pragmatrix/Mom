@@ -86,52 +86,50 @@ module ChannelExtensions =
         member this.state = this.State |> ChannelState.parse
 
         member this.hangup(?reason) = 
-            Channels.Hangup(this.Id, ?reason = reason)
+            Channels.Channels.Hangup(this.Id, ?reason = reason)
         member this.continueInDialplan(?context, ?extension, ?priority, ?label) =
-            Channels.ContinueInDialplan(this.Id, ?context = context, ?extension = extension, ?priority = priority, ?label = label)
+            Channels.Channels.ContinueInDialplan(this.Id, ?context = context, ?extension = extension, ?priority = priority, ?label = label)
         member this.redirect(endpoint) = 
-            Channels.Redirect(this.Id, endpoint)
+            Channels.Channels.Redirect(this.Id, endpoint)
         member this.answer() = 
-            Channels.Answer(this.Id)
+            Channels.Channels.Answer(this.Id)
         member this.ring() = 
-            Channels.Ring(this.Id)
+            Channels.Channels.Ring(this.Id)
         member this.ringStop() = 
-            Channels.RingStop(this.Id)
+            Channels.Channels.RingStop(this.Id)
         member this.sendDTMF(dtmf, ?before, ?between, ?duration, ?after) = 
-            Channels.SendDTMF(this.Id, dtmf, ?before = before, ?between = between, ?duration = duration, ?after = after)
+            Channels.Channels.SendDTMF(this.Id, dtmf, ?before = before, ?between = between, ?duration = duration, ?after = after)
         member this.mute(?direction) =
-            Channels.Mute(this.Id, ?direction = direction)
+            Channels.Channels.Mute(this.Id, ?direction = direction)
         member this.unmute(?direction) = 
-            Channels.Unmute(this.Id, ?direction = direction)
+            Channels.Channels.Unmute(this.Id, ?direction = direction)
         member this.hold() = 
-            Channels.Hold(this.Id)
+            Channels.Channels.Hold(this.Id)
         member this.unhold() = 
-            Channels.Unhold(this.Id)
+            Channels.Channels.Unhold(this.Id)
         member this.startMOH(?mohClass) =
-            Channels.StartMOH(this.Id, ?mohClass = mohClass)
+            Channels.Channels.StartMOH(this.Id, ?mohClass = mohClass)
         member this.stopMOH() = 
-            Channels.StopMOH(this.Id)
+            Channels.Channels.StopMOH(this.Id)
         member this.startSilence() = 
-            Channels.StartSilence(this.Id)
+            Channels.Channels.StartSilence(this.Id)
         member this.stopSilence() = 
-            Channels.StopSilence(this.Id)
+            Channels.Channels.StopSilence(this.Id)
         member this.play(media, ?lang, ?offset, ?skip, ?playbackId) = 
-            Channels.Play(this.Id, media, ?lang = lang, ?offset = offset, ?skip = skip, ?playbackId = playbackId)
+            Channels.Channels.Play(this.Id, media, ?lang = lang, ?offset = offset, ?skip = skip, ?playbackId = playbackId)
         member this.record(name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
-            Channels.Record(this.Id, name, format, ?maxDuration = maxDuration, ?maxSilence = maxSilence, ?ifExists = ifExists, ?beep = beep, ?terminateOn = terminateOn)
+            Channels.Channels.Record(this.Id, name, format, ?maxDuration = maxDuration, ?maxSilence = maxSilence, ?ifExists = ifExists, ?beep = beep, ?terminateOn = terminateOn)
         member this.getVar(variable) = 
-            Channels.GetChannelVar(this.Id, variable)
+            Channels.Channels.GetChannelVar(this.Id, variable)
         member this.setVar(variable, ?value) = 
-            Channels.SetChannelVar(this.Id, variable, ?value = value)
+            Channels.Channels.SetChannelVar(this.Id, variable, ?value = value)
         member this.snoop(app, ?spy, ?whisper, ?appArgs, ?snoopId) = 
-            Channels.SnoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
+            Channels.Channels.SnoopChannel(this.Id, app, ?spy = spy, ?whisper = whisper, ?appArgs = appArgs, ?snoopId = snoopId)
 
         /// An IVR that plays a media, and waits for the PlaybackFinishedEvent
         member this.play'(media, ?lang, ?offset, ?skip) : unit ivr= 
             ivr {
-                let! playback = 
-                    this.play(media, ?lang = lang, ?offset = offset, ?skip = skip)
-                    |> IVR.send
+                let! playback = this.play(media, ?lang = lang, ?offset = offset, ?skip = skip)
                 do! IVR.waitForPlaybackFinished(playback.Id)
             }
 

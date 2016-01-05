@@ -110,28 +110,35 @@ module Asterisk =
     type Asterisk() =
         static member GetObject(configClass, objectType, id) = 
             { GetObject.configClass = configClass; objectType = objectType; id = id }
+            |> IVR.send
         static member UpdateObject(configClass, objectType, id, ?fields) = 
             { UpdateObject.configClass = configClass; objectType = objectType; id = id; fields = fields }
+            |> IVR.send
+
         static member DeleteObject(configClass, objectType, id) = 
             { DeleteObject.configClass = configClass; objectType = objectType; id = id }
-        
+            |> IVR.post
+
         static member GetInfo(?only) = 
             GetInfo only
+            |> IVR.send
         
         static member ListModules() = 
-            ListModules
+            ListModules |> IVR.send
         static member GetModule(moduleName) = 
-            GetModule(moduleName)
+            GetModule(moduleName) |> IVR.send
         static member LoadModule(moduleName) = 
-            LoadModule(moduleName)
+            LoadModule(moduleName) |> IVR.post
         static member UnloadModule(moduleName) = 
-            UnloadModule(moduleName)
+            UnloadModule(moduleName) |> IVR.post
         static member ReloadMoudle(moduleName) = 
-            ReloadModule(moduleName)
+            ReloadModule(moduleName) |> IVR.post
 
         static member GetGlobalVar(variable) = 
             GetGlobalVar variable
+            |> IVR.send
         static member SetGlobalVar(variable, ?value) = 
             SetGlobalVar(variable, value)
+            |> IVR.post
 
     

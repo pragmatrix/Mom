@@ -48,10 +48,13 @@ module Mailboxes =
     type Mailboxes() = 
         static member List() = 
             List
+            |> IVR.send
         static member Get(mailboxName) = 
             Get(mailboxName)
+            |> IVR.send
         static member Update(mailboxName, oldMessages, newMessages) = 
             { mailboxName = mailboxName; oldMessages = oldMessages; newMessages = newMessages }
+            |> IVR.post
 
     
 

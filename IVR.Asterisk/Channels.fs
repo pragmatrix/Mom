@@ -336,7 +336,9 @@ module Channels =
     
     [<AbstractClass; Sealed>]
     type Channels() = 
-        static member List() = List
+        static member List() =
+            List
+            |> IVR.send
         static member Originate(endpoint, ?extension, ?context, ?priority, ?label, ?app, ?appArgs, ?callerId, ?timeout, ?variables, ?channelId, ?otherChannelId, ?originator) =
             {
                 endpoint = endpoint
@@ -353,9 +355,13 @@ module Channels =
                 otherChannelId = otherChannelId
                 originator = originator
             }
-        static member Get(channelId) = Get channelId
+            |> IVR.send
+        static member Get(channelId) = 
+            Get channelId
+            |> IVR.send
         static member Hangup(channelId, ?reason) = 
             Hangup (channelId, ?reason = reason)
+            |> IVR.post
         static member ContinueInDialplan(channelId, ?context, ?extension, ?priority, ?label) =
             {
                 ContinueInDialplan.channelId = channelId
@@ -364,14 +370,19 @@ module Channels =
                 priority = priority
                 label = label
             }
+            |> IVR.post
         static member Redirect(channelId, endpoint) = 
             Redirect (channelId, endpoint)
+            |> IVR.post
         static member Answer(channelId) =
             Answer channelId
+            |> IVR.post
         static member Ring(channelId) = 
             Ring channelId
+            |> IVR.post
         static member RingStop(channelId) = 
             RingStop channelId
+            |> IVR.post
         static member SendDTMF(channelId, dtmf, ?before, ?between, ?duration, ?after) =
             {
                 SendDTMF.channelId = channelId
@@ -381,23 +392,32 @@ module Channels =
                 duration = duration
                 after = after
             }
+            |> IVR.post
         static member Mute(channelId, ?direction) =
             Mute (channelId, direction)
+            |> IVR.post
         static member Unmute(channelId, ?direction) = 
             Unmute (channelId, direction)
+            |> IVR.post
         static member Hold(channelId) = 
             Hold channelId
+            |> IVR.post
         static member Unhold(channelId) = 
             Unhold channelId
+            |> IVR.post
         static member StartMOH(channelId, ?mohClass) =
             StartMOH (channelId, mohClass)
+            |> IVR.post
         static member StopMOH(channelId) =
             StopMOH channelId
+            |> IVR.post
 
         static member StartSilence(channelId) = 
             StartSilence channelId
+            |> IVR.post
         static member StopSilence(channelId) =
             StopSilence channelId
+            |> IVR.post
 
         static member Play(channelId, media, ?lang, ?offset, ?skip, ?playbackId) =
             {
@@ -408,6 +428,7 @@ module Channels =
                 skip = skip
                 playbackId = playbackId
             }
+            |> IVR.send
         static member Record(channelId, name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
             {
                 Record.channelId = channelId
@@ -419,10 +440,13 @@ module Channels =
                 beep = beep
                 terminateOn = terminateOn
             }
+            |> IVR.send
         static member GetChannelVar(channelId, variable) =
             GetChannelVar (channelId, variable)
+            |> IVR.send
         static member SetChannelVar(channelId, variable, ?value) = 
             SetChannelVar (channelId, variable, value)
+            |> IVR.post
         static member SnoopChannel(channelId, app, ?spy, ?whisper, ?appArgs, ?snoopId) = 
             {
                 SnoopChannel.channelId = channelId
@@ -432,4 +456,5 @@ module Channels =
                 appArgs = appArgs
                 snoopId = snoopId
             }
+            |> IVR.send
 

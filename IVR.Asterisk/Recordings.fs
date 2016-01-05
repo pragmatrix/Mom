@@ -94,26 +94,37 @@ module Recordings =
     type Recordings() =
         static member ListStored() =
             ListStored
+            |> IVR.send
         static member GetStored(recordingName) = 
             GetStored(recordingName)
+            |> IVR.send
         static member DeleteStored(recordingName) = 
             DeleteStored(recordingName)
+            |> IVR.post
         static member CopyStored(recordingName, destinationRecordingName) = 
             CopyStored(recordingName, destinationRecordingName)
+            |> IVR.send
         static member GetLive(recordingName) =
             GetLive(recordingName)
+            |> IVR.send
         static member Cancel(recordingName) = 
             Cancel(recordingName)
+            |> IVR.post
         static member Stop(recordingName) = 
             Stop(recordingName)
+            |> IVR.post
         static member Pause(recordingName) = 
             Pause(recordingName)
+            |> IVR.post
         static member Unpause(recordingName) =
             Unpause(recordingName)
+            |> IVR.post
         static member Mute(recordingName) = 
             Mute(recordingName)
+            |> IVR.post
         static member Unmute(recordingName) = 
             Unmute(recordingName)
+            |> IVR.post
 
 
 

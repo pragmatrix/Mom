@@ -147,21 +147,30 @@ module Bridges =
 
     [<AbstractClass;Sealed>]
     type Bridges() =
-        static member List() = List
+        static member List() = 
+            List
+            |> IVR.send
         static member Create(?typeAttributes, ?bridgeId, ?name) = 
             { Create.typeAttributes = typeAttributes; bridgeId = bridgeId; name = name }
+            |> IVR.send
         static member Get(bridgeId) = 
             Get(bridgeId)
+            |> IVR.send
         static member Destroy(bridgeId) = 
             Destroy(bridgeId)
+            |> IVR.post
         static member AddChannel(bridgeId, channels, ?role) =
             { AddChannel.bridgeId = bridgeId; channels = channels; role = role }
+            |> IVR.post
         static member RemoveChannel(bridgeId, channels) = 
             { RemoveChannel.bridgeId = bridgeId; channels = channels }
+            |> IVR.post
         static member StartMOH(bridgeId, ?mohClass) =
             StartMOH(bridgeId, mohClass)
+            |> IVR.post
         static member StopMOH(bridgeId) = 
             StopMOH(bridgeId)
+            |> IVR.post
         static member Play(bridgeId, media, ?lang, ?offset, ?skip, ?playbackId) =
             {
                 Play.bridgeId = bridgeId
@@ -171,6 +180,7 @@ module Bridges =
                 skip = skip
                 playbackId = playbackId
             }
+            |> IVR.send
         static member Record(bridgeId, name, format, ?maxDuration, ?maxSilence, ?ifExists, ?beep, ?terminateOn) =
             {
                 Record.bridgeId = bridgeId
@@ -182,3 +192,4 @@ module Bridges =
                 beep = beep
                 terminateOn = terminateOn
             }
+            |> IVR.send

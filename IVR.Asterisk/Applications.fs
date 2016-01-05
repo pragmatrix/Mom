@@ -43,10 +43,10 @@ module Applications =
     
     [<AbstractClass; Sealed>]
     type Applications() =
-        static member List() = List
-
+        static member List() = List |> IVR.send
+        static member Get(applicationName) = Get applicationName |> IVR.send
         static member Subscribe(applicationName: string, eventSource: string) = 
-            Subscribe(applicationName, eventSource)
+            Subscribe(applicationName, eventSource) |> IVR.send
 
         static member Unsubscribe(applicationName: string, eventSource: string) = 
-            Unsubscribe(applicationName, eventSource)
+            Unsubscribe(applicationName, eventSource) |> IVR.send

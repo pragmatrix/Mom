@@ -32,6 +32,8 @@ module Sounds =
     type Sounds() = 
         member this.List(?lang, ?format) = 
             List(lang, format)
+            |> IVR.send
         member this.Get(soundId) = 
             Get(soundId)
+            |> IVR.send
         

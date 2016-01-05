@@ -65,11 +65,16 @@ module DeviceStates =
                 |> box
     [<AbstractClass;Sealed>]
     type DeviceStates() =
-        static member List() = List
+        static member List() = 
+            List
+            |> IVR.send
         static member Get(deviceName) =
             Get(deviceName)
+            |> IVR.send
         static member Update(deviceName, deviceState) = 
             Update(deviceName, deviceState)
+            |> IVR.post
         static member Delete(deviceName) = 
             Delete(deviceName)
+            |> IVR.post
         
