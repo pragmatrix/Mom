@@ -531,10 +531,8 @@ module IVR =
 
     let ivr<'result> = IVRBuilder<'result>()
 
-    //
-    // Construct an IDisposalbeProc from a unit ivr, so that this ivr can be used
-    // with F# use keyword inside a computation expression.
-
+    /// Construct an IDisposableProc from a unit ivr, so that this ivr can be used
+    /// with F# 'use' keyword inside a computation expression.
     let asDisposable (ivr: unit ivr) =
         { 
             new IDisposableProc with
