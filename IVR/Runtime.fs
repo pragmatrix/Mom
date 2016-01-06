@@ -62,15 +62,15 @@ module Runtime =
         
     [<NoComparison;NoEquality>]
     type Builder = {
-            queue: SynchronizedQueue<Event>
+            eventQueue: SynchronizedQueue<Event>
             services: Service list
             closed: bool
         }
 
-    let builder = { queue = SynchronizedQueue<Event>(); services = []; closed = false }
+    let builder = { eventQueue = SynchronizedQueue<Event>(); services = []; closed = false }
 
-    let withQueue queue builder = 
-        { builder with queue = queue }
+    let withEventQueue queue builder = 
+        { builder with eventQueue = queue }
 
     let withService (service: Service) builder = 
         { builder with
@@ -103,7 +103,7 @@ module Runtime =
                 | None -> failwithf "%A: command unhandled" cmd
                 | Some response -> response
 
-        new Runtime (builder.queue, serviceHost)
+        new Runtime (builder.eventQueue, serviceHost)
 
     //
     // Some predefined services that should be supported by every runtime.
