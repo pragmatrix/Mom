@@ -42,6 +42,62 @@ module ChannelExtensions =
         with
         member this.value = let (ChannelId v) = this in v
 
+    /// https://wiki.asterisk.org/wiki/display/AST/Hangup+Cause+Mappings
+    type AsteriskHangupCause = 
+        | NotDefined = 0
+        | Unallocated = 1
+        | NoRouteTransitNet = 2
+        | NoRouteDestination = 3
+        | MisdialledTrunkPrefix = 5
+        | ChannelUnacceptable = 6
+        | CallAwardedDelivered = 7
+        | PreEmpted = 8
+        | NumberPortedNotHere = 14
+        | NormalClearing = 16
+        | UserBusy = 17
+        | NoUserResponse = 18
+        | NoAnswer = 19
+        | SubscriberAbsent = 20
+        | CallRejected = 21
+        | NumberChanged = 22
+        | RedirectedToNewDestination = 23
+        | AnsweredElsewhere = 26
+        | DestinationOutOfOrder = 27
+        | InvalidNumberFormat = 28
+        | FacilityRejected = 29
+        | ResponseToStatusEnquiry = 30
+        | NormalUnspecified = 31
+        | NormalCircuitCongestion = 34
+        | NetworkOutOfOrder = 38 
+        | NormalTemporaryFailure = 41
+        | SwitchCongestion = 42
+        | AccessInfoDiscarded = 43
+        | RequestedChannelUnavailable = 44
+        | FacilityNotSubscribed = 50
+        | OutgoingCallBarred = 52
+        | IncomingCallBarred = 54
+        | BearerCapabilityNotAuthorized = 57
+        | BearerCapabilityNotAvailable = 58
+        | BearerCapabilityNotImplemented = 65
+        | ChannelTypeNotImplemented = 66
+        | FacilityNotImplemented = 69
+        | InvalidCallReference = 81
+        | IncompatibleDestination = 88 
+        | InvalidMessageUnspecified = 95
+        | MandatoryInformationElementMissing = 96
+        | MessageTypeNonExistent = 97
+        | WrongMessage = 98
+        | InformationElementNonExistent = 99
+        | InvalidInformationElementContents = 100
+        | WrongCallState = 101
+        | RecoveryOnTimerExpire = 102
+        | UnspecifiedProtocolError = 111
+        | UnspecifiedInternetworking = 127
+
+    type HangupCause = HangupCause of int
+        with
+        member this.value = let (HangupCause v) = this in v
+
     // https://wiki.asterisk.org/wiki/display/AST/Asterisk+13+Channels+REST+API#Asterisk13ChannelsRESTAPI-list
             
     type Channel with
