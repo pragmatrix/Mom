@@ -150,6 +150,11 @@ module IVR =
             |> Inactive
         continueWith f ivr
     
+    /// Lifts a value. Creates an IVR that returns the value.
+    let ofValue (v: 'v) : 'v ivr = 
+        fun _ -> v |> Value |> Completed
+        |> Inactive
+
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
             
@@ -157,7 +162,7 @@ module IVR =
     let whenCompleted f =
         continueWith (fun r -> f(); (fun _ -> r |> Completed) |> Inactive)
 
-    /// Returns the result of a completed ivr.
+    /// The result of a completed ivr.
     let result ivr = 
         match ivr with
         | Completed r -> r
@@ -456,8 +461,7 @@ module IVR =
         member this.Return(v: 'r) : 'r ivr = 
             // tbd: this is probably delayed anyway, so we could return an
             // active ivr here (but then start must handle ivrs with a result)
-            fun _ -> v |> Value |> Completed
-            |> Inactive
+            ofValue v
 
         member this.ReturnFrom(ivr : 'r ivr) = ivr
 
