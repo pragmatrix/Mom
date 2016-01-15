@@ -1,12 +1,11 @@
 ﻿namespace IVR.Asterisk
 
-open AsterNET.ARI.Models
-open IVR
-
-open Channels
-
-module ChannelExtensions =
+module Extensions =
     
+    open AsterNET.ARI.Models
+    open IVR
+    open Channels
+
     type ChannelState =
         | Down
         | Reserved
@@ -197,5 +196,5 @@ module ChannelExtensions =
                 do! IVR.waitForPlaybackFinished(playback.Id)
             }
 
-[<assembly:AutoOpen("IVR.Asterisk.ChannelExtensions")>]
+[<assembly:AutoOpen("IVR.Asterisk.Extensions")>]
 do ()

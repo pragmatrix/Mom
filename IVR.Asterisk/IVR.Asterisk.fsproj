@@ -63,7 +63,7 @@
     <Compile Include="Recordings.fs" />
     <Compile Include="Sounds.fs" />
     <Compile Include="Client.fs" />
-    <Compile Include="ChannelExtensions.fs" />
+    <Compile Include="Extensions.fs" />
     <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
