@@ -98,6 +98,12 @@ module Extensions =
         member this.value = let (HangupCause v) = this in v
 
     // https://wiki.asterisk.org/wiki/display/AST/Asterisk+13+Channels+REST+API#Asterisk13ChannelsRESTAPI-list
+
+    module Application = 
+        let waitForReplaced (applicationName: string) = 
+            fun (e: ApplicationReplacedEvent) ->
+                e.Application = applicationName 
+            |> IVR.waitFor'
             
     type Channel with
 
