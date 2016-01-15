@@ -562,8 +562,9 @@ module IVR =
             Active waiter
         |> Inactive
 
-    /// Waits for some event with a predicate that returns
-    /// true or false
+    /// Waits for some event by asking a predicate for each event that comes along.
+    /// Continues waiting when the predicate returns false, ends the ivr when the predicate 
+    /// returns true.
     let wait' predicate = 
         let f e = 
             let r = predicate e
@@ -573,7 +574,9 @@ module IVR =
 
         wait f
 
-    /// Waits for an event of a type derived by a function passed in.
+    /// Waits for an event of a type derived by the function f that is passed in. 
+    /// Ends the ivr with the value returned by the function if it returns (Some value), 
+    /// continues waiting when f returns None
     let waitFor (f : 'e -> 'r option) = 
 
         let f (e : Event) = 
@@ -583,6 +586,8 @@ module IVR =
 
         wait f
 
+    /// Waits for an event of a type derived by the function f that is passed in.
+    /// Ends the ivr when f return true. Continues waiting when f returns false.
     let waitFor' (f : 'e -> bool) =
         let f (e: Event) =
             match e with
