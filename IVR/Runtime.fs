@@ -94,7 +94,7 @@ module Runtime =
         let services = builder.services |> List.rev
 
         let serviceHost runtime =
-            // partially apply services
+            // parameterize services with the runtime
             let services = services |> List.map ((|>) runtime)
             fun (cmd: Command) ->
                 services
@@ -140,6 +140,21 @@ module Runtime =
                         )
                     id |> box |> Some
                 | _ -> None
+
+        /// Forward the msg to all services and expect each either to consume the msg or to ignore it.
+        let forward (services: Service list) =
+            fun runtime ->
+                let services = services |> List.map ((|>) runtime)
+                fun obj ->
+                    // either all or none of the events must be consumed.
+                    let consumptionResults = services |> List.map (fun srv -> (srv obj).IsSome)
+                    let all = consumptionResults |> List.forall ((=) true)
+                    if all then () |> box |> Some
+                    else
+                    let none = consumptionResults |> List.forall ((=) false)
+                    if none then None
+                    else
+                    failwithf "Service.forward: The consumption results of the command were inconsistent: %A" obj 
 
         let disabled _ _ = None
 
