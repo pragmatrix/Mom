@@ -2,8 +2,10 @@
 
 module Extensions =
     
+    open System
     open AsterNET.ARI.Models
     open IVR
+    open Applications
     open Channels
 
     type ChannelState =
@@ -40,6 +42,7 @@ module Extensions =
     type ChannelId = ChannelId of string
         with
         member this.value = let (ChannelId v) = this in v
+        member this.uri = "channel:" + this.value |> Uri
 
     /// https://wiki.asterisk.org/wiki/display/AST/Hangup+Cause+Mappings
     type AsteriskHangupCause = 

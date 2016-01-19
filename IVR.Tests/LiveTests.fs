@@ -86,7 +86,7 @@ type LiveTests() =
         while true do
             let msg = connection.nextEvent()
             System.Diagnostics.Debug.WriteLine(sprintf "primary msg: %A" msg)
-            
+
             match msg with
             | ARIEvent (:? StasisStartEvent as e) ->
                 let id = e.Channel.Id
