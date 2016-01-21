@@ -146,15 +146,14 @@ module Runtime =
             fun runtime ->
                 let services = services |> List.map ((|>) runtime)
                 fun obj ->
-                    // either all or none of the events must be consumed.
-                    let consumptionResults = services |> List.map (fun srv -> (srv obj).IsSome)
-                    let all = consumptionResults |> List.forall ((=) true)
-                    if all then () |> box |> Some
-                    else
-                    let none = consumptionResults |> List.forall ((=) false)
-                    if none then None
-                    else
-                    failwithf "Service.forward: The consumption results of the command were inconsistent: %A" obj 
+                    // if one or more of the services consume the event, it's returned as consumed
+                    let consumed = 
+                        services 
+                        |> List.map (fun srv -> (srv obj).IsSome) 
+                        |> List.contains true
+                    if consumed 
+                    then () |> box |> Some
+                    else None
 
         let disabled _ _ = None
 
