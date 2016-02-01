@@ -6,6 +6,7 @@ open FsUnit
 open System
 open System.Collections.Generic
 open IVR
+open System.Threading
 
 //
 // Basic Combinator and semantic tests.
@@ -577,20 +578,76 @@ type IVRTests() =
         let host _ = null
         let runtime = Runtime.newRuntime host
 
+        let ev = new ManualResetEvent(false)
+
         async {
-            try
-                runtime.run ivr |> ignore
-            with Cancelled ->
-                ()
+            runtime.run ivr |> should equal None
+            ev.Set() |> ignore
         } |> Async.Start
 
         (runtime :> IDisposable).Dispose();
 
-        // wait a while... tbd: this makes this test brittle
-        Async.Sleep(100) |> Async.RunSynchronously
-
+        ev.WaitOne(2000) |> ignore
+        
         ct.disposed |> should equal true
 
+    [<Test>]
+    member this.``when an ivr gets cancelled, it ends cancelled but does not throw any exception``() = 
+
+        let ivr = ivr {
+            try
+                do! IVR.waitFor' (fun (Event1) -> true)
+            with e ->
+                Assert.Fail()
+                ()
+        }
+
+        let res = 
+            ivr
+            |> start
+            |> step IVR.TryCancel
+
+        IVR.isCancelled res |> should be True
+
+    [<Test>]
+    member this.``when an ivr gets cancelled, it runs the finally part``() = 
+
+        let mutable runFinally = false
+
+        let ivr = ivr {
+            try
+                do! IVR.waitFor' (fun (Event1) -> true)
+            finally
+                runFinally <- true
+        }
+
+        let res = 
+            ivr
+            |> start
+            |> step IVR.TryCancel
+    
+        runFinally |> should be True
+        IVR.isCancelled res |> should be True
+
+    [<Test>]
+    member this.``when an ivr gets cancelled in a while loop, it does not continue outside of it``() = 
+
+        let mutable continued = false
+
+        let ivr = ivr {
+            let mutable f = 0
+            while true do
+                do! IVR.waitFor' (fun (Event1) -> true)
+            continued <- true
+        }
+
+        let res = 
+            ivr
+            |> start
+            |> step IVR.TryCancel
+    
+        IVR.isCancelled res |> should be True
+        
     [<Test>]
     member this.``computation expression: yield sends a command to the host``() =
         let queue = Queue()

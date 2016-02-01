@@ -32,6 +32,7 @@ module Runtime =
         member private this.cancel() = 
             this.scheduleEvent CancelIVR
 
+        /// Runs the ivr synchronously. Returns Some value or None if the ivr was cancelled.
         member this.run ivr = 
 
             let rec runLoop ivr = 
@@ -43,8 +44,11 @@ module Runtime =
 
             and next ivr =
                 match ivr with
-                | Completed (Value r) -> Some r
-                | Completed (Error e) -> raise e
+                | Completed c -> 
+                    match c with 
+                    | Value r -> Some r
+                    | Error e -> raise e
+                    | Cancelled -> None
                 | Active _ -> runLoop ivr
                 | Inactive _ -> failwith "internal error, state transition of an ivr from active -> inactive"
 

@@ -20,6 +20,7 @@ module Tracing =
     type ResultTrace = 
         | Result of obj
         | Error of exn
+        | Cancelled
 
     /// Represents a trace of a command. A command can either return without a result or throw an exception.
     [<NoComparison>]
@@ -136,6 +137,7 @@ module Tracing =
             | Active _ -> None
             | Completed (IVR.Value r) -> Result r |> Some
             | Completed (IVR.Error e) -> Error e |> Some
+            | Completed IVR.Cancelled -> Cancelled |> Some
             | Inactive _ -> failwith "internal error, tried to retrieve a trace result from an inactive ivr"
 
         let startAndTraceCommands =
@@ -162,6 +164,8 @@ module Tracing =
                 match cmdt.result with
                 | Result r -> r
                 | Error e -> raise e
+                /// tbd: not sure about this!
+                | Cancelled -> failwith "internal error: host can not cancel an IVR"
 
     /// Register a tracer for tracing a declared IVR. Whenever the declared IVR is run, the tracer will receive
     /// a full trace of the ivr in realtime.

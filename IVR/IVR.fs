@@ -23,12 +23,14 @@ exception Cancelled
 type 'result result =
     | Value of 'result
     | Error of exn
+    | Cancelled
 
 module Result =
     let map f r =
         match r with
-        | Error e -> Error e
         | Value r -> Value (f r)
+        | Error e -> Error e
+        | Cancelled -> Cancelled
 
 [<NoComparison;NoEquality>]
 type 'result ivr = 
@@ -115,7 +117,7 @@ module IVR =
 
     let isCancelled ivr = 
         match ivr with
-        | Completed (Error Cancelled) -> true
+        | Completed Cancelled -> true
         | _ -> false
 
     let (|IsCancelled|_|) ivr = 
@@ -150,17 +152,25 @@ module IVR =
             |> Inactive
         continueWith f ivr
     
+    /// Lifts a result.
+    let ofResult (r: 'r result) : 'r ivr = 
+        fun _ -> r |> Completed
+        |> Inactive
+
     /// Lifts a value. Creates an IVR that returns the value.
     let ofValue (v: 'v) : 'v ivr = 
-        fun _ -> v |> Value |> Completed
-        |> Inactive
+        v |> Value |> ofResult
+    
+    /// Lifts an error.
+    let ofError e : 'v ivr =
+        e |> Error |> ofResult
 
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
-        continueWith (fun r -> f(); (fun _ -> r |> Completed) |> Inactive)
+        continueWith (fun r -> f(); r |> ofResult)
 
     /// The result of a completed ivr.
     let result ivr = 
@@ -175,8 +185,10 @@ module IVR =
         | Completed _ -> failwithf "IVR.resultValue ivr has not been completed with a resulting value: %A" ivr
         | _ -> failwithf "IVR.resultValue: ivr is not completed: %A" ivr
 
-    /// The event that is sent to an active IVR when it gets cancelled. The only accepted return state is Cancelled.
-    type Cancel = Cancel
+    /// The event that is sent to an active IVR when it gets cancelled. Note that this is basically a hint to 
+    /// the IVR to begin cancellation and does not need to be respected and also it may take an arbitrary 
+    /// amount of time until the IVR finally completes.
+    type TryCancel = TryCancel
 
     /// Tries to cancels the ivr. This actually sends a Cancel event to the ivr, but otherwise
     /// does nothing. The ivr is responsible to react on Cancel events (for example every wait function does that).
@@ -189,9 +201,9 @@ module IVR =
     let tryCancel h ivr = 
         match ivr with
         | Active _ -> 
-            ivr |> step h Cancel
+            ivr |> step h TryCancel
         | Completed (Error _) -> ivr
-        | _ -> Cancelled |> Error |> Completed
+        | _ -> Cancelled |> Completed
 
     //
     // IVR Combinators
@@ -264,7 +276,7 @@ module IVR =
                 state 
                 |> function 
                 | Value v -> v 
-                | Error e -> failwithf "internal error: %A" e
+                | e -> failwithf "internal error: %A" e
             try
                 arbiter state r
             with e ->
@@ -321,8 +333,9 @@ module IVR =
     let game master (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
         let arbiter state (r: 'r result) = 
             match r with
-            | Error e -> cancelField (Error e)
             | Value v -> master state v
+            | Error e -> cancelField (Error e)
+            | Cancelled -> cancelField Cancelled
 
         field arbiter initial ivrs
 
@@ -344,6 +357,7 @@ module IVR =
                 let state = state |> Map.add i r
                 continueField state []
             | Error r -> cancelField (Error r)
+            | Cancelled -> cancelField Cancelled
 
         // and last convert the map to a list.
         let mapToList m = 
@@ -436,60 +450,86 @@ module IVR =
     //
     // IDisposable, IVR style
     //
-    // I am also introducing a new terminology here, the proc. A more generic term for
-    // IVR. proc = small process.
+    // This is also introducing a new terminology here that should replace 'ivr' in the future,
+    // the proc. proc = small process.
 
     type IDisposableProc =
         inherit IDisposable
         abstract member DisposableProc : unit ivr
 
     //
+    // Cancellation Helper
+    //
+
+    /// Exception / Error that represents a nested cancellation error
+
+    exception NestedCancellation
+
+    /// Install an cancallation ivr for the ivr body. That cancellation ivr is called 
+    /// when the code inside the block gets cancelled. This function can only be used in a use! 
+    /// instruction inside of a computation expression.
+
+    let cancelWith cancelIVR body = 
+        let afterBody rBody =
+            let afterCancel rCancellation = 
+                match rCancellation with
+                | Value _ -> rBody |> ofResult
+                | Error e -> e |> ofError
+                // the cancellation ivr got cancelled! This is an error for now!
+                // tbd: An cancellation ivr must be protected from further cancellation.
+                | Cancelled -> NestedCancellation |> ofError
+
+            match rBody with
+            | Cancelled -> cancelIVR |> continueWith afterCancel
+            | _ -> rBody |> ofResult
+
+        body
+        |> continueWith afterBody
+
+    //
     // Simple computation expression to build sequential IVR processes
     //
 
     type IVRBuilder<'result>() = 
+        
+        let delay (f : unit -> 'r ivr) : 'r ivr = 
+            fun h -> f() |> start h
+            |> Inactive
+
         member this.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
             ivr
-            |> continueWith (
-                function 
+            |> continueWith (function 
                 | Value r -> body r
-                | Error err -> 
-                    // kinda sad that we need to delay here.
-                    fun _ -> err |> Error |> Completed
-                    |> Inactive)
+                | Error err -> err |> ofError
+                | Cancelled -> Cancelled |> ofResult)
 
-        member this.Return(v: 'r) : 'r ivr = 
-            // tbd: this is probably delayed anyway, so we could return an
-            // active ivr here (but then start must handle ivrs with a result)
-            ofValue v
-
+        // tbd: this is probably delayed anyway, so we could return an
+        // active ivr here (but then start must handle ivrs with a result)
+        member this.Return(v: 'r) : 'r ivr = ofValue v
         member this.ReturnFrom(ivr : 'r ivr) = ivr
-
-        member this.Delay(f : unit -> 'r ivr) : 'r ivr = 
-            fun h ->
-                f()
-                |> start h
-            |> Inactive
-              
-        member this.Zero () : unit ivr = 
-            fun _ -> () |> Value |> Completed
-            |> Inactive
+        member this.Delay(f : unit -> 'r ivr) : 'r ivr = delay f
+        member this.Zero () : unit ivr = ofValue ()
 
         member this.Using(disposable : 't, body : 't -> 'r ivr when 't :> IDisposable) : 'r ivr =
             let body = body disposable
             match box disposable with
-            | :? IDisposableProc as dp -> this.TryFinally(body, fun () -> dp.DisposableProc)
-            | _ -> this.TryFinally(body, disposable.Dispose)
+            | :? IDisposableProc as dp -> 
+                this.TryFinally(body, fun () -> dp.DisposableProc)
+            | _ -> 
+                this.TryFinally(body, disposable.Dispose)
 
         member this.TryFinally(ivr: 'r ivr, f: unit -> unit ivr) : 'r ivr =
-            let finallyBlock res =
+            let finallyBlock tryResult =
 
+                // if the finally ivr results in an error or cancellation, 
+                // this is our result, otherwise return the result.
                 let afterFinally finallyResult =
-                    fun _ ->
-                        match finallyResult with
-                        | Error e -> e |> Error |> Completed
-                        | _ -> res |> Completed
-                    |> Inactive
+                    match finallyResult with
+                    | Value _ -> tryResult |> ofResult
+                    | Error e -> e |> ofError
+                    // if the finallly {} got cancelled, our whole
+                    // block's result is Cancelled
+                    | Cancelled -> Cancelled |> ofResult
 
                 // note: f is already delayed, so we can run it in place.
                 f() 
@@ -506,15 +546,16 @@ module IVR =
             ivr
             |> continueWith (function
                 | Error e -> eh e
-                | r -> (fun _ -> r |> Completed) |> Inactive)
-
+                | r -> r |> ofResult)
+                
         member this.Yield(cmd: Command) : unit ivr = post cmd
 
         member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
             |> continueWith (function
-                | Error e -> (fun _ -> e |> Error |> Completed) |> Inactive
-                | _ -> ivr2
+                | Error e -> e |> ofError
+                | Cancelled -> Cancelled |> ofResult
+                | Value _ -> ivr2
             )
     
         // http://fsharpforfunandprofit.com/posts/computation-expressions-builder-part6/
@@ -552,7 +593,7 @@ module IVR =
     let wait f =
         let rec waiter (e: Event) _ =  
             match e with
-            | :? Cancel -> Cancelled |> Error |> Completed
+            | :? TryCancel -> Cancelled |> Completed
             | _ ->
             match f e with
             | Some r -> r |> Value |> Completed
@@ -629,11 +670,6 @@ module IVR =
     // Async interopability
     //
 
-    let fromResult(result: 'r result) = 
-        fun _ ->
-            result |> Completed
-        |> Inactive
-
     // As long we don't support asynchronous runtimes, async computations are scheduled on
     // the threadpool by default.
 
@@ -666,7 +702,7 @@ module IVR =
                 waitFor(
                     fun (AsyncComputationCompleted (id', result)) -> 
                         if id' = id then Some result else None)
-            return! fromResult (result |> Result.map unbox)
+            return! (result |> Result.map unbox) |> ofResult
         }
 
 /// Helpers for mapping values of IVR lists
