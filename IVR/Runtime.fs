@@ -56,6 +56,10 @@ module Runtime =
             |> IVR.start host
             |> next
 
+        member this.run (ivr, cancellationToken: CancellationToken) = 
+            use c = cancellationToken.Register(fun () -> this.cancel())
+            this.run ivr
+
     //
     // A builder that supports the creation of runtimes and adding services to it.
     //
