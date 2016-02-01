@@ -707,21 +707,8 @@ module IVR =
 
 /// Helpers for mapping values of IVR lists
 module IVRs = 
-    let map f ivrs = IVR.lmap
-    let mapi f ivrs = IVR.lmapi
-
-
-#if false
-
-    // Direct integration of async computations inside IVR computation expressions seems
-    // to impair the type inferencer somewhat. So we use IVR.async for now.
-
-    type IVRBuilder<'result> with
-        member this.Bind(computation: Async<'r>, body: 'r -> 'r2 ivr) : 'r2 ivr = 
-            let ivr = async computation
-            this.Bind(ivr, body)
-
-#endif
+    let map f ivrs = IVR.lmap f ivrs
+    let mapi f ivrs = IVR.lmapi f ivrs
 
 module BuilderExtensions = 
     let ivr<'r> = IVR.ivr<'r>
