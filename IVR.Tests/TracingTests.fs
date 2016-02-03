@@ -20,7 +20,7 @@ type TracingTests() =
 
         let ivr = ivr {
             let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
-            yield x
+            do! IVR.post x
             return x
         }
 
@@ -55,7 +55,7 @@ type TracingTests() =
 
         let ivr = ivr {
             let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
-            yield x
+            do! IVR.post x
             return x
         }
 

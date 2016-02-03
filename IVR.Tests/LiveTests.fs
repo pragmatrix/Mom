@@ -101,24 +101,24 @@ type LiveTests() =
     member this.createTestIVR() = 
         let channelIVR (channel: Channel) = 
             ivr {
-                yield channel.ring()
+                do! channel.ring()
                 do! IVR.delay (2 .seconds)
-                yield channel.answer()
+                do! channel.answer()
                 do! IVR.delay (1 .seconds)
                 do! channel.play' (Uri("sound:tt-weasels"))
-                yield channel.hangup()
+                do! channel.hangup()
             }
 
         let hangupOn1 (channel: Channel) = 
             ivr {
                 do! channel.waitForKey '1'
-                yield channel.hangup()
+                do! channel.hangup()
             }
                         
         let handleHangupRequestByHangingUp (channel : Channel) = 
             ivr {
                 do! channel.waitForHangupRequest() |> IVR.ignore
-                yield channel.hangup()
+                do! channel.hangup()
             }
 
         let rec distributor() = 

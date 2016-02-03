@@ -556,8 +556,6 @@ module IVR =
                 | Error e -> eh e
                 | r -> r |> ofResult)
                 
-        member this.Yield(cmd: Command) : unit ivr = post cmd
-
         member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
             |> continueWith (function

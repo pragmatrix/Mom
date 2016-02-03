@@ -649,11 +649,11 @@ type IVRTests() =
         IVR.isCancelled res |> should be True
         
     [<Test>]
-    member this.``computation expression: yield sends a command to the host``() =
+    member this.``computation expression: IVR.post sends a command to the host``() =
         let queue = Queue()
         
         let test = ivr {
-            yield 0
+            do! IVR.post 0
         } 
 
         test
@@ -664,12 +664,12 @@ type IVRTests() =
 
 
     [<Test>]
-    member this.``computation expression: yield sends combined commands to the host in the right order``() =
+    member this.``computation expression: IVR.post sends combined commands to the host in the right order``() =
         let queue = Queue()
         
         let test = ivr {
-            yield 0
-            yield 1
+            do! IVR.post 0
+            do! IVR.post 1
         } 
 
         test
@@ -679,13 +679,13 @@ type IVRTests() =
         queue |> should equal [0;1]
 
     [<Test>]
-    member this.``computation expression: after a wait, yield sends a command to the host``() =
+    member this.``computation expression: after a wait, IVR.post sends a command to the host``() =
         let queue = Queue()
         
         let test = ivr {
-            yield 0
+            do! IVR.post 0
             do! IVR.waitFor' (fun Event1 -> true)
-            yield 1
+            do! IVR.post 1
         } 
 
         test
@@ -696,14 +696,14 @@ type IVRTests() =
         queue |> should equal [0;1]
 
     [<Test>]
-    member this.``computation expression: after a wait, yield sends a command to the correct host``() =
+    member this.``computation expression: after a wait, IVR.post sends a command to the correct host``() =
         let queue1 = Queue()
         let queue2 = Queue()
         
         let test = ivr {
-            yield 0
+            do! IVR.post 0
             do! IVR.waitFor' (fun Event1 -> true)
-            yield 1
+            do! IVR.post 1
         } 
 
         test
