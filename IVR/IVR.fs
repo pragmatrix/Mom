@@ -256,6 +256,11 @@ module IVR =
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
+    [<NoComparison;NoEquality>]
+    type private FieldState<'state> = 
+        | FieldActive of 'state
+        | FieldCancelling of 'state ivr
+
     /// A generic algorithm for running IVRs in parallel.
     /// The field:
     /// All ivrs are processed in parallel, and as soon an ivr completes, the arbiter is asked what to do.
@@ -272,49 +277,52 @@ module IVR =
 
         // we need to protect the arbiter and handle its death
         let protectedArbiter state r = 
-            let state = 
-                state 
-                |> function 
-                | Value v -> v 
-                | e -> failwithf "internal error: %A" e
             try
                 arbiter state r
             with e ->
                 CancelField (e |> Error)
 
-        let rec stepAll h stepF ((cancelling, state) as s) active ivrs =
+        let rec stepAll h stepF (state: FieldState<'state>) active ivrs =
             match ivrs with
-            | [] -> s, active |> List.rev
+            | [] -> state, active |> List.rev
             | ivr::todo ->
             let ivr = ivr |> stepF h
             match ivr with
             | Inactive _ -> failwith "internal error"
-            | Active _ -> stepAll h stepF s (ivr::active) todo
+            | Active _ -> stepAll h stepF state (ivr::active) todo
             | Completed r ->
-            if cancelling then
+            match state with
+            | FieldCancelling _ ->
                 // already cancelling, so we can ignore this result.
-                stepAll h stepF s active todo
-            else
+                stepAll h stepF state active todo
+            | FieldActive s ->
+
             // ask the arbiter what to do next
-            let decision = protectedArbiter state r
+            let decision = protectedArbiter s r
             match decision with
-            | CancelField state -> (true, state), parCancel h active todo
-            | ContinueField (state, newIVRs) ->
+            | CancelField state -> FieldCancelling (state |> Completed), parCancel h active todo
+            | ContinueField (s, newIVRs) ->
+            let state = FieldActive s
             // start all new IVRs before putting them on the field.
-            let (cancelling, state), newIVRs = newIVRs |> stepAll h start (false, state |> Value) []
-            if cancelling then
+            let state, newIVRs = 
+                newIVRs |> stepAll h start state []
+            match state with
+            | FieldCancelling _ ->
                 let active, todo = parCancel' h active todo
-                (true, state), [active |> List.rev; newIVRs; todo] |> List.flatten
-            else
+                state, [active |> List.rev; newIVRs; todo] |> List.flatten
+            | FieldActive _ ->
             // embed by prepending them to the list of already processed IVRs
             // (don't use the current step function on the new ones)
             let active = active |> List.revAndPrepend newIVRs
-            stepAll h stepF (false, state) active todo
+            stepAll h stepF state active todo
            
-        and next ((_, state) as s, ivrs) = 
+        and next (state: FieldState<'state>, ivrs) = 
             match ivrs with
-            | [] -> state |> Completed
-            | _ -> active ivrs s |> Active
+            | [] -> 
+                match state with
+                | FieldActive state -> state |> Value |> Completed
+                | FieldCancelling state -> state
+            | ivrs -> active ivrs state |> Active
 
         and active ivrs s e h = 
             ivrs 
@@ -323,7 +331,7 @@ module IVR =
     
         fun (h: Host) ->
             ivrs
-            |> stepAll h start (false, initial |> Value) []
+            |> stepAll h start (FieldActive initial) []
             |> next
         |> Inactive
     
