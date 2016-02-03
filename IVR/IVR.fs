@@ -259,7 +259,7 @@ module IVR =
     [<NoComparison;NoEquality>]
     type private FieldState<'state> = 
         | FieldActive of 'state
-        | FieldCancelling of 'state ivr
+        | FieldCancelling of 'state result
 
     /// A generic algorithm for running IVRs in parallel.
     /// The field:
@@ -300,7 +300,7 @@ module IVR =
             // ask the arbiter what to do next
             let decision = protectedArbiter s r
             match decision with
-            | CancelField state -> FieldCancelling (state |> Completed), parCancel h active todo
+            | CancelField state -> FieldCancelling state, parCancel h active todo
             | ContinueField (s, newIVRs) ->
             let state = FieldActive s
             // start all new IVRs before putting them on the field.
@@ -321,7 +321,7 @@ module IVR =
             | [] -> 
                 match state with
                 | FieldActive state -> state |> Value |> Completed
-                | FieldCancelling state -> state
+                | FieldCancelling state -> state |> Completed
             | ivrs -> active ivrs state |> Active
 
         and active ivrs s e h = 
