@@ -7,21 +7,14 @@ open AsterNET.ARI.Actions
 
 module Asterisk =
     
-    type IAsteriskCommand<'r> =
-        inherit IDispatch<IAsteriskActions>
-        inherit IVR.IReturns<'r>
-
-    type IAsteriskCommand =
-        inherit IDispatch<IAsteriskActions>
-
     type GetObject = {
         configClass: string
         objectType: string
         id: string
         } with
-        interface IAsteriskCommand<(string * string) list> with
-            member this.dispatch asterisk = 
-                asterisk.GetObject(this.configClass, this.objectType, this.id)
+        interface IDispatchAction<(string * string) list> with
+            member this.dispatch client = 
+                client.Asterisk.GetObject(this.configClass, this.objectType, this.id)
                 |> Seq.toList
                 |> List.map(fun ct -> ct.Attribute, ct.Value)
                 |> box
@@ -32,9 +25,9 @@ module Asterisk =
         id: string
         fields: (string * string) list option
         } with
-        interface IAsteriskCommand<(string * string) list> with
-            member this.dispatch asterisk = 
-                asterisk.UpdateObject(this.configClass, this.objectType, this.id, optvars this.fields)
+        interface IDispatchAction<(string * string) list> with
+            member this.dispatch client = 
+                client.Asterisk.UpdateObject(this.configClass, this.objectType, this.id, optvars this.fields)
                 |> Seq.toList
                 |> List.map(fun ct -> ct.Attribute, ct.Value)
                 |> box
@@ -44,65 +37,65 @@ module Asterisk =
         objectType: string
         id: string
         } with
-        interface IAsteriskCommand with
-            member this.dispatch asterisk = 
-                asterisk.DeleteObject(this.configClass, this.objectType, this.id)
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Asterisk.DeleteObject(this.configClass, this.objectType, this.id)
                 |> box
 
     type GetInfo = GetInfo of only: string option with
-        interface IAsteriskCommand<AsteriskInfo> with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<AsteriskInfo> with
+            member this.dispatch client = 
                 let (GetInfo only) = this
-                asterisk.GetInfo(opts only)
+                client.Asterisk.GetInfo(opts only)
                 |> box
 
     type ListModules = ListModules with
-        interface IAsteriskCommand<Module list> with
-            member this.dispatch asterisk = 
-                asterisk.ListModules()
+        interface IDispatchAction<Module list> with
+            member this.dispatch client = 
+                client.Asterisk.ListModules()
                 |> Seq.toList
                 |> box
 
     type GetModule = GetModule of moduleName: string with
-        interface IAsteriskCommand<Module> with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<Module> with
+            member this.dispatch client = 
                 let (GetModule moduleName) = this
-                asterisk.GetModule(moduleName)
+                client.Asterisk.GetModule(moduleName)
                 |> box
 
     type LoadModule = LoadModule of moduleName: string with
-        interface IAsteriskCommand with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (LoadModule moduleName) = this
-                asterisk.LoadModule(moduleName)
+                client.Asterisk.LoadModule(moduleName)
                 |> box
 
     type UnloadModule = UnloadModule of moduleName: string with
-        interface IAsteriskCommand with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (UnloadModule moduleName) = this
-                asterisk.UnloadModule(moduleName)
+                client.Asterisk.UnloadModule(moduleName)
                 |> box
 
     type ReloadModule = ReloadModule of moduleName: string with
-        interface IAsteriskCommand with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (ReloadModule moduleName) = this
-                asterisk.ReloadModule(moduleName)
+                client.Asterisk.ReloadModule(moduleName)
                 |> box
 
     type GetGlobalVar = GetGlobalVar of variable: string with
-        interface IAsteriskCommand<Variable> with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<Variable> with
+            member this.dispatch client = 
                 let (GetGlobalVar variable) = this
-                asterisk.GetGlobalVar(variable)
+                client.Asterisk.GetGlobalVar(variable)
                 |> box
 
     type SetGlobalVar = SetGlobalVar of variable: string * value: string option with
-        interface IAsteriskCommand with
-            member this.dispatch asterisk = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (SetGlobalVar(variable, value)) = this
-                asterisk.SetGlobalVar(variable, opts value)
+                client.Asterisk.SetGlobalVar(variable, opts value)
                 |> box
 
 

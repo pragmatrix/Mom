@@ -18,6 +18,10 @@ module IVR =
     type IDispatch<'i> =
         abstract member dispatch : 'i -> Response
 
+    type IDispatchAction<'r> = 
+        inherit IDispatch<IAriActionClient>
+        inherit IVR.IReturns<'r>
+
     let inline optref (r: 'a option) = 
         match r with
         | Some r -> r

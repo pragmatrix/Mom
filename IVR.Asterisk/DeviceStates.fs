@@ -6,13 +6,6 @@ open AsterNET.ARI.Actions
 
 module DeviceStates =
 
-    type IDeviceStatesCommand<'r> =
-        inherit IDispatch<IDeviceStatesActions>
-        inherit IVR.IReturns<'r>
-
-    type IDeviceStatesCommand =
-        inherit IDispatch<IDeviceStatesActions>
-
     type DeviceState = 
         | NotInUse = 0
         | InUse = 1
@@ -38,30 +31,30 @@ module DeviceStates =
             | ds -> failwithf "invalid device state: %A" ds
 
     type List = List with
-        interface IDeviceStatesCommand<DeviceState list> with
-            member this.dispatch deviceStates =
-                deviceStates.List() |> Seq.toList
+        interface IDispatchAction<DeviceState list> with
+            member this.dispatch client =
+                client.DeviceStates.List() |> Seq.toList
                 |> box
 
     type Get = Get of deviceName: string with
-        interface IDeviceStatesCommand<DeviceState> with
-            member this.dispatch deviceStates = 
+        interface IDispatchAction<DeviceState> with
+            member this.dispatch client = 
                 let (Get deviceName) = this
-                deviceStates.Get(deviceName)
+                client.DeviceStates.Get(deviceName)
                 |> box
 
     type Update = Update of deviceName: string * deviceState: DeviceState with
-        interface IDeviceStatesCommand with
-            member this.dispatch deviceStates = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Update (deviceName, deviceState)) = this
-                deviceStates.Update(deviceName, deviceState |> DeviceState.tos)
+                client.DeviceStates.Update(deviceName, deviceState |> DeviceState.tos)
                 |> box
 
     type Delete = Delete of deviceName: string with
-        interface IDeviceStatesCommand with
-            member this.dispatch deviceStates = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Delete deviceName) = this
-                deviceStates.Delete(deviceName)
+                client.DeviceStates.Delete(deviceName)
                 |> box
     [<AbstractClass;Sealed>]
     type DeviceStates() =

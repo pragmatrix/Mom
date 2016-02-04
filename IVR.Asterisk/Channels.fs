@@ -5,16 +5,8 @@ open System
 open IVR
 
 open AsterNET.ARI.Models
-open AsterNET.ARI.Actions
 
 module Channels =
-
-    type IChannelsCommand<'r> =
-        inherit IDispatch<IChannelsActions>
-        inherit IVR.IReturns<'r>
-
-    type IChannelsCommand =
-        inherit IDispatch<IChannelsActions>
 
     type HangupReason =
         | Normal = 0
@@ -72,9 +64,9 @@ module Channels =
             | v -> failwithf "invalid AudioDirection: %A" v
 
     type List = List with
-        interface IChannelsCommand<Channel list> with
-            member this.dispatch channels = 
-                channels.List() |> Seq.toList 
+        interface IDispatchAction<Channel list> with
+            member this.dispatch client = 
+                client.Channels.List() |> Seq.toList 
                 |> box
 
     type Originate = { 
@@ -92,9 +84,9 @@ module Channels =
         otherChannelId: string option
         originator: string option
         } with 
-        interface IChannelsCommand<Channel> with
-            member this.dispatch channels = 
-                channels.Originate(
+        interface IDispatchAction<Channel> with
+            member this.dispatch client = 
+                client.Channels.Originate(
                     this.endpoint, 
                     opts this.extension, 
                     opts this.context, 
@@ -111,19 +103,19 @@ module Channels =
                 |> box
 
     type Get = Get of channelId: string with 
-        interface IChannelsCommand<Channel> with
-            member this.dispatch channels = 
+        interface IDispatchAction<Channel> with
+            member this.dispatch client = 
                 let (Get channelId) = this
-                channels.Get(channelId)
+                client.Channels.Get(channelId)
                 |> box
 
     type Hangup = Hangup of channelId: string * reason: HangupReason option 
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Hangup (channelId, reason)) = this
                 let reason = reason |> Option.map HangupReason.tos
-                channels.Hangup(channelId, opts reason)
+                client.Channels.Hangup(channelId, opts reason)
                 |> box
 
     type ContinueInDialplan = {
@@ -133,9 +125,9 @@ module Channels =
         priority: int option
         label: string option
         } with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
-                channels.ContinueInDialplan(
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Channels.ContinueInDialplan(
                     this.channelId,
                     opts this.context,
                     opts this.extension,
@@ -145,34 +137,34 @@ module Channels =
 
     type Redirect = Redirect of channelId: string * endpoint: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels =     
+        interface IDispatchAction<unit> with
+            member this.dispatch client =     
                 let (Redirect (channelId, endpoint)) = this
-                channels.Redirect(channelId, endpoint) 
+                client.Channels.Redirect(channelId, endpoint) 
                 |> box
 
     type Answer = Answer of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Answer channelId) = this
-                channels.Answer(channelId) 
+                client.Channels.Answer(channelId) 
                 |> box
 
     type Ring = Ring of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Ring channelId) = this
-                channels.Ring(channelId) 
+                client.Channels.Ring(channelId) 
                 |> box
 
     type RingStop = RingStop of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (RingStop channelId) = this
-                channels.RingStop(channelId) 
+                client.Channels.RingStop(channelId) 
                 |> box
 
     type SendDTMF = {
@@ -183,9 +175,9 @@ module Channels =
         duration: TimeSpan option
         after: TimeSpan option
         } with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
-                channels.SendDTMF(
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Channels.SendDTMF(
                     this.channelId,
                     this.dtmf,
                     this.before |> Option.map TimeSpan.toms |> opt,
@@ -196,66 +188,66 @@ module Channels =
 
     type Mute = Mute of channelId: string * direction: MuteDirection option
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Mute (channelId, direction)) = this
-                channels.Mute(channelId, direction |> Option.map MuteDirection.tos |> opts) 
+                client.Channels.Mute(channelId, direction |> Option.map MuteDirection.tos |> opts) 
                 |> box
 
     type Unmute = Unmute of channelId: string * direction: MuteDirection option
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Unmute (channelId, direction)) = this
-                channels.Unmute(channelId, direction |> Option.map MuteDirection.tos |> opts) 
+                client.Channels.Unmute(channelId, direction |> Option.map MuteDirection.tos |> opts) 
                 |> box
 
     type Hold = Hold of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Hold channelId) = this
-                channels.Hold(channelId) 
+                client.Channels.Hold(channelId) 
                 |> box
 
     type Unhold = Unhold of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Unhold channelId) = this
-                channels.Unhold(channelId) 
+                client.Channels.Unhold(channelId) 
                 |> box
 
     type StartMOH = StartMOH of channelId: string * mohClass: string option
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (StartMOH (channelId, mohClass)) = this
-                channels.StartMoh(channelId, opts mohClass) 
+                client.Channels.StartMoh(channelId, opts mohClass) 
                 |> box
 
     type StopMOH = StopMOH of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (StopMOH channelId) = this
-                channels.StopMoh(channelId) 
+                client.Channels.StopMoh(channelId) 
                 |> box
 
     type StartSilence = StartSilence of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (StartSilence channelId) = this
-                channels.StartSilence(channelId) 
+                client.Channels.StartSilence(channelId) 
                 |> box
 
     type StopSilence = StopSilence of channelId: string
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (StopSilence channelId) = this
-                channels.StopSilence(channelId) 
+                client.Channels.StopSilence(channelId) 
                 |> box
 
     [<NoComparison>]
@@ -267,9 +259,9 @@ module Channels =
         skip: TimeSpan option
         playbackId: string option
         } with 
-        interface IChannelsCommand<Playback> with
-            member this.dispatch channels = 
-                channels.Play(
+        interface IDispatchAction<Playback> with
+            member this.dispatch client = 
+                client.Channels.Play(
                     this.channelId,
                     this.media.ToString(),
                     opts this.lang,
@@ -288,9 +280,9 @@ module Channels =
         beep: bool option
         terminateOn: TerminateOn option
         } with 
-        interface IChannelsCommand<LiveRecording> with
-            member this.dispatch channels = 
-                channels.Record(
+        interface IDispatchAction<LiveRecording> with
+            member this.dispatch client = 
+                client.Channels.Record(
                     this.channelId,
                     this.name,
                     this.format,
@@ -303,17 +295,17 @@ module Channels =
 
     type GetChannelVar = GetChannelVar of channelId: string * variable: string
         with
-        interface IChannelsCommand<Variable> with
-            member this.dispatch channels = 
+        interface IDispatchAction<Variable> with
+            member this.dispatch client = 
                 let (GetChannelVar (channelId, variable)) = this
-                channels.GetChannelVar(channelId, variable) |> box
+                client.Channels.GetChannelVar(channelId, variable) |> box
     
     type SetChannelVar = SetChannelVar of channelId: string * variable: string * value: string option
         with
-        interface IChannelsCommand with
-            member this.dispatch channels = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (SetChannelVar (channelId, variable, value)) = this
-                channels.SetChannelVar(channelId, variable, opts value)
+                client.Channels.SetChannelVar(channelId, variable, opts value)
                 |> box
 
     type SnoopChannel = {
@@ -324,9 +316,9 @@ module Channels =
         appArgs: string option
         snoopId: string option 
         } with
-        interface IChannelsCommand<Channel> with
-            member this.dispatch channels = 
-                channels.SnoopChannel(
+        interface IDispatchAction<Channel> with
+            member this.dispatch client = 
+                client.Channels.SnoopChannel(
                     this.channelId,
                     this.app,
                     this.spy |> Option.map AudioDirection.tos |> opts,

@@ -3,41 +3,33 @@
 open IVR
 
 open AsterNET.ARI.Models
-open AsterNET.ARI.Actions
 
 module Applications =
 
-    type IApplicationsCommand<'r> =
-        inherit IDispatch<IApplicationsActions>
-        inherit IVR.IReturns<'r>
-
-    type IApplicationsCommand =
-        inherit IDispatch<IApplicationsActions>
-
     type List = List with
-        interface IApplicationsCommand<Application list> with
-            member this.dispatch channels = 
-                channels.List() |> Seq.toList |> box
+        interface IDispatchAction<Application list> with
+            member this.dispatch client = 
+                client.Channels.List() |> Seq.toList |> box
 
     type Get = Get of applicationName: string with
-        interface IApplicationsCommand<Application> with
-            member this.dispatch applications =
+        interface IDispatchAction<Application> with
+            member this.dispatch client =
                 let (Get applicationName) = this
-                applications.Get(applicationName)
+                client.Applications.Get(applicationName)
                 |> box
 
     type Subscribe = Subscribe of applicationName: string * eventSource: string with
-        interface IApplicationsCommand<Application> with
-            member this.dispatch applications =
+        interface IDispatchAction<Application> with
+            member this.dispatch client =
                 let (Subscribe (applicationName, eventSource)) = this
-                applications.Subscribe(applicationName, eventSource)
+                client.Applications.Subscribe(applicationName, eventSource)
                 |> box
 
     type Unsubscribe = Unsubscribe of applicationName: string * eventSource: string with
-        interface IApplicationsCommand<Application> with
-            member this.dispatch applications =
+        interface IDispatchAction<Application> with
+            member this.dispatch client =
                 let (Unsubscribe (applicationName, eventSource)) = this
-                applications.Unsubscribe(applicationName, eventSource)
+                client.Applications.Unsubscribe(applicationName, eventSource)
                 |> box
 
     

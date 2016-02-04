@@ -2,22 +2,14 @@
 
 open IVR
 
-open AsterNET.ARI.Actions
 open AsterNET.ARI.Models
 
 module Endpoints =
 
-    type IEndpointsCommand<'r> =
-        inherit IDispatch<IEndpointsActions>
-        inherit IVR.IReturns<'r>
-
-    type IEndpointsCommand =
-        inherit IDispatch<IEndpointsActions>
-
     type List = List with
-        interface IEndpointsCommand<Endpoint list> with
-            member this.dispatch endpoints = 
-                endpoints.List() |> Seq.toList 
+        interface IDispatchAction<Endpoint list> with
+            member this.dispatch client = 
+                client.Endpoints.List() |> Seq.toList 
                 |> box
 
     type SendMessage = {
@@ -26,9 +18,9 @@ module Endpoints =
         body: string option
         variables: (string * string) list option
         } with
-        interface IEndpointsCommand with
-            member this.dispatch endpoints = 
-                endpoints.SendMessage(
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Endpoints.SendMessage(
                     this.receiver,
                     this.sender, 
                     this.body |> opts, 
@@ -36,17 +28,17 @@ module Endpoints =
                 |> box
 
     type ListByTech = ListByTech of tech: string with
-        interface IEndpointsCommand<Endpoint list> with
-            member this.dispatch endpoints = 
+        interface IDispatchAction<Endpoint list> with
+            member this.dispatch client = 
                 let (ListByTech tech) = this
-                endpoints.ListByTech(tech) |> Seq.toList
+                client.Endpoints.ListByTech(tech) |> Seq.toList
                 |> box
 
     type Get = Get of tech: string * resource: string with
-        interface IEndpointsCommand<Endpoint> with
-            member this.dispatch endpoints = 
+        interface IDispatchAction<Endpoint> with
+            member this.dispatch client = 
                 let (Get (tech, resource)) = this
-                endpoints.Get(tech, resource)
+                client.Endpoints.Get(tech, resource)
                 |> box
 
     type SendMessageToEndpoint = {
@@ -56,9 +48,9 @@ module Endpoints =
         body: string option
         variables: (string * string) list option
         } with
-        interface IEndpointsCommand with
-            member this.dispatch endpoints = 
-                endpoints.SendMessageToEndpoint(
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Endpoints.SendMessageToEndpoint(
                     this.tech,
                     this.resource,
                     this.sender, 

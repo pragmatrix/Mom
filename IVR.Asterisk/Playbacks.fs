@@ -8,28 +8,20 @@ open IVR
 open AsterNET.ARI.Models
 open AsterNET.ARI.Actions
 
-
 module Playbacks =
 
-    type IPlaybacksCommand<'r> =
-        inherit IDispatch<IPlaybacksActions>
-        inherit IVR.IReturns<'r>
-
-    type IPlaybacksCommand =
-        inherit IDispatch<IPlaybacksActions>
-
     type Get = Get of playbackId: string with
-        interface IPlaybacksCommand<Playback> with
-            member this.dispatch playbacks = 
+        interface IDispatchAction<Playback> with
+            member this.dispatch client = 
                 let (Get playbackId) = this
-                playbacks.Get(playbackId)
+                client.Playbacks.Get(playbackId)
                 |> box
 
     type Stop = Stop of playbackId: string with
-        interface IPlaybacksCommand<Playback> with
-            member this.dispatch playbacks = 
+        interface IDispatchAction<Playback> with
+            member this.dispatch client = 
                 let (Stop playbackId) = this
-                playbacks.Stop(playbackId)
+                client.Playbacks.Stop(playbackId)
                 |> box
 
     type Operation =
@@ -51,10 +43,10 @@ module Playbacks =
             | v -> failwithf "invalid Operation: %A" v
 
     type Control = Control of playbackId: string * operation: Operation with
-        interface IPlaybacksCommand with
-            member this.dispatch playbacks = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Control (playbackId, operation)) = this
-                playbacks.Control(playbackId, operation |> Operation.tos)
+                client.Playbacks.Control(playbackId, operation |> Operation.tos)
                 |> box
 
     [<AbstractClass; Sealed>]

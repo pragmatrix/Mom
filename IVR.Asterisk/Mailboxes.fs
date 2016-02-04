@@ -3,28 +3,20 @@
 open IVR
 
 open AsterNET.ARI.Models
-open AsterNET.ARI.Actions
 
 module Mailboxes = 
-    
-    type IMailboxesCommand<'r> =
-        inherit IDispatch<IMailboxesActions>
-        inherit IVR.IReturns<'r>
-
-    type IMailboxesCommand =
-        inherit IDispatch<IMailboxesActions>
 
     type List = List with
-        interface IMailboxesCommand<Mailbox list> with
-            member this.dispatch mailboxes = 
-                mailboxes.List() |> Seq.toList 
+        interface IDispatchAction<Mailbox list> with
+            member this.dispatch client = 
+                client.Mailboxes.List() |> Seq.toList 
                 |> box
 
     type Get = Get of mailboxName: string with
-        interface IMailboxesCommand<Mailbox> with
-            member this.dispatch mailboxes = 
+        interface IDispatchAction<Mailbox> with
+            member this.dispatch client = 
                 let (Get mailboxName) = this
-                mailboxes.Get(mailboxName)
+                client.Mailboxes.Get(mailboxName)
                 |> box
 
     type Update = {
@@ -32,16 +24,16 @@ module Mailboxes =
         oldMessages: int
         newMessages: int
         } with
-        interface IMailboxesCommand with
-            member this.dispatch mailboxes = 
-                mailboxes.Update(this.mailboxName, this.oldMessages, this.newMessages)
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Mailboxes.Update(this.mailboxName, this.oldMessages, this.newMessages)
                 |> box
 
     type Delete = Delete of mailboxName: string with
-        interface IMailboxesCommand with
-            member this.dispatch mailboxes = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Delete mailboxName) = this
-                mailboxes.Delete(mailboxName)
+                client.Mailboxes.Delete(mailboxName)
                 |> box
 
     [<AbstractClass; Sealed>]

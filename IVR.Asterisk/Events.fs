@@ -3,22 +3,14 @@
 open IVR
 
 open AsterNET.ARI.Models
-open AsterNET.ARI.Actions
 
 module Events = 
 
-    type IEventsCommand<'r> =
-        inherit IDispatch<IEventsActions>
-        inherit IVR.IReturns<'r>
-
-    type IEventsCommand =
-        inherit IDispatch<IEventsActions>
-
     type EventWebSocket = EventWebSocket of string with
-        interface IEventsCommand<Message> with
-            member this.dispatch events = 
+        interface IDispatchAction<Message> with
+            member this.dispatch client = 
                 let (EventWebSocket application) = this
-                events.EventWebsocket(application)
+                client.Events.EventWebsocket(application)
                 |> box
 
     type UserEvent = {
@@ -27,9 +19,9 @@ module Events =
         source: string option
         variables: (string * string) list option
         } with
-        interface IEventsCommand with
-            member this.dispatch events = 
-                events.UserEvent(this.eventName, this.application, opts this.source, optvars this.variables)
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Events.UserEvent(this.eventName, this.application, opts this.source, optvars this.variables)
                 |> box
 
     [<AbstractClass; Sealed>]

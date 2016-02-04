@@ -9,17 +9,10 @@ open AsterNET.ARI.Actions
 
 module Bridges =
     
-    type IBridgesCommand<'r> =
-        inherit IDispatch<IBridgesActions>
-        inherit IVR.IReturns<'r>
-
-    type IBridgesCommand =
-        inherit IDispatch<IBridgesActions>
-
     type List = List with
-        interface IBridgesCommand<Bridge list> with
-            member this.dispatch bridges = 
-                bridges.List() |> Seq.toList
+        interface IDispatchAction<Bridge list> with
+            member this.dispatch client = 
+                client.Bridges.List() |> Seq.toList
                 |> box
 
     type TypeAttribute = 
@@ -43,26 +36,26 @@ module Bridges =
         bridgeId: string option
         name: string option
         } with
-        interface IBridgesCommand<Bridge> with
-            member this.dispatch bridges = 
-                bridges.Create(
+        interface IDispatchAction<Bridge> with
+            member this.dispatch client = 
+                client.Bridges.Create(
                     this.typeAttributes |> Option.map (List.map TypeAttribute.tos >> css) |> opts,
                     this.bridgeId |> opts,
                     this.name |> opts)
                 |> box
 
     type Get = Get of bridgeId: string with
-        interface IBridgesCommand<Bridge> with
-            member this.dispatch bridges = 
+        interface IDispatchAction<Bridge> with
+            member this.dispatch client = 
                 let (Get bridgeId) = this
-                bridges.Get(bridgeId)
+                client.Bridges.Get(bridgeId)
                 |> box
 
     type Destroy = Destroy of bridgeId: string with
-        interface IBridgesCommand with
-            member this.dispatch bridges = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Destroy bridgeId) = this
-                bridges.Destroy(bridgeId)
+                client.Bridges.Destroy(bridgeId)
                 |> box
 
     type AddChannel = {
@@ -70,9 +63,9 @@ module Bridges =
         channels: string list
         role: string option
         } with
-        interface IBridgesCommand with
-            member this.dispatch bridges = 
-                bridges.AddChannel(
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Bridges.AddChannel(
                     this.bridgeId,
                     this.channels |> css,
                     this.role |> opts)
@@ -82,25 +75,25 @@ module Bridges =
         bridgeId: string
         channels: string list
         } with
-        interface IBridgesCommand with
-            member this.dispatch bridges = 
-                bridges.RemoveChannel(
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
+                client.Bridges.RemoveChannel(
                     this.bridgeId,
                     this.channels |> css)
                 |> box
 
     type StartMOH = StartMOH of bridgeId: string * mohClass: string option with
-        interface IBridgesCommand with
-            member this.dispatch bridges = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (StartMOH (bridgeId, mohClass)) = this
-                bridges.StartMoh(bridgeId, mohClass |> opts)
+                client.Bridges.StartMoh(bridgeId, mohClass |> opts)
                 |> box
 
     type StopMOH = StopMOH of bridgeId: string with
-        interface IBridgesCommand with
-            member this.dispatch bridges = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (StopMOH bridgeId) = this
-                bridges.StopMoh(bridgeId)
+                client.Bridges.StopMoh(bridgeId)
                 |> box
 
     [<NoComparison>]
@@ -112,9 +105,9 @@ module Bridges =
         skip: TimeSpan option
         playbackId: string option
         } with 
-        interface IBridgesCommand<Playback> with
-            member this.dispatch bridges = 
-                bridges.Play(
+        interface IDispatchAction<Playback> with
+            member this.dispatch client = 
+                client.Bridges.Play(
                     this.bridgeId,
                     this.media.ToString(),
                     opts this.lang,
@@ -133,9 +126,9 @@ module Bridges =
         beep: bool option
         terminateOn: TerminateOn option
         } with 
-        interface IBridgesCommand<LiveRecording> with
-            member this.dispatch channels = 
-                channels.Record(
+        interface IDispatchAction<LiveRecording> with
+            member this.dispatch client = 
+                client.Bridges.Record(
                     this.bridgeId,
                     this.name,
                     this.format,

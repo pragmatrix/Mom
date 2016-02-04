@@ -110,16 +110,6 @@ module Client =
 
         member this.host (cmd: Command) : Response = 
             match cmd with
-            | :? IDispatch<Actions.IApplicationsActions> as d -> d.dispatch this.Applications
-            | :? IDispatch<Actions.IAsteriskActions> as d -> d.dispatch this.Asterisk
-            | :? IDispatch<Actions.IBridgesActions> as d -> d.dispatch this.Bridges
-            | :? IDispatch<Actions.IChannelsActions> as d -> d.dispatch this.Channels
-            | :? IDispatch<Actions.IDeviceStatesActions> as d -> d.dispatch this.DeviceStates
-            | :? IDispatch<Actions.IEndpointsActions> as d -> d.dispatch this.Endpoints
-            | :? IDispatch<Actions.IEventsActions> as d -> d.dispatch this.Events
-            | :? IDispatch<Actions.IMailboxesActions> as d -> d.dispatch this.Mailboxes
-            | :? IDispatch<Actions.IPlaybacksActions> as d -> d.dispatch this.Playbacks
-            | :? IDispatch<Actions.IRecordingsActions> as d -> d.dispatch this.Recordings
-            | :? IDispatch<Actions.ISoundsActions> as d -> d.dispatch this.Sounds
+            | :? IDispatch<IAriActionClient> as d -> d.dispatch this
         
             | _ -> failwithf "Unsupported command: %A" cmd

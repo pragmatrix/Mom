@@ -3,91 +3,83 @@
 open IVR
 
 open AsterNET.ARI.Models
-open AsterNET.ARI.Actions
 
 module Recordings =
 
-    type IRecordingsCommand<'r> =
-        inherit IDispatch<IRecordingsActions>
-        inherit IVR.IReturns<'r>
-
-    type IRecordingsCommand =
-        inherit IDispatch<IRecordingsActions>
-
     type ListStored = ListStored with
-        interface IRecordingsCommand<StoredRecording list> with
-            member this.dispatch recordings = 
-                recordings.ListStored() |> Seq.toList 
+        interface IDispatchAction<StoredRecording list> with
+            member this.dispatch client = 
+                client.Recordings.ListStored() |> Seq.toList 
                 |> box
 
     type GetStored = GetStored of recordingName: string with
-        interface IRecordingsCommand<StoredRecording> with
-            member this.dispatch recordings = 
+        interface IDispatchAction<StoredRecording> with
+            member this.dispatch client = 
                 let (GetStored recordingName) = this
-                recordings.GetStored(recordingName)
+                client.Recordings.GetStored(recordingName)
                 |> box
 
     type DeleteStored = DeleteStored of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (DeleteStored recordingName) = this
-                recordings.DeleteStored(recordingName)
+                client.Recordings.DeleteStored(recordingName)
                 |> box
 
     type CopyStored = CopyStored of recordingname: string * destinationRecordingName: string with
-        interface IRecordingsCommand<StoredRecording> with
-            member this.dispatch recordings = 
+        interface IDispatchAction<StoredRecording> with
+            member this.dispatch client = 
                 let (CopyStored (recordingName, destinationRecordingName)) = this
-                recordings.CopyStored(recordingName, destinationRecordingName)
+                client.Recordings.CopyStored(recordingName, destinationRecordingName)
                 |> box
 
     type GetLive = GetLive of recordingName: string with
-        interface IRecordingsCommand<LiveRecording> with
-            member this.dispatch recordings = 
+        interface IDispatchAction<LiveRecording> with
+            member this.dispatch client = 
                 let (GetLive recordingName) = this
-                recordings.GetLive(recordingName)
+                client.Recordings.GetLive(recordingName)
                 |> box
 
     type Cancel = Cancel of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Cancel recordingName) = this
-                recordings.Cancel(recordingName)
+                client.Recordings.Cancel(recordingName)
                 |> box
 
     type Stop = Stop of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Stop recordingName) = this
-                recordings.Stop(recordingName)
+                client.Recordings.Stop(recordingName)
                 |> box
 
     type Pause = Pause of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Pause recordingName) = this
-                recordings.Pause(recordingName)
+                client.Recordings.Pause(recordingName)
                 |> box
     
     type Unpause = Unpause of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Unpause recordingName) = this
-                recordings.Unpause(recordingName)
+                client.Recordings.Unpause(recordingName)
                 |> box
 
     type Mute = Mute of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Mute recordingName) = this
-                recordings.Mute(recordingName)
+                client.Recordings.Mute(recordingName)
                 |> box
 
     type Unmute = Unmute of recordingName: string with
-        interface IRecordingsCommand with
-            member this.dispatch recordings = 
+        interface IDispatchAction<unit> with
+            member this.dispatch client = 
                 let (Unmute recordingName) = this
-                recordings.Unmute(recordingName)
+                client.Recordings.Unmute(recordingName)
                 |> box
     
     [<AbstractClass;Sealed>]

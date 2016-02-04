@@ -64,6 +64,7 @@
     <Compile Include="Sounds.fs" />
     <Compile Include="Client.fs" />
     <Compile Include="Extensions.fs" />
+    <Compile Include="Testing.fs" />
     <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
