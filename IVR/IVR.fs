@@ -9,7 +9,7 @@ open System
     - can synchronously wait and respond to events.
     - can be combined in parallel or sequentially.
     - can send any number of commands to a host.
-    - can be run in individual steps.
+    - can be run in steps.
 *)
 
 type Event = obj
@@ -676,8 +676,7 @@ module IVR =
     // Async interopability
     //
 
-    // As long we don't support asynchronous runtimes, async computations are scheduled on
-    // the threadpool by default.
+    // async computations are scheduled the threadpool by default.
 
     type IAsyncComputation = 
         abstract member run : (obj result -> unit) -> unit
