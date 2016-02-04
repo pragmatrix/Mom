@@ -23,7 +23,7 @@ type RuntimeTests() =
             return v
         }
 
-        let host _ = null
+        let host _ _ = None
 
         let runtime = IVR.Runtime.newRuntime(host)
         let result = runtime.run test
@@ -44,7 +44,7 @@ type RuntimeTests() =
             return v
         }
 
-        let host _ = null
+        let host _ _ = None
 
         let runtime = IVR.Runtime.newRuntime(host)
         runtime.run test |> ignore
@@ -66,7 +66,7 @@ type RuntimeTests() =
                 return 11
         }
 
-        let host _ = null
+        let host _ _ = None
 
         let runtime = IVR.Runtime.newRuntime(host)
         runtime.run test |> should equal (Some 11)

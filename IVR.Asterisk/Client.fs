@@ -108,8 +108,8 @@ module Client =
         member this.connect(runtime: IVR.Runtime.Runtime) = 
             this.connect(deliverARIEventToRuntime runtime)
 
-        member this.host (cmd: Command) : Response = 
-            match cmd with
-            | :? IAriActionClientDispatch as d -> d.dispatch this
-        
-            | _ -> failwithf "Unsupported command: %A" cmd
+        member this.service (context: IVR.Runtime.IServiceContext) =
+            fun (cmd : Command) ->
+                match cmd with
+                | :? IAriActionClientDispatch as d -> d.dispatch this |> Some
+                | _ -> failwithf "Unsupported command: %A" cmd

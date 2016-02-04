@@ -16,14 +16,23 @@ module Runtime =
     /// This event can be sent to the Runtime to try to cancel the current IVR.
     type CancelIVR = CancelIVR
 
-    /// This is the runtime that drives the IVR.
-    type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: Runtime -> Host) as this = 
+    /// The stuff a service can do.
+    type IServiceContext = 
+        abstract scheduleEvent : Event -> unit
+        abstract postCommand : Command -> unit
 
-        // Partially apply the runtime to the host, so that hosts can initialize attached vars.
+    /// This is the runtime that drives the IVR.
+    type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceContext -> Host) as this = 
+
+        // Partially apply the runtime to the host, so that hosts can initialize.
         let host = host this
 
         interface IDisposable with
             member this.Dispose() = this.cancel()
+
+        interface IServiceContext with
+            member this.scheduleEvent event = this.scheduleEvent event
+            member this.postCommand command = host command |> ignore
 
         /// Asynchronously schedules an event to the runtime.
         member this.scheduleEvent (event : Event) = 
@@ -64,9 +73,9 @@ module Runtime =
     // A builder that supports the creation of runtimes and adding services to it.
     //
 
-    /// Defines a service. Note that a service's runtime is partially applied. This way the
-    /// service can associate its own instance variables with the Runtime.
-    type Service = Runtime -> Command -> Response option
+    /// Defines a service. Note that a service's context is partially applied per Runtime. 
+    /// This way the service can associate its own instance variables with the Runtime.
+    type Service = IServiceContext -> Command -> Response option
         
     [<NoComparison;NoEquality>]
     type Builder = {
@@ -83,19 +92,6 @@ module Runtime =
     let withService (service: Service) builder = 
         { builder with
             services = service :: builder.services }
-
-    let private close builder = { builder with closed = true }
-
-    let withHost (host: Host) builder = 
-        if builder.closed then
-            failwith "can not add a host to a closed builder"
-
-        let service _ command = 
-            host command |> Some
-
-        builder 
-        |> withService service
-        |> close
 
     let create builder = 
 
@@ -120,31 +116,31 @@ module Runtime =
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Service = 
 
-        let schedule (runtime: Runtime) (cmd: Command) = 
+        let schedule (context: IServiceContext) (cmd: Command) = 
             match cmd with
-            | :? IVR.Schedule as s -> s.event |> runtime.scheduleEvent; () |> box |> Some
+            | :? IVR.Schedule as s -> s.event |> context.scheduleEvent; () |> box |> Some
             | _ -> None
 
-        let delay (runtime: Runtime) =
+        let delay (context: IServiceContext) =
             let delayIdGenerator = Ids.newGenerator()
             fun (cmd : Command) ->
                 match cmd with
                 | :? IVR.Delay as d -> 
                     let (IVR.Delay timespan) = d
                     let id = delayIdGenerator.generateId()
-                    let callback _ = runtime.scheduleEvent (IVR.DelayCompleted id)
+                    let callback _ = context.scheduleEvent (IVR.DelayCompleted id)
                     new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
                     id |> box |> Some
                 | _ -> None
 
-        let async (runtime: Runtime) =
+        let async (context: IServiceContext) =
             let asyncIdGenerator = Ids.newGenerator()
             fun (cmd: Command) ->
                 match cmd with
                 | :? IVR.IAsyncComputation as ac -> 
                     let id = asyncIdGenerator.generateId()
                     ac.run(fun r ->
-                        runtime.scheduleEvent (IVR.AsyncComputationCompleted(id, r))
+                        context.scheduleEvent (IVR.AsyncComputationCompleted(id, r))
                         )
                     id |> box |> Some
                 | _ -> None
@@ -175,18 +171,18 @@ module Runtime =
         /// Disable the service that crashed
         let DisableService = ReplaceService disabled
 
-        type ServiceCrashResponder = Runtime -> Command -> exn -> ServiceCrashResponse
+        type ServiceCrashResponder = IServiceContext -> Command -> exn -> ServiceCrashResponse
 
         let protect (responder: ServiceCrashResponder) (service: Service) : Service =
-            fun runtime ->
-                let mutable current = service
+            fun context ->
+                let mutable current = service context
                 fun command ->
                 try
-                    service runtime command
+                    current command
                 with e ->
-                    let crashResponse = responder runtime command e
+                    let crashResponse = responder context command e
                     match crashResponse with
-                    | ReplaceService service -> current <- service
+                    | ReplaceService service -> current <- service context
                     | ContinueService -> ()
                     None
 
@@ -197,10 +193,10 @@ module Runtime =
         |> withService Service.delay
         |> withService Service.async
 
-    /// Builds a default runtime that forwards all commands to the host. The runtime includes the
+    /// Builds a default runtime that forwards all commands to the service. The runtime includes the
     /// services schedule, delay, and async.
-    let newRuntime host = 
+    let newRuntime hostService = 
         defaultBuilder
-        |> withHost host
+        |> withService hostService
         |> create
     

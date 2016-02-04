@@ -575,7 +575,7 @@ type IVRTests() =
             do! IVR.waitFor' (fun (Event1) -> true)
         }
 
-        let host _ = null
+        let host _ _ = None
         let runtime = Runtime.newRuntime host
 
         let ev = new ManualResetEvent(false)
