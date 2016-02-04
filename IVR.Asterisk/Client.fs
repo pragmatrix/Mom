@@ -110,6 +110,6 @@ module Client =
 
         member this.host (cmd: Command) : Response = 
             match cmd with
-            | :? IDispatch<IAriActionClient> as d -> d.dispatch this
+            | :? IAriActionClientDispatch as d -> d.dispatch this
         
             | _ -> failwithf "Unsupported command: %A" cmd

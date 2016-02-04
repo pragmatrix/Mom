@@ -15,11 +15,11 @@ module IVR =
     let waitForPlaybackFinished(playbackId: string) = 
         IVR.waitFor' (fun (e: PlaybackFinishedEvent) -> e.Playback.Id = playbackId)
 
-    type IDispatch<'i> =
-        abstract member dispatch : 'i -> Response
+    type IAriActionClientDispatch =
+        abstract member dispatch : IAriActionClient -> Response
 
     type IDispatchAction<'r> = 
-        inherit IDispatch<IAriActionClient>
+        inherit IAriActionClientDispatch
         inherit IVR.IReturns<'r>
 
     let inline optref (r: 'a option) = 
