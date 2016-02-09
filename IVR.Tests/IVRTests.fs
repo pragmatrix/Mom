@@ -647,6 +647,34 @@ type IVRTests() =
             |> step IVR.TryCancel
     
         IVR.isCancelled res |> should be True
+
+    [<Test>]
+    member this.``when one part of a parallel ivr gets cancelled, the followup ivr continues while the cancellation is run``() = 
+
+        let primaryIVR = ivr {
+                do! IVR.waitFor' (fun (Event1) -> true)
+            }
+
+        // cancellation of the secondary IVR takes forvever
+        let secondaryIVR = ivr {
+            try
+                do! IVR.waitFor' (fun (Event2) -> true)
+            finally
+                IVR.idle
+        }
+
+        let test = ivr {
+                do! IVR.any [primaryIVR; secondaryIVR]
+                do! IVR.waitFor' (fun (Event3) -> true)
+            }
+
+        let res = 
+            test
+            |> start
+            |> step Event1
+            |> step Event3
+
+        res |> IVR.isCompleted |> should be True        
         
     [<Test>]
     member this.``computation expression: IVR.post sends a command to the host``() =

@@ -104,11 +104,6 @@ module IVR =
         | Completed (Error _) -> true
         | _ -> false
 
-    let (|IsError|_|) ivr = 
-        match ivr with
-        | Completed (Error e) -> Some e
-        | _ -> None
-
     /// Returns the error of a completed ivr.
     let error ivr = 
         match ivr with
@@ -119,9 +114,6 @@ module IVR =
         match ivr with
         | Completed Cancelled -> true
         | _ -> false
-
-    let (|IsCancelled|_|) ivr = 
-        if isCancelled ivr then Some() else None
 
     //
     // Primitives Part 2
@@ -348,7 +340,7 @@ module IVR =
         field arbiter initial ivrs
 
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
-    /// All ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
+    /// all ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
     /// that error and all other ivrs are cancelled.
 
     let all (ivrs: 'r ivr list) : 'r list ivr = 
