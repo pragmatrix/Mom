@@ -36,7 +36,7 @@ type TracingTests() =
 
         traced
         |> IVR.start host
-        |> IVR.step host (TraceEvent1 10)
+        |> IVR.step (TraceEvent1 10)
         |> ignore
 
         let trace = trace.Value
@@ -69,7 +69,7 @@ type TracingTests() =
 
         traced
         |> IVR.start host
-        |> IVR.step host (TraceEvent1 10)
+        |> IVR.step (TraceEvent1 10)
         |> ignore
 
         let trace = Tracers.readFileTrace fn

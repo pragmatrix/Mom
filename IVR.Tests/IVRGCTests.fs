@@ -40,7 +40,7 @@ type IVRGCTests() =
                 GC.Collect()
                 let totalMem = GC.GetTotalMemory(true)
                 array.[cnt / memTrace] <- totalMem
-            stepLoop (IVR.step host null ivr) (cnt+1)
+            stepLoop (IVR.step null ivr) (cnt+1)
 
         stepLoop ivr 0
 

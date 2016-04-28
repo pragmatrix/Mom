@@ -34,7 +34,7 @@ type IVRTests() =
 
     let dummyHost = fun _ -> null
     let start ivr = IVR.start dummyHost ivr
-    let step ivr = IVR.step dummyHost ivr
+    let step ivr = IVR.step ivr
 
     //
     // Automatic cancellation of Active ivrs.
@@ -718,29 +718,10 @@ type IVRTests() =
 
         test
         |> IVR.start (fun c -> queue.Enqueue c; null)
-        |> IVR.step (fun c -> queue.Enqueue c; null) Event1
+        |> IVR.step Event1
         |> ignore
 
         queue |> should equal [0;1]
-
-    [<Test>]
-    member this.``computation expression: after a wait, IVR.post sends a command to the correct host``() =
-        let queue1 = Queue()
-        let queue2 = Queue()
-        
-        let test = ivr {
-            do! IVR.post 0
-            do! IVR.waitFor' (fun Event1 -> true)
-            do! IVR.post 1
-        } 
-
-        test
-        |> IVR.start (fun c -> queue1.Enqueue c; null)
-        |> IVR.step (fun c -> queue2.Enqueue c; null) Event1
-        |> ignore
-
-        queue1 |> should equal [0]
-        queue2 |> should equal [1]
 
     [<Test>]
     member this.``IVR.delay (simulated)``() = 
@@ -755,7 +736,7 @@ type IVRTests() =
             test |> IVR.start host 
             
         state 
-        |> IVR.step host (IVR.DelayCompleted 1L)
+        |> IVR.step (IVR.DelayCompleted 1L)
         |> IVR.isCompleted |> should equal true
 
     [<Test>]
@@ -789,9 +770,9 @@ type IVRTests() =
         let host _ = null
         test
         |> IVR.start host
-        |> IVR.step host Event1
-        |> IVR.step host Event1
-        |> IVR.step host Event1
+        |> IVR.step Event1
+        |> IVR.step Event1
+        |> IVR.step Event1
         |> IVR.result
         |> should equal (Value 3) 
 
@@ -805,9 +786,9 @@ type IVRTests() =
         let host _ = null
         test
         |> IVR.start host
-        |> IVR.step host Event1
-        |> IVR.step host Event1
-        |> IVR.step host Event1
+        |> IVR.step Event1
+        |> IVR.step Event1
+        |> IVR.step Event1
         |> IVR.result
         |> should equal (Value ()) 
      

@@ -150,7 +150,7 @@ module Tracing =
             fun host event ivr -> 
                 let commands = ref []
                 let host = traceCommands commands host
-                IVR.step host event ivr, !commands |> List.rev
+                IVR.step event ivr, !commands |> List.rev
 
         let replayHost commandTraces = 
             let mutable todo = commandTraces
@@ -186,7 +186,7 @@ module Tracing =
                 | Completed _ -> 
                     state
                 | Active _ ->
-                    fun e h -> state |> Helper.stepAndTraceCommands h e |> next e
+                    fun e -> state |> Helper.stepAndTraceCommands host e |> next e
                     |> Active
                 | Inactive _ ->
                     failwith "internal error state transition from active to inactive observed"

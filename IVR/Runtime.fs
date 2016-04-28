@@ -47,8 +47,8 @@ module Runtime =
             let rec runLoop ivr = 
                 let event = eventQueue.dequeue()
                 match event with
-                | :? CancelIVR -> IVR.tryCancel host ivr
-                | event -> IVR.step host event ivr
+                | :? CancelIVR -> IVR.tryCancel ivr
+                | event -> IVR.step event ivr
                 |> next 
 
             and next ivr =
