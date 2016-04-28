@@ -496,7 +496,7 @@ module IVR =
             fun h -> f() |> start h
             |> Inactive
 
-        member this.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
+        member __.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
             ivr
             |> continueWith (function 
                 | Value r -> body r
@@ -505,10 +505,10 @@ module IVR =
 
         // tbd: this is probably delayed anyway, so we could return an
         // active ivr here (but then start must handle ivrs with a result)
-        member this.Return(v: 'r) : 'r ivr = ofValue v
-        member this.ReturnFrom(ivr : 'r ivr) = ivr
-        member this.Delay(f : unit -> 'r ivr) : 'r ivr = delay f
-        member this.Zero () : unit ivr = ofValue ()
+        member __.Return(v: 'r) : 'r ivr = ofValue v
+        member __.ReturnFrom(ivr : 'r ivr) = ivr
+        member __.Delay(f : unit -> 'r ivr) : 'r ivr = delay f
+        member __.Zero () : unit ivr = ofValue ()
 
         member this.Using(disposable : 't, body : 't -> 'r ivr when 't :> IDisposable) : 'r ivr =
             let body = body disposable
@@ -518,7 +518,7 @@ module IVR =
             | _ -> 
                 this.TryFinally(body, disposable.Dispose)
 
-        member this.TryFinally(ivr: 'r ivr, f: unit -> unit ivr) : 'r ivr =
+        member __.TryFinally(ivr: 'r ivr, f: unit -> unit ivr) : 'r ivr =
             let finallyBlock tryResult =
 
                 // if the finally ivr results in an error or cancellation, 
@@ -538,17 +538,17 @@ module IVR =
             ivr
             |> continueWith finallyBlock
 
-        member this.TryFinally(ivr: 'r ivr, f: unit -> unit) : 'r ivr =
+        member __.TryFinally(ivr: 'r ivr, f: unit -> unit) : 'r ivr =
             ivr
             |> whenCompleted f
 
-        member this.TryWith(ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
+        member __.TryWith(ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
             ivr
             |> continueWith (function
                 | Error e -> eh e
                 | r -> r |> ofResult)
                 
-        member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
+        member __.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
             ivr1
             |> continueWith (function
                 | Error e -> e |> ofError
@@ -580,7 +580,7 @@ module IVR =
         { 
             new IDisposableProc with
                 member __.Dispose() = ()
-                member x.DisposableProc = ivr
+                member __.DisposableProc = ivr
         }
             
     //
@@ -677,7 +677,7 @@ module IVR =
         interface IAsyncComputation with
             /// Run the asynchronous computation on a threadpool thread and post 
             /// its result to the receiver.
-            member this.run(receiver : obj result -> unit) : unit = 
+            member __.run(receiver : obj result -> unit) : unit = 
                 async {
                     try
                         let! r = computation
