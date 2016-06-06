@@ -40,7 +40,7 @@ module Configuration =
     let applicationName = "IVR.Test.Application"
 
 [<TestFixture;Category("DependsOnHost")>]
-type LiveTests() =
+type ARITests() =
 
     [<Test>]
     member this.failedConnect() =

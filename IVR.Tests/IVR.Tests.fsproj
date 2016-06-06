@@ -54,7 +54,7 @@
     <Compile Include="IVRGCTests.fs" />
     <Compile Include="TracingTests.fs" />
     <Compile Include="RuntimeTests.fs" />
-    <Compile Include="LiveTests.fs" />
+    <Compile Include="ARITests.fs" />
     <Compile Include="SystemTests.fs" />
     <Content Include="packages.config" />
     <Content Include="app.config" />
