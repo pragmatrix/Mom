@@ -7,6 +7,7 @@ open IVR
 
 open IVR.Asterisk
 open IVR.Asterisk.Client
+open IVR.Asterisk.Extensions
 
 open AsterNET.ARI
 open AsterNET.ARI.Models

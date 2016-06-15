@@ -204,6 +204,3 @@ module Extensions =
                 let! playback = this.play(media, ?lang = lang, ?offset = offset, ?skip = skip)
                 do! IVR.waitForPlaybackFinished(playback.Id)
             }
-
-[<assembly:AutoOpen("IVR.Asterisk.Extensions")>]
-do ()
