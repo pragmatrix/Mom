@@ -7,10 +7,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "IVR", "IVR\IVR.fsproj", "{D
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "IVR.Tests", "IVR.Tests\IVR.Tests.fsproj", "{1F4EBD89-5E2D-4C7C-A068-D7DEA77F7518}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "IVR.Asterisk", "IVR.Asterisk\IVR.Asterisk.fsproj", "{D1A9FC5B-A686-4672-84A3-563A9E477E30}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsterNET.ARI", "AsterNET.ARI\AsterNET.ARI\AsterNET.ARI.csproj", "{F4C8C633-2207-4C25-89A8-4D23D9CFA964}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

@@ -54,7 +54,6 @@
     <Compile Include="IVRGCTests.fs" />
     <Compile Include="TracingTests.fs" />
     <Compile Include="RuntimeTests.fs" />
-    <Compile Include="ARITests.fs" />
     <Compile Include="SystemTests.fs" />
     <Content Include="packages.config" />
     <Content Include="app.config" />
@@ -82,16 +81,6 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\AsterNET.ARI\AsterNET.ARI\AsterNET.ARI.csproj">
-      <Name>AsterNET.ARI</Name>
-      <Project>{f4c8c633-2207-4c25-89a8-4d23d9cfa964}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\IVR.Asterisk\IVR.Asterisk.fsproj">
-      <Name>IVR.Asterisk</Name>
-      <Project>{d1a9fc5b-a686-4672-84a3-563a9e477e30}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\IVR\IVR.fsproj">
       <Name>IVR</Name>
       <Project>{dfe14fd2-df84-47fa-a547-f43487f80275}</Project>

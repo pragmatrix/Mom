@@ -1,4 +1,0 @@
-[submodule "AsterNET.ARI"]
-	path = AsterNET.ARI
-	url = https://github.com/pragmatrix/AsterNET.ARI.git
-	branch = master
