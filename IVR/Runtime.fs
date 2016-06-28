@@ -3,13 +3,13 @@
 open System
 open Threading
 
+///
+/// The IVR runtime.
+/// 
+
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 [<RequireQualifiedAccess>]
 module Runtime =
-
-    //
-    // The IVR runtime.
-    // 
 
     // predefined runtime events
 
@@ -69,14 +69,15 @@ module Runtime =
             use c = cancellationToken.Register(fun () -> this.cancel())
             this.run ivr
 
-    //
-    // A builder that supports the creation of runtimes and adding services to it.
-    //
-
-    /// Defines a service. Note that a service's context is partially applied per Runtime. 
+    /// Defines a service. 
+    /// Note that a service's context is partially applied per Runtime. 
     /// This way the service can associate its own instance variables with the Runtime.
+    /// Note that the return value indicates not only the response itself, it also notifies the
+    /// runtime if a command is handled, so if the command is asynchronous and can not actually
+    /// return a reponse, () should be returned when the command is considered to be processed.
     type Service = IServiceContext -> Command -> Response option
         
+    /// A builder that supports the creation of runtimes and adding services to it.
     [<NoComparison;NoEquality>]
     type Builder = {
             eventQueue: SynchronizedQueue<Event>
@@ -109,10 +110,7 @@ module Runtime =
 
         new Runtime (builder.eventQueue, serviceHost)
 
-    //
-    // Some predefined services that should be supported by every runtime.
-    //
-
+    /// Some predefined services that should be supported by every runtime.
     [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
     module Service = 
 
@@ -186,14 +184,14 @@ module Runtime =
                     | ContinueService -> ()
                     None
 
-    /// Runtimes a default builder, that includes the services schedule, delay, and async.
+    /// Creates a default builder, that includes the services schedule, delay, and async.
     let defaultBuilder = 
         builder
         |> withService Service.schedule
         |> withService Service.delay
         |> withService Service.async
 
-    /// Builds a default runtime that forwards all commands to the service. The runtime includes the
+    /// Builds a default runtime that forwards all commands to the host service. The runtime includes the
     /// services schedule, delay, and async.
     let newRuntime hostService = 
         defaultBuilder
