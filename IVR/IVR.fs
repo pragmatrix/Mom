@@ -669,7 +669,7 @@ module IVR =
     // Async interopability
     //
 
-    // async computations are scheduled the threadpool by default.
+    // async computations are scheduled on the threadpool by default.
 
     type IAsyncComputation = 
         abstract member run : (obj result -> unit) -> unit
