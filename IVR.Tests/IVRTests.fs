@@ -1,12 +1,11 @@
 ﻿namespace IVR.Tests
 
-open NUnit.Framework
-open FsUnit
-
 open System
 open System.Collections.Generic
-open IVR
 open System.Threading
+open NUnit.Framework
+open FsUnit
+open IVR
 
 //
 // Basic Combinator and semantic tests.

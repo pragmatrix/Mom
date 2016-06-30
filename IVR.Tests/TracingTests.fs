@@ -1,10 +1,9 @@
 ﻿namespace IVR.Tests
 
-open IVR
-open Tracing
-
 open NUnit.Framework
 open FsUnit
+open IVR
+open Tracing
 
 type TraceEvent1 = TraceEvent1 of int
 

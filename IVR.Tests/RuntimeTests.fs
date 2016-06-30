@@ -1,9 +1,8 @@
 ﻿namespace IVR.Tests
 
-open IVR
-
 open NUnit.Framework
 open FsUnit
+open IVR
 
 exception AsyncException of string
 

@@ -2,8 +2,8 @@
 
 open System
 open System.IO
-open Nessos.FsPickler
 open System.Diagnostics
+open Nessos.FsPickler
 open Tracing
 
 module Tracers = 

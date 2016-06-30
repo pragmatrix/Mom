@@ -1,8 +1,8 @@
 ﻿namespace IVR.Tests
 
-open IVR
-open NUnit.Framework
 open System
+open NUnit.Framework
+open IVR
 
 [<AutoOpen>]
 module Helper = 
