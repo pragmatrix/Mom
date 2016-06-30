@@ -24,7 +24,7 @@ module Tracers =
 
     let entryTracer (sessionInfo : SessionInfo) (receiver: TraceHeader -> TraceStep -> unit) = 
         
-        let startTimeAbsolute = DateTime.UtcNow
+        let startTimeAbsolute = DateTimeOffset.UtcNow
         // use the stopwatch to avoid time skews.
         let stopWatch = Stopwatch.StartNew()
         let header = startTimeAbsolute, sessionInfo

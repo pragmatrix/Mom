@@ -219,7 +219,7 @@ module Tracing =
     // Types for a trace that is annotated with timing information.
     //
 
-    type TraceHeader = DateTime * SessionInfo
+    type TraceHeader = DateTimeOffset * SessionInfo
     type TraceStep = TimeSpan * StepTrace
     type Trace = TraceHeader * TraceStep list
 
@@ -294,7 +294,7 @@ module Tracing =
 
         open System.Text.RegularExpressions
 
-        let private dateTime (dt: DateTime) =
+        let private dateTime (dt: DateTimeOffset) =
             // Inspired by ISO 8601, 
             // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
             let localTime = dt.ToLocalTime()
