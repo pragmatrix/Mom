@@ -3,7 +3,7 @@
 open System
 open System.IO
 open System.Diagnostics
-open Nessos.FsPickler
+open MBrace.FsPickler
 open Tracing
 
 module Tracers = 

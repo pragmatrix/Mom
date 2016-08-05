@@ -6,3 +6,4 @@ obj/
 *.ncrunchproject
 /_NCrunch_*/
 /packages/
+/.paket/paket.exe

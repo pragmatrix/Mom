@@ -29,7 +29,7 @@ type RuntimeTests() =
         result |> should equal (Some 10)
 
 
-    [<Test; ExpectedException(typeof<AsyncException>)>]
+    [<Test>]
     member this.``async exceptions are propagated``() = 
 
         let waitAndReturn10 = async {
@@ -46,7 +46,9 @@ type RuntimeTests() =
         let host _ _ = None
 
         let runtime = IVR.Runtime.newRuntime(host)
-        runtime.run test |> ignore
+        
+        (fun () -> runtime.run test |> ignore)
+        |> should throw typeof<AsyncException>
 
     [<Test>]
     member this.``async exceptions can be catched inside an IVR``() = 
