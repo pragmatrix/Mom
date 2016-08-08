@@ -1,4 +1,4 @@
-﻿module IVR.Traces
+﻿module IVR.Tracers
 
 open System
 open System.IO
