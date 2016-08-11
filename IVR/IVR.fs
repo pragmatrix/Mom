@@ -702,7 +702,5 @@ module BuilderExtensions =
     let ivr<'r> = IVR.ivr<'r>
 
 // a little inception may not do any harm :)
-
-[<assembly:AutoOpen("IVR.TimeSpanExtensions")>]
 [<assembly:AutoOpen("IVR.BuilderExtensions")>]
 do ()
