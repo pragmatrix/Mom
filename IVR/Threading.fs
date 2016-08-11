@@ -9,7 +9,7 @@ type SynchronizedQueue<'t>() =
     let monitor = obj()
     let queue = Queue<'t>()
         
-    member this.enqueue v = 
+    member __.Enqueue v = 
         lock monitor (
             fun () -> 
                 queue.Enqueue v
@@ -17,7 +17,7 @@ type SynchronizedQueue<'t>() =
                     Monitor.Pulse monitor
             )
 
-    member this.dequeue() =
+    member __.Dequeue() =
         lock monitor (
             fun () ->
                 while queue.Count = 0 do

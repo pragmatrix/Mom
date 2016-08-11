@@ -17,7 +17,7 @@ type Command = obj
 type Response = obj
 type Host = Command -> Response
 
-exception Cancelled
+exception CancelledException
 
 [<NoComparison>]
 type 'result result =
@@ -37,16 +37,6 @@ type 'result ivr =
     | Inactive of (Host -> 'result ivr)
     | Active of (Event -> 'result ivr)
     | Completed of 'result result
-
-module TimeSpanExtensions =
-
-    type Int32 with
-        member this.seconds = TimeSpan.FromSeconds(float this)
-        member this.milliseconds = TimeSpan.FromMilliseconds(float this)
-
-    type Double with
-        member this.seconds = TimeSpan.FromSeconds(this)
-        member this.milliseconds = TimeSpan.FromMilliseconds(this)
 
 module internal List =
     let inline flatten l = List.collect id l
@@ -208,7 +198,7 @@ module IVR =
 
     let internal lmapi (f: int -> 'a -> 'b) (ivrs: 'a ivr list) : ('b ivr list) = 
         ivrs 
-        |> List.mapi (fun i -> f i |> map)
+        |> List.mapi (f >> map)
 
     // Cancels a pair of ivr lists in the reversed specified order while in the process of 
     // processing a step for all parallel ivrs.
@@ -464,7 +454,7 @@ module IVR =
 
     /// Exception / Error that represents a nested cancellation error
 
-    exception NestedCancellation
+    exception NestedCancellationException
 
     /// Install an cancallation ivr for the ivr body. That cancellation ivr is called 
     /// when the code inside the block gets cancelled. This function can only be used in a use! 
@@ -478,7 +468,7 @@ module IVR =
                 | Error e -> e |> ofError
                 // the cancellation ivr got cancelled! This is an error for now!
                 // tbd: An cancellation ivr must be protected from further cancellation.
-                | Cancelled -> NestedCancellation |> ofError
+                | Cancelled -> NestedCancellationException |> ofError
 
             match rBody with
             | Cancelled -> cancelIVR |> continueWith afterCancel
@@ -643,8 +633,8 @@ module IVR =
     // IVR System Commands & Events
     //
 
-    type Delay = Delay of TimeSpan
-        with
+    type Delay = 
+        | Delay of TimeSpan
         interface IReturns<Id>
 
     type DelayCompleted = DelayCompleted of Id
@@ -658,9 +648,9 @@ module IVR =
 
     /// Deliver an event to the currently active processes.
     [<NoComparison>]
-    type Schedule = Schedule of Event
-        with
-        member this.event = let (Schedule e) = this in e
+    type Schedule = 
+        | Schedule of Event
+        member this.Event = let (Schedule e) = this in e
     
     let schedule (e: Event) = 
         e |> Schedule |> post
@@ -672,13 +662,13 @@ module IVR =
     // async computations are scheduled on the threadpool by default.
 
     type IAsyncComputation = 
-        abstract member run : (obj result -> unit) -> unit
+        abstract member Run : (obj result -> unit) -> unit
 
     type AsyncComputation<'r>(computation: Async<'r>) = 
         interface IAsyncComputation with
             /// Run the asynchronous computation on a threadpool thread and post 
             /// its result to the receiver.
-            member __.run(receiver : obj result -> unit) : unit = 
+            member __.Run(receiver : obj result -> unit) : unit = 
                 async {
                     try
                         let! r = computation

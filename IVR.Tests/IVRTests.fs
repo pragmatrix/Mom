@@ -580,7 +580,7 @@ type IVRTests() =
         let ev = new ManualResetEvent(false)
 
         async {
-            runtime.run ivr |> should equal None
+            runtime.Run ivr |> should equal None
             ev.Set() |> ignore
         } |> Async.Start
 

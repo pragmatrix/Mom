@@ -38,7 +38,7 @@ let traceReceiver (traceReceiver: Trace -> unit) =
         let mutable steps = []
         fun (step: TraceStep) ->
             steps <- step :: steps
-            if (snd step).hasResult then
+            if (snd step).HasResult then
                 (header, (steps |> List.rev)) |> traceReceiver
 
 /// Receives traces and writes them to a stream in binary format.
@@ -46,7 +46,7 @@ let binaryStreamReceiver (stream: Stream) =
     fun (header: TraceHeader) ->
         Helper.serializer.Serialize(stream, header, leaveOpen = true)
         fun (step: TraceStep) ->
-            let lastStep = (snd step).hasResult
+            let lastStep = (snd step).HasResult
             Helper.serializer.Serialize(stream, step, leaveOpen = not lastStep)
                 
 let streamTracer sessionInfo stream =
@@ -55,7 +55,7 @@ let streamTracer sessionInfo stream =
     |> entryTracer sessionInfo
 
 let filename (sessionInfo: SessionInfo) : string =
-    sprintf "%s.%d.trace.bin" (sessionInfo.name |> sprintf "%A" |> Helper.toFilename) sessionInfo.id
+    sprintf "%s.%d.trace.bin" (sessionInfo.Name |> sprintf "%A" |> Helper.toFilename) sessionInfo.Id
         
 let fileTracer fn (sessionInfo : SessionInfo) =
     let f = File.Open(fn, FileMode.Create, FileAccess.Write, FileShare.None)
@@ -68,7 +68,7 @@ let readFileTrace (fn: string) : Trace =
     let rec readSteps steps = 
         let (step : TraceStep) = Helper.serializer.Deserialize(stream, leaveOpen = true)
         let steps = step :: steps
-        if (snd step).hasResult then steps
+        if (snd step).HasResult then steps
         else readSteps steps
 
     let steps = 

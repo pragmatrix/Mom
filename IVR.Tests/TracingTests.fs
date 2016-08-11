@@ -45,7 +45,7 @@ type TracingTests() =
 
         trace
         |> Tracing.replay (fun _ -> ivr)
-        |> fun r -> r.steps
+        |> fun r -> r.Steps
         |> Seq.iter (printfn "%A")
 
 
@@ -75,7 +75,7 @@ type TracingTests() =
         
         trace
         |> Tracing.replay (fun _ -> ivr)
-        |> (fun r -> r.steps)
+        |> (fun r -> r.Steps)
         |> Seq.iter (printfn "%A")
 
     [<Test>]
@@ -111,6 +111,6 @@ type TracingTests() =
             trace.Value
             |> Tracing.replay (fun _ -> ivr)
         
-        report.incidents |> Seq.iter (printfn "%A")
-        report.isEmpty |> should equal true
+        report.Incidents |> Seq.iter (printfn "%A")
+        report.IsEmpty |> should equal true
 

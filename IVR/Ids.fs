@@ -9,11 +9,11 @@ type Id = int64
 module Ids =
     
     type Generator = {
-        id: Id ref
+        Id: Id ref
     }
     with 
-        member this.generateId() = 
-            Interlocked.Increment(this.id)
+        member this.GenerateId() = 
+            Interlocked.Increment(this.Id)
 
     let newGenerator() = 
-        { id = ref 0L }
+        { Id = ref 0L }

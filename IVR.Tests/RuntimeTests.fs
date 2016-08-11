@@ -25,7 +25,7 @@ type RuntimeTests() =
         let host _ _ = None
 
         let runtime = IVR.Runtime.newRuntime(host)
-        let result = runtime.run test
+        let result = runtime.Run test
         result |> should equal (Some 10)
 
 
@@ -47,7 +47,7 @@ type RuntimeTests() =
 
         let runtime = IVR.Runtime.newRuntime(host)
         
-        (fun () -> runtime.run test |> ignore)
+        (fun () -> runtime.Run test |> ignore)
         |> should throw typeof<AsyncException>
 
     [<Test>]
@@ -70,5 +70,5 @@ type RuntimeTests() =
         let host _ _ = None
 
         let runtime = IVR.Runtime.newRuntime(host)
-        runtime.run test |> should equal (Some 11)
+        runtime.Run test |> should equal (Some 11)
         

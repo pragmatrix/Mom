@@ -22,7 +22,7 @@ type ResultTrace =
 
 /// Represents a trace of a command. A command can either return without a result or throw an exception.
 [<NoComparison>]
-type CommandTrace = { command: Command; result: ResultTrace }
+type CommandTrace = { Command: Command; Result: ResultTrace }
 
 /// A step trace represents a trace for a single step of an IVR. 
 ///
@@ -31,20 +31,27 @@ type CommandTrace = { command: Command; result: ResultTrace }
 /// result is set for the last step.
 
 [<NoComparison>]
-type StepTrace = { event: Event; commands: CommandTrace list; result: ResultTrace option }
-    with
-    member this.hasResult = this.result.IsSome
+type StepTrace = {
+    Event: Event 
+    Commands: CommandTrace list
+    Result: ResultTrace option 
+} with
+    member this.HasResult = this.Result.IsSome
 
 /// A session tracer is a function that consumes trace records for a specific IVR instantiation (session).
 type SessionTracer = StepTrace -> unit
     
 /// Describes the an IVR tracing session.
 [<NoComparison>]
-type SessionInfo = { name: Name; id: Id; param: obj }
+type SessionInfo = { 
+    Name: Name
+    Id: Id
+    Param: obj 
+}
 
 /// Creates a new SessionInfo record with a name, an id and a parameterization. 
 let sessionInfo name id param = 
-    { name = name; id = id; param = param }
+    { Name = name; Id = id; Param = param }
 
 /// A Tracer is a function that creates a session tracer for a specific IVR session.
 type Tracer = SessionInfo -> SessionTracer
@@ -111,7 +118,7 @@ module private SessionIds =
                     _generators.Add(name, g)
                     g
                 | true, g -> g
-            g.generateId()
+            g.GenerateId()
         )
        
 module private Helper =  
@@ -124,10 +131,10 @@ module private Helper =
         fun command ->
             try
                 let r = host command
-                commands := { command = command; result = Result r } :: !commands
+                commands := { Command = command; Result = Result r } :: !commands
                 r
             with e ->
-                commands := { command = command; result = Error e } :: !commands
+                commands := { Command = command; Result = Error e } :: !commands
                 reraise()
                     
     let traceResult state = 
@@ -157,9 +164,9 @@ module private Helper =
             | [] -> failwith "replay host: no more command traces"
             | cmdt::rest ->
             todo <- rest
-            if (cmd <> cmdt.command) then
-                failwithf "replay host: command differs, ignoring result, expected: %A, actual %A" cmdt.command cmd
-            match cmdt.result with
+            if (cmd <> cmdt.Command) then
+                failwithf "replay host: command differs, ignoring result, expected: %A, actual %A" cmdt.Command cmd
+            match cmdt.Result with
             | Result r -> r
             | Error e -> raise e
             /// tbd: not sure about this!
@@ -178,7 +185,7 @@ let registerTracer (name: Name) tracer =
 let trace sessionTracer ivr = 
     fun host ->
         let rec next event (state, commands) = 
-            { event = event; commands = commands; result = Helper.traceResult state }
+            { Event = event; Commands = commands; Result = Helper.traceResult state }
             |> sessionTracer
             match state with
             | Completed _ -> 
@@ -207,7 +214,7 @@ let declare (name : Name) (f : 'param -> 'r ivr) =
         | None -> ivr
         | Some tracer ->
         let id = SessionIds.generateNew name
-        let sessionInfo = { name = name; id = id; param = param }
+        let sessionInfo = { Name = name; Id = id; Param = param }
         let sessionTracer = tracer sessionInfo
 
         ivr 
@@ -238,21 +245,21 @@ type StepTraceReport = StepTraceReport of StepTraceDiff * StepTrace * StepTrace
 [<NoComparison>]
 type ReplayReport = ReplayReport of StepTraceReport list
     with 
-    member this.steps = this |> fun (ReplayReport steps) -> steps
-    member this.incidents = 
-        this.steps
+    member this.Steps = this |> fun (ReplayReport steps) -> steps
+    member this.Incidents = 
+        this.Steps
         |> Seq.filter (fun step -> step.Diff <> StepTraceDiff.None)
-    member this.isEmpty =
-        this.incidents |> Seq.isEmpty
+    member this.IsEmpty =
+        this.Incidents |> Seq.isEmpty
 
 let private diffStepTrace (expected: StepTrace) (actual: StepTrace) = 
     let none = StepTraceDiff.None
     let diff =
-        if (expected.event <> actual.event) then StepTraceDiff.Event else none
+        if (expected.Event <> actual.Event) then StepTraceDiff.Event else none
         |||
-        if (expected.commands <> actual.commands) then StepTraceDiff.Commands else none
+        if (expected.Commands <> actual.Commands) then StepTraceDiff.Commands else none
         |||
-        if (expected.result <> actual.result) then StepTraceDiff.Result else none
+        if (expected.Result <> actual.Result) then StepTraceDiff.Result else none
 
     StepTraceReport (diff, expected, actual)
 
@@ -260,13 +267,13 @@ let private diffStepTrace (expected: StepTrace) (actual: StepTrace) =
 let replay (f: 'param -> 'r ivr) (trace: Trace) : ReplayReport = 
     let sessionInfo = trace |> fst |> snd
     let stepTraces = trace |> snd |> List.map snd
-    let ivr = unbox sessionInfo.param |> f
+    let ivr = unbox sessionInfo.Param |> f
         
     let rec next report stepTraces (state, commands) = 
         match stepTraces with
         | [] -> failwith "internal error, a trace must have at least one StepTrace with a StartEvent"
         | step :: rest ->
-        let actual = { event = step.event; commands = commands; result = Helper.traceResult state}
+        let actual = { Event = step.Event; Commands = commands; Result = Helper.traceResult state}
         let report = diffStepTrace step actual :: report
         match state with
         | Completed _ -> report
@@ -275,13 +282,13 @@ let replay (f: 'param -> 'r ivr) (trace: Trace) : ReplayReport =
         | [] -> report // premature end
         | nextStep :: _ ->
 
-        let replayHost = Helper.replayHost nextStep.commands 
+        let replayHost = Helper.replayHost nextStep.Commands 
         state
-        |> Helper.stepAndTraceCommands replayHost nextStep.event 
+        |> Helper.stepAndTraceCommands replayHost nextStep.Event 
         |> next report rest
         
     ivr 
-    |> Helper.startAndTraceCommands (stepTraces |> List.head |> (fun st -> st.commands) |> Helper.replayHost)
+    |> Helper.startAndTraceCommands (stepTraces |> List.head |> (fun st -> st.Commands) |> Helper.replayHost)
     |> next [] stepTraces 
     |> List.rev 
     |> ReplayReport
@@ -334,13 +341,13 @@ module Format =
     /// Formats a TraceHeader to a human comprehensible format. Note that this format might change.
     let header (header: TraceHeader) = 
         let (time, si) = header
-        { time = dateTime time; name = si.name; id = si.id; param = si.param }
+        { time = dateTime time; name = si.Name; id = si.Id; param = si.Param }
         |> sprintf "%A" |> postProcess
 
     /// Formats a TraceStep to a human comprehensible format. Note that this format might change.
     let step (step: TraceStep) = 
         let (offset, step) = step
-        { offset = timeSpan offset; event = step.event; commands = step.commands; result = step.result }
+        { offset = timeSpan offset; event = step.Event; commands = step.Commands; result = step.Result }
         |> sprintf "%A" |> postProcess
  
     /// Formats a Trace to a human comprehensible format. Note that this format might change.
