@@ -656,6 +656,18 @@ module IVR =
         e |> Schedule |> post
 
     //
+    // IVR System combinators
+    //
+
+    /// Process the ivr given and return it's value as an option or
+    /// timeout after the given timespan and return None.
+    let timeoutAfter (ts: TimeSpan) ivr = 
+        any [
+            ivr |> map Some
+            delay ts |> map (fun () -> None)
+        ]
+
+    //
     // Async interopability
     //
 
