@@ -60,7 +60,7 @@ module IVR =
                 f host
             with e ->
                 e |> Error |> Completed
-        | _ -> failwithf "IVR.start: ivr not inactive: %A" ivr
+        | _ -> failwithf "IVR.start: can't start an ivr that is not inactive: %A" ivr
 
     /// Continue an ivr with one event.
     let rec step e ivr = 
@@ -350,7 +350,7 @@ module IVR =
             | Error r -> cancelField (Error r)
             | Cancelled -> cancelField Cancelled
 
-        // and last convert the map to a list.
+        // and at last, convert the map to a list.
         let mapToList m = 
             m 
             |> Map.toList
@@ -383,13 +383,13 @@ module IVR =
 
     let join (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
 
-        // we implement join in terms of all
+        // join is implemented in terms of all
 
         [map box ivr1; map box ivr2] 
         |> all
         |> map (function 
             | [l;r] -> unbox l, unbox r 
-            | _ -> failwith "internal error: here to keep the compiler happy")
+            | _ -> failwith "internal error")
 
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
