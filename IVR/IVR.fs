@@ -460,7 +460,7 @@ module IVR =
     /// when the code inside the block gets cancelled. This function can only be used in a use! 
     /// instruction inside of a computation expression.
 
-    let cancelWith cancelIVR body = 
+    let onCancel cancelIVR body = 
         let afterBody rBody =
             let afterCancel rCancellation = 
                 match rCancellation with
