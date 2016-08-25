@@ -642,8 +642,11 @@ module IVR =
     /// Wait for the given time span and continue then.
     let delay (ts: TimeSpan) =
         ivr {
-            let! id = Delay ts |> send
-            do! waitFor' (fun (DelayCompleted id') -> id' = id)
+            if ts < TimeSpan.Zero then
+                failwith "IVR.delay: unsupported negative time span: %"
+            if ts <> TimeSpan.Zero then
+                let! id = Delay ts |> send
+                do! waitFor' (fun (DelayCompleted id') -> id' = id)
         }
 
     /// Deliver an event to the currently active processes.

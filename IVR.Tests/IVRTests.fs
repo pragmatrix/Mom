@@ -739,6 +739,20 @@ type IVRTests() =
         |> IVR.isCompleted |> should equal true
 
     [<Test>]
+    member this.``IVR.delay does not send an command for a zero delay``() = 
+        let host _ = 
+            failwith "failed"
+
+        let test = IVR.delay TimeSpan.Zero            
+
+        let state = 
+            test |> IVR.start host 
+            
+        state 
+        |> IVR.isError |> should equal false
+
+
+    [<Test>]
     member this.``computation expression syntax: Command with return type``() = 
         let test = ivr {
             let! r = IVR.send (Command 10)
