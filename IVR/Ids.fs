@@ -10,8 +10,7 @@ module Ids =
     
     type Generator = {
         Id: Id ref
-    }
-    with 
+    } with 
         member this.GenerateId() = 
             Interlocked.Increment(this.Id)
 
