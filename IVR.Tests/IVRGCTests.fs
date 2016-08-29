@@ -9,7 +9,7 @@ open IVR
 module Helper = 
     let ivr<'r> = IVR.IVR.ivr<'r>
 
-[<Fact>]
+[<Fact(Skip="brittle")>]
 let longSequentialLoopDoesNotEatUpStackOrMemory() =
     
     // interestingly, the "Generate Tail Calls" option does 
