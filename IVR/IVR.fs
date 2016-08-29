@@ -482,14 +482,9 @@ module IVR =
     //
 
     type IVRBuilder<'result>() = 
-        
-        let delay (f : unit -> 'r ivr) : 'r ivr = 
-            fun h -> f() |> start h
-            |> Inactive
 
         member __.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
-            ivr
-            |> continueWith (function 
+            ivr |> continueWith (function 
                 | Value r -> body r
                 | Error err -> err |> ofError
                 | Cancelled -> Cancelled |> ofResult)
@@ -498,8 +493,10 @@ module IVR =
         // active ivr here (but then start must handle ivrs with a result)
         member __.Return(v: 'r) : 'r ivr = ofValue v
         member __.ReturnFrom(ivr : 'r ivr) = ivr
-        member __.Delay(f : unit -> 'r ivr) : 'r ivr = delay f
-        member __.Zero () : unit ivr = ofValue ()
+        member this.Delay(f : unit -> 'r ivr) : 'r ivr = 
+            this.Bind(this.Return(), f)
+        member this.Zero () : unit ivr = 
+            this.Return()
 
         member this.Using(disposable : 't, body : 't -> 'r ivr when 't :> IDisposable) : 'r ivr =
             let body = body disposable
@@ -523,32 +520,22 @@ module IVR =
                     | Cancelled -> Cancelled |> ofResult
 
                 // note: f is already delayed, so we can run it in place.
-                f() 
-                |> continueWith afterFinally
+                f() |> continueWith afterFinally
 
-            ivr
-            |> continueWith finallyBlock
+            ivr |> continueWith finallyBlock
 
         member __.TryFinally(ivr: 'r ivr, f: unit -> unit) : 'r ivr =
-            ivr
-            |> whenCompleted f
+            ivr |> whenCompleted f
 
         member __.TryWith(ivr: 'r ivr, eh: exn -> 'r ivr) : 'r ivr =
-            ivr
-            |> continueWith (function
+            ivr |> continueWith (function
                 | Error e -> eh e
                 | r -> r |> ofResult)
                 
-        member __.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
-            ivr1
-            |> continueWith (function
-                | Error e -> e |> ofError
-                | Cancelled -> Cancelled |> ofResult
-                | Value _ -> ivr2
-            )
-    
-        // http://fsharpforfunandprofit.com/posts/computation-expressions-builder-part6/
+        member this.Combine(ivr1: unit ivr, ivr2: 'r ivr) : 'r ivr =
+            this.Bind(ivr1, fun () -> ivr2)
 
+        // http://fsharpforfunandprofit.com/posts/computation-expressions-builder-part6/
         // While can be implemented in terms of Zero() and Bind()
         member this.While(guard: unit -> bool, body: unit ivr) : unit ivr =
             if not (guard()) then
