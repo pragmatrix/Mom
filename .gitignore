@@ -7,3 +7,5 @@ obj/
 /_NCrunch_*/
 /packages/
 /.paket/paket.exe
+/*.user
+

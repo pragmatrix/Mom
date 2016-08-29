@@ -1,14 +1,11 @@
-﻿namespace IVR.Tests
+﻿module IVR.Tests.SystemTests
 
-open NUnit.Framework
 open FsUnit
+open Xunit
 
-[<TestFixture>]
-type SystemTests() = 
-
-    [<Test>]
-    member this.boxedValueOfUnitIsNull() = 
-        () |> box 
-        |> should equal null
+[<Fact>]
+let boxedValueOfUnitIsNull() = 
+    () |> box 
+    |> should equal null
 
 
