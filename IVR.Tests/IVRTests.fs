@@ -723,7 +723,7 @@ let ``IVR.delay (simulated)``() =
 
     let host c = 
         c |> should equal (IVR.Delay (TimeSpan(1, 0, 0)))
-        1L |> box // return the 64 bit id of the Delay
+        Id 1L |> box // return the 64 bit id of the Delay
 
     let test = IVR.delay (TimeSpan(1, 0, 0))            
 
@@ -731,7 +731,7 @@ let ``IVR.delay (simulated)``() =
         test |> IVR.start host 
             
     state 
-    |> IVR.step (IVR.DelayCompleted 1L)
+    |> IVR.step (IVR.DelayCompleted (Id 1L))
     |> IVR.isCompleted |> should equal true
 
 [<Fact>]

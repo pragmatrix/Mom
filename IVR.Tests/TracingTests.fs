@@ -22,7 +22,7 @@ let simpleTraceAndReplay() =
     }
 
 
-    let sessionInfo = Tracing.sessionInfo "" 0L null
+    let sessionInfo = Tracing.sessionInfo "" (Id 0L) null
     let mutable trace = None
     let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
 
@@ -56,7 +56,7 @@ let simpleTraceBinarySerializationTest() =
         return x
     }
 
-    let sessionInfo = Tracing.sessionInfo "" 0L null
+    let sessionInfo = Tracing.sessionInfo "" (Id 0L) null
     let fn = "test.trace"
     let tracer = Tracers.fileTracer fn sessionInfo
     let traced = 
@@ -91,7 +91,7 @@ let replayReplaysCommandResponses() =
 
     // tbd: prettify tracing APIs for common cases and tests! This is ugly as ....!
 
-    let sessionInfo = Tracing.sessionInfo "" 0L null
+    let sessionInfo = Tracing.sessionInfo "" (Id 0L) null
     let mutable trace = None
     let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
         
