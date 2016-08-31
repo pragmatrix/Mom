@@ -55,7 +55,7 @@ let streamTracer sessionInfo stream =
     |> entryTracer sessionInfo
 
 let filename (sessionInfo: SessionInfo) : string =
-    sprintf "%s.%d.trace.bin" (sessionInfo.Name |> sprintf "%A" |> Helper.toFilename) sessionInfo.Id
+    sprintf "%s.%d.trace.bin" (sessionInfo.Name |> sprintf "%A" |> Helper.toFilename) sessionInfo.Id.Value
         
 let fileTracer fn (sessionInfo : SessionInfo) =
     let f = File.Open(fn, FileMode.Create, FileAccess.Write, FileShare.None)
