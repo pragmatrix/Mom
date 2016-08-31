@@ -630,7 +630,7 @@ module IVR =
     let delay (ts: TimeSpan) =
         ivr {
             if ts < TimeSpan.Zero then
-                failwith "IVR.delay: unsupported negative time span: %"
+                failwithf "IVR.delay: unsupported negative time span: %s" (ts |> string)
             if ts <> TimeSpan.Zero then
                 let! id = Delay ts |> send
                 do! waitFor' (fun (DelayCompleted id') -> id' = id)
