@@ -92,6 +92,11 @@ let withService (service: Service) builder =
     { builder with
         Services = service :: builder.Services }
 
+let private flip f a b = f b a
+    
+let withServices (services: Service list) builder = 
+    services |> List.fold (flip withService) builder
+
 let create builder = 
 
     let services = builder.Services |> List.rev
@@ -141,17 +146,24 @@ module Service =
                 id |> box |> Some
             | _ -> None
 
-    /// Forward the msg to all services and expect each either to consume the msg or to ignore it.
+    /// Forward the msg to _all_ the services specified. These services are a treated as message sinks.
+    /// Only if none of the services processes the message, the delivrity mechanism continues to services outside of this
+    /// forwarding group.
     let forward (services: Service list) =
         fun runtime ->
             let services = services |> List.map ((|>) runtime)
-            fun obj ->
+            fun message ->
                 // if one or more of the services consume the event, it's returned as consumed
                 let consumed = 
                     services 
-                    |> List.map (fun srv -> (srv obj).IsSome) 
+                    |> List.map (fun service -> 
+                        match service message with
+                        | Some v when v = box () -> true
+                        | Some v -> failwithf "a service that is in a forwarding group, returned an unexpected value: %A" v
+                        | None -> false
+                        ) 
                     |> List.contains true
-                if consumed 
+                if consumed
                 then () |> box |> Some
                 else None
 
