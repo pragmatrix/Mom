@@ -24,8 +24,8 @@ type Event1 = Event1
 type Event2 = Event2
 type Event3 = Event3
 
-type Command = Command of int
-    with 
+type Command = 
+    | Command of int
     interface IVR.IReturns<string>
 
 let dummyHost = fun _ -> null
@@ -753,7 +753,25 @@ let ``computation expression syntax: Command with return type``() =
     let test = ivr {
         let! r = IVR.send (Command 10)
         return r
-        }
+    }
+
+    let host (c:obj) : obj =
+        match box c with
+        | :? Command -> "Hello"
+        | _ -> ""
+        |> box
+
+    test
+    |> IVR.start host
+    |> IVR.resultValue
+    |> should equal "Hello"
+
+[<Fact>]
+let ``computation expression syntax: Command with return type (implicit send!)``() = 
+    let test = ivr {
+        let! r = Command 10
+        return r
+    }
 
     let host (c:obj) : obj =
         match box c with

@@ -487,6 +487,10 @@ module IVR =
 
     type IVRBuilder<'result>() = 
 
+        member __.Source(ivr: 'r ivr) : 'r ivr = ivr
+        member __.Source(r: 'r when 'r :> IReturns<'rr>) = r |> send
+        member __.Source(s: 'e seq) = s
+
         member __.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
             ivr |> continueWith (function 
                 | Value r -> body r
