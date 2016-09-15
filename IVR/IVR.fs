@@ -412,11 +412,15 @@ module IVR =
     // Sending and posting commands to the host.
     //
 
-    /// Response type interface that is used to tag commands with.
+    /// Response type interface that is used to tag commands with. Tag data types with
+    /// this interface and use them as a command with IVR.send so that IVR.send can automatically 
+    /// cast the resulting value.
     type IReturns<'result> = 
         interface end
 
-    /// An IVR that synchronously sends a command to a host and returns its response.
+    /// An IVR that synchronously sends a command to a host and returns its response. The commands
+    /// need to implement the IReturns<_> interface so that the returned response value can be typed
+    /// properly.
     let send (cmd: IReturns<'r>) : 'r ivr = 
         fun (h: Host) ->
             try
