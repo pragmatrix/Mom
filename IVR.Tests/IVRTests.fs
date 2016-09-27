@@ -26,7 +26,7 @@ type Event3 = Event3
 
 type Command = 
     | Command of int
-    interface IVR.IReturns<string>
+    interface IVR.ICommand<string>
 
 let dummyHost = fun _ -> null
 let start ivr = IVR.start dummyHost ivr

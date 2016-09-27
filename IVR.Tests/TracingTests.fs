@@ -9,7 +9,7 @@ type TraceEvent1 = TraceEvent1 of int
 
 type ConvertIntToStr = 
     | ConvertIntToStr of int
-    interface IVR.IReturns<string>
+    interface IVR.ICommand<string>
 
 
 [<Fact>]

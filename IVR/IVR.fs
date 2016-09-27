@@ -412,32 +412,37 @@ module IVR =
     // Sending and posting commands to the host.
     //
 
-    /// Response type interface that is used to tag commands with. Tag data types with
-    /// this interface and use them as a command with IVR.send so that IVR.send can automatically 
-    /// cast the resulting value.
-    type IReturns<'result> = 
+    /// Command interface. Tag types with ICommand that are commands without a return value.
+    /// Tagging with ICommand is optional, but if not, IVR.post has to be used.
+    type ICommand = 
+        interface end
+
+    /// An IVR that synchronously sends a command to a host and ignores its response.
+    let post cmd : unit ivr = 
+        fun (h:Host) ->
+            try
+                cmd |> h |> Operators.ignore
+                () |> Value |> Completed
+            with e ->
+                e |> Error |> Completed
+        |> Inactive
+
+    /// Response type interface that is used to tag commands with that return a value. 
+    /// Tag data types with this interface and use them as a command with IVR.send so that 
+    /// IVR.send can automatically cast the resulting value.
+    type ICommand<'result> = 
         interface end
 
     /// An IVR that synchronously sends a command to a host and returns its response. The commands
     /// need to implement the IReturns<_> interface so that the returned response value can be typed
     /// properly.
-    let send (cmd: IReturns<'r>) : 'r ivr = 
+    let send (cmd: ICommand<'r>) : 'r ivr = 
         fun (h: Host) ->
             try
                 cmd
                 |> h
                 |> unbox 
                 |> Value |> Completed
-            with e ->
-                e |> Error |> Completed
-        |> Inactive
-
-    /// An IVR that synchronously sends a command to a host, but ignores its response.
-    let post cmd : unit ivr = 
-        fun (h:Host) ->
-            try
-                cmd |> h |> Operators.ignore
-                () |> Value |> Completed
             with e ->
                 e |> Error |> Completed
         |> Inactive
@@ -488,7 +493,8 @@ module IVR =
     type IVRBuilder<'result>() = 
 
         member __.Source(ivr: 'r ivr) : 'r ivr = ivr
-        member __.Source(r: 'r when 'r :> IReturns<'rr>) = r |> send
+        member __.Source(r: 'r when 'r :> ICommand) = r |> post
+        member __.Source(r: 'r when 'r :> ICommand<'rr>) = r |> send
         member __.Source(s: 'e seq) = s
 
         member __.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
@@ -562,12 +568,11 @@ module IVR =
 
     /// Construct an IDisposableProc from a unit ivr, so that this ivr can be used
     /// with F# 'use' keyword inside a computation expression.
-    let asDisposable (ivr: unit ivr) =
-        { 
-            new IDisposableProc with
-                member __.Dispose() = ()
-                member __.DisposableProc = ivr
-        }
+    let asDisposable (ivr: unit ivr) = { 
+        new IDisposableProc with
+            member __.Dispose() = ()
+            member __.DisposableProc = ivr
+    }
             
     //
     // Wait primitives
@@ -583,8 +588,7 @@ module IVR =
             | Some r -> r |> Value |> Completed
             | None -> Active waiter
 
-        fun _ ->
-            Active waiter
+        fun _ -> Active waiter
         |> Inactive
 
     /// Waits for some event by asking a predicate for each event that comes along.
@@ -630,7 +634,7 @@ module IVR =
 
     type Delay = 
         | Delay of TimeSpan
-        interface IReturns<Id>
+        interface ICommand<Id>
 
     type DelayCompleted = DelayCompleted of Id
 
@@ -687,7 +691,7 @@ module IVR =
                         e |> Error |> receiver
                 } |> Async.Start
 
-        interface IReturns<Id>
+        interface ICommand<Id>
 
     [<NoComparison>]
     type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: obj result
