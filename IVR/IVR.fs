@@ -211,8 +211,7 @@ module IVR =
         todo @ active
         |> List.map tryCancel 
         |> List.filter isActive 
-        |> List.rev         
-
+        |> List.rev
 
     let private parCancel' active todo = 
         let cancelIVRs ivrs = ivrs |> List.map tryCancel |> List.filter isActive
@@ -434,7 +433,7 @@ module IVR =
         interface end
 
     /// An IVR that synchronously sends a command to a host and returns its response. The commands
-    /// need to implement the IReturns<_> interface so that the returned response value can be typed
+    /// need to implement the ICommand<_> interface so that the returned response value can be typed
     /// properly.
     let send (cmd: ICommand<'r>) : 'r ivr = 
         fun (h: Host) ->
