@@ -22,7 +22,7 @@ type ResultTrace =
 
 /// Represents a trace of a command. A command can either return without a result or throw an exception.
 [<NoComparison>]
-type CommandTrace = { Command: Command; Result: ResultTrace }
+type CommandTrace = { Command: Request; Result: ResultTrace }
 
 /// A step trace represents a trace for a single step of an IVR. 
 ///
@@ -143,7 +143,7 @@ module private Helper =
         | Completed (IVR.Value r) -> Result r |> Some
         | Completed (IVR.Error e) -> Error e |> Some
         | Completed IVR.Cancelled -> Cancelled |> Some
-        | Inactive _ -> failwith "internal error, tried to retrieve a trace result from an inactive ivr"
+        | Delayed _ -> failwith "internal error, tried to retrieve a trace result from an inactive ivr"
 
     let startAndTraceCommands =
         fun host ivr ->
@@ -193,11 +193,11 @@ let trace sessionTracer ivr =
             | Active _ ->
                 fun e -> state |> Helper.stepAndTraceCommands host e |> next e
                 |> Active
-            | Inactive _ ->
+            | Delayed _ ->
                 failwith "internal error state transition from active to inactive observed"
 
         ivr |> Helper.startAndTraceCommands host |> next StartEvent
-    |> Inactive
+    |> Delayed
 
 /// For an IVR to be eligible for tracing by a registered tracer, it must be declared. 
 ///

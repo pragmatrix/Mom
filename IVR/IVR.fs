@@ -13,9 +13,9 @@ open System
 *)
 
 type Event = obj
-type Command = obj
+type Request = obj
 type Response = obj
-type Host = Command -> Response
+type Host = Request -> Response
 
 exception CancelledException
 
@@ -34,7 +34,7 @@ module Result =
 
 [<NoComparison;NoEquality>]
 type 'result ivr = 
-    | Inactive of (Host -> 'result ivr)
+    | Delayed of (Host -> 'result ivr)
     | Active of (Event -> 'result ivr)
     | Completed of 'result result
 
@@ -55,7 +55,7 @@ module IVR =
     /// Start up an ivr.
     let start host ivr = 
         match ivr with
-        | Inactive f -> 
+        | Delayed f -> 
             try
                 f host
             with e ->
@@ -75,7 +75,7 @@ module IVR =
             with e ->
                 e |> Error |> Completed
        
-        | Inactive _ -> failwithf "IVR.step: ivr is inactive"
+        | Delayed _ -> failwithf "IVR.step: ivr is inactive"
         | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
         
     /// Returns true if the ivr is completed (i.e. has a result).
@@ -119,25 +119,25 @@ module IVR =
                 |> Active
             | Completed r -> 
                 f r |> start h
-            | Inactive _ ->
+            | Delayed _ ->
                 failwithf "IVR.continueWith, ivr is inactive: %A" state
 
         fun h ->
             ivr |> start h |> next h
-        |> Inactive
+        |> Delayed
 
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
     let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
         let f (r: 'a result) = 
             fun _ -> r |> Result.map f |> Completed
-            |> Inactive
+            |> Delayed
         continueWith f ivr
     
     /// Lifts a result.
     let ofResult (r: 'r result) : 'r ivr = 
         fun _ -> r |> Completed
-        |> Inactive
+        |> Delayed
 
     /// Lifts a value. Creates an IVR that returns the value.
     let ofValue (v: 'v) : 'v ivr = 
@@ -271,7 +271,7 @@ module IVR =
                 | ivr::todo ->
                 let ivr = ivr |> stepF
                 match ivr with
-                | Inactive _ -> failwith "internal error"
+                | Delayed _ -> failwith "internal error"
                 | Active _ -> stepAll stepF state (ivr::active) todo
                 | Completed r ->
                 match state with
@@ -315,7 +315,7 @@ module IVR =
             ivrs
             |> stepAll (start h) (FieldActive initial) []
             |> next
-        |> Inactive
+        |> Delayed
     
     /// game is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the game so that the game master does not need to handle them.
@@ -424,7 +424,7 @@ module IVR =
                 () |> Value |> Completed
             with e ->
                 e |> Error |> Completed
-        |> Inactive
+        |> Delayed
 
     /// Response type interface that is used to tag commands with that return a value. 
     /// Tag data types with this interface and use them as a command with IVR.send so that 
@@ -444,7 +444,7 @@ module IVR =
                 |> Value |> Completed
             with e ->
                 e |> Error |> Completed
-        |> Inactive
+        |> Delayed
 
     //
     // IDisposable, IVR style
@@ -588,7 +588,7 @@ module IVR =
             | None -> Active waiter
 
         fun _ -> Active waiter
-        |> Inactive
+        |> Delayed
 
     /// Waits for some event by asking a predicate for each event that comes along.
     /// Continues waiting when the predicate returns false, ends the ivr when the predicate 

@@ -17,7 +17,7 @@ type CancelIVR = CancelIVR
 /// The stuff a service can do.
 type IServiceContext = 
     abstract ScheduleEvent : Event -> unit
-    abstract PostCommand : Command -> unit
+    abstract PostCommand : Request -> unit
 
 /// This is the runtime that drives the IVR.
 type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceContext -> Host) as this = 
@@ -57,7 +57,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
                 | Error e -> raise e
                 | Cancelled -> None
             | Active _ -> runLoop ivr
-            | Inactive _ -> failwith "internal error, state transition of an ivr from active -> inactive"
+            | Delayed _ -> failwith "internal error, state transition of an ivr from active -> inactive"
 
         ivr
         |> IVR.start host
@@ -73,7 +73,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
 /// Note that the return value indicates not only the response itself, it also notifies the
 /// runtime if a command is handled, so if the command is asynchronous and can not actually
 /// return a reponse, () should be returned when the command is considered to be processed.
-type Service = IServiceContext -> Command -> Response option
+type Service = IServiceContext -> Request -> Response option
         
 /// A builder that supports the creation of runtimes and adding services to it.
 [<NoComparison;NoEquality>]
@@ -104,7 +104,7 @@ let create builder =
     let serviceHost runtime =
         // parameterize services with the runtime
         let services = services |> List.map ((|>) runtime)
-        fun (cmd: Command) ->
+        fun (cmd: Request) ->
             services
             |> List.tryPick (fun s -> s cmd)
             |> function 
@@ -117,14 +117,14 @@ let create builder =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Service = 
 
-    let schedule (context: IServiceContext) (cmd: Command) = 
+    let schedule (context: IServiceContext) (cmd: Request) = 
         match cmd with
         | :? IVR.Schedule as s -> s.Event |> context.ScheduleEvent; () |> box |> Some
         | _ -> None
 
     let delay (context: IServiceContext) =
         let delayIdGenerator = Ids.newGenerator()
-        fun (cmd : Command) ->
+        fun (cmd : Request) ->
             match cmd with
             | :? IVR.Delay as d -> 
                 let (IVR.Delay timespan) = d
@@ -136,7 +136,7 @@ module Service =
 
     let async (context: IServiceContext) =
         let asyncIdGenerator = Ids.newGenerator()
-        fun (cmd: Command) ->
+        fun (cmd: Request) ->
             match cmd with
             | :? IVR.IAsyncComputation as ac -> 
                 let id = asyncIdGenerator.GenerateId()
@@ -179,7 +179,7 @@ module Service =
     /// Disable the service that crashed
     let DisableService = ReplaceService disabled
 
-    type ServiceCrashResponder = IServiceContext -> Command -> exn -> ServiceCrashResponse
+    type ServiceCrashResponder = IServiceContext -> Request -> exn -> ServiceCrashResponse
 
     let protect (responder: ServiceCrashResponder) (service: Service) : Service =
         fun context ->
