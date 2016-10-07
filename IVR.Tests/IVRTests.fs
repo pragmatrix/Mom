@@ -28,10 +28,17 @@ type Command =
     | Command of int
     interface IVR.ICommand<string>
 
-let dummyHost = fun _ -> null
-let start ivr = IVR.start dummyHost ivr
-let step ivr = IVR.step ivr
-
+let start = IVR.start
+let step ev ivr = 
+    match ivr with
+    | Active(None, f) -> f ev
+    | _ -> failwithf "step: invalid state %A" ivr
+let stepH host ivr =
+    match ivr with
+    | Active (Some r, cont) -> 
+        host r |> cont
+    | _ -> failwithf "stepH: invalid state %A" ivr
+        
 //
 // Automatic cancellation of Active ivrs.
 //
@@ -680,7 +687,8 @@ let ``computation expression: IVR.post sends a command to the host``() =
     } 
 
     test
-    |> IVR.start (fun v -> queue.Enqueue v; null)
+    |> start
+    |> stepH (fun v -> queue.Enqueue v; null)
     |> ignore
 
     queue |> Seq.toList |> should equal [box 0]
@@ -696,7 +704,9 @@ let ``computation expression: IVR.post sends combined commands to the host in th
     } 
 
     test
-    |> IVR.start (fun c -> queue.Enqueue c; null)
+    |> start
+    |> stepH queue.Enqueue
+    |> stepH queue.Enqueue
     |> ignore
 
     queue |> Seq.toList |> should equal [box 0; box 1]
@@ -712,8 +722,10 @@ let ``computation expression: after a wait, IVR.post sends a command to the host
     } 
 
     test
-    |> IVR.start (fun c -> queue.Enqueue c; null)
-    |> IVR.step Event1
+    |> start
+    |> stepH queue.Enqueue
+    |> step Event1
+    |> stepH queue.Enqueue
     |> ignore
 
     queue |> Seq.toList |> should equal [box 0;box 1]
@@ -721,31 +733,30 @@ let ``computation expression: after a wait, IVR.post sends a command to the host
 [<Fact>]
 let ``IVR.delay (simulated)``() = 
 
-    let host c = 
+    let host (c: obj) = 
         c |> should equal (IVR.Delay (TimeSpan(1, 0, 0)))
         Id 1L |> box // return the 64 bit id of the Delay
 
     let test = IVR.delay (TimeSpan(1, 0, 0))            
 
     let state = 
-        test |> IVR.start host 
+        test |> start
             
     state 
-    |> IVR.step (IVR.DelayCompleted (Id 1L))
+    |> stepH host
+    |> step (IVR.DelayCompleted (Id 1L))
     |> IVR.isCompleted |> should equal true
 
 [<Fact>]
-let ``IVR.delay does not send an command for a zero delay``() = 
-    let host _ = 
-        failwith "failed"
+let ``IVR.delay completes immediately in case of a zero delay``() = 
 
     let test = IVR.delay TimeSpan.Zero            
 
     let state = 
-        test |> IVR.start host 
+        test |> start
             
     state 
-    |> IVR.isError |> should equal false
+    |> IVR.isCompleted |> should be True
 
 
 [<Fact>]
@@ -762,7 +773,8 @@ let ``computation expression syntax: Command with return type``() =
         |> box
 
     test
-    |> IVR.start host
+    |> start
+    |> stepH host
     |> IVR.resultValue
     |> should equal "Hello"
 
@@ -780,7 +792,8 @@ let ``computation expression syntax: Command with return type (implicit send!)``
         |> box
 
     test
-    |> IVR.start host
+    |> start
+    |> stepH host
     |> IVR.resultValue
     |> should equal "Hello"
         
@@ -794,12 +807,11 @@ let ``computation expression: While``() =
         return f
     }
 
-    let host _ = null
     test
-    |> IVR.start host
-    |> IVR.step Event1
-    |> IVR.step Event1
-    |> IVR.step Event1
+    |> start
+    |> step Event1
+    |> step Event1
+    |> step Event1
     |> IVR.result
     |> should equal (Value 3) 
 
@@ -810,12 +822,11 @@ let ``computation expression: For``() =
             do! IVR.waitFor' (fun Event1 -> true)
     }
 
-    let host _ = null
     test
-    |> IVR.start host
-    |> IVR.step Event1
-    |> IVR.step Event1
-    |> IVR.step Event1
+    |> start
+    |> step Event1
+    |> step Event1
+    |> step Event1
     |> IVR.result
     |> should equal (Value ()) 
      

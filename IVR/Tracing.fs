@@ -1,5 +1,7 @@
 ﻿module IVR.Tracing
 
+#if false
+
 open System
 open System.Collections.Generic
 open System.Globalization
@@ -357,3 +359,5 @@ module Format =
             for s in (snd trace) ->
                 step s
         }
+
+#endif

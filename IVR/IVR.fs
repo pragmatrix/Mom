@@ -12,9 +12,10 @@ open System
     - can be run in steps.
 *)
 
-type Event = obj
+/// None means that the IVR is waiting for an event only.
 type Request = obj
 type Response = obj
+type Event = obj
 type Host = Request -> Response
 
 exception CancelledException
@@ -34,8 +35,8 @@ module Result =
 
 [<NoComparison;NoEquality>]
 type 'result ivr = 
-    | Delayed of (Host -> 'result ivr)
-    | Active of (Event -> 'result ivr)
+    | Delayed of (unit -> 'result ivr)
+    | Active of Request option * (Response -> 'result ivr)
     | Completed of 'result result
 
 module internal List =
@@ -53,30 +54,38 @@ module IVR =
     //
 
     /// Start up an ivr.
-    let start host ivr = 
+    let start ivr = 
         match ivr with
         | Delayed f -> 
             try
-                f host
+                f()
             with e ->
                 e |> Error |> Completed
         | _ -> failwithf "IVR.start: can't start an ivr that is not inactive: %A" ivr
 
-    /// Continue an ivr with one event.
-    let rec step e ivr = 
+#if false
+    /// Continue an ivr with an event. This requires a host to process all synchronous requests.
+    /// tbd: this is used for testing only, so may move it out of the core.
+    let rec step (host: Host) ev ivr = 
         match ivr with
         // may be we should start it here, too?
         //> no: delays are not supported, once an IVR starts, subsequential
         //> IVRs do have to be started before stepping through
 
-        | Active f -> 
+        | Active (None, f) -> 
             try
-                f e
+                f ev
+            with e ->
+                e |> Error |> Completed
+        | Active (Some request, f) ->
+            try
+                host request |> f
             with e ->
                 e |> Error |> Completed
        
         | Delayed _ -> failwithf "IVR.step: ivr is inactive"
         | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
+#endif
         
     /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
@@ -110,22 +119,21 @@ module IVR =
     //
 
     /// Continues the ivr with a followup ivr (Monad bind).
-    let continueWith (f : 'a result -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
+    let continueWith (followup : 'a result -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
 
-        let rec next h state = 
+        let rec next state = 
             match state with
-            | Active _ -> 
-                fun e -> state |> step e |> next h
-                |> Active
+            | Active (req, cont) ->
+                Active (req, cont >> next)
             | Completed r -> 
-                f r |> start h
+                r |> followup |> start
             | Delayed _ ->
-                failwithf "IVR.continueWith, ivr is inactive: %A" state
+                failwithf "IVR.continueWith, ivr is delayed: %A" state
 
-        fun h ->
-            ivr |> start h |> next h
-        |> Delayed
-
+        Delayed <|
+        fun () ->
+            ivr |> start |> next
+    
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
     let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
@@ -178,14 +186,17 @@ module IVR =
     /// handlers can run ivrs.
     /// If an ivr is completed, the result is overwritten (freed indirectly) with a Cancelled error,
     /// but an error is not, to avoid shadowing the error.
-    /// If an ivr is Inactive, it is also converted to Cancelled error, to prevent anyone else
-    /// from activating it and to free the code behind the activation function.
+    /// An ivr that is delayed (not started) or waiting for a synchronous response, can not be cancelled.
     let tryCancel ivr = 
         match ivr with
-        | Active _ -> 
-            ivr |> step TryCancel
+        | Active (None, cont) -> 
+            cont TryCancel
+        | Active (Some _, _) ->
+            failwith "failed to cancel an active IVR that is waiting for a synchronous response"
         | Completed (Error _) -> ivr
-        | _ -> Cancelled |> Completed
+        | Completed _ -> Cancelled |> Completed
+        | Delayed _ ->
+            failwith "failed to cancel an IVR that has not been started yet"
 
     //
     // IVR Combinators
@@ -200,6 +211,7 @@ module IVR =
         ivrs 
         |> List.mapi (f >> map)
 
+#if false
     // Cancels a pair of ivr lists in the reversed specified order while in the process of 
     // processing a step for all parallel ivrs.
     // active are the ones that where already processed (in the reversed order specified).
@@ -218,6 +230,7 @@ module IVR =
         let todo = todo |> List.rev |> cancelIVRs |> List.rev
         let active = active |> cancelIVRs
         (active, todo)
+#endif
 
     //
     // field
@@ -237,10 +250,21 @@ module IVR =
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
-    [<NoComparison;NoEquality>]
-    type private FieldState<'state> = 
-        | FieldActive of 'state
-        | FieldCancelling of 'state result
+#if false
+    [<NoEquality; NoComparison>]
+    type private FieldState =
+        | FieldActive
+        | FieldCancelling
+#endif
+
+    [<NoEquality; NoComparison>]
+    type private Field<'state, 'r> = {
+        State: 'state
+        Event: Response option
+        Pending: 'r ivr list
+        /// All ivrs that got the event already or new ivrs, all in reversed order.
+        Processed: 'r ivr list
+    }
 
     /// A generic algorithm for running IVRs in parallel.
     /// The field:
@@ -256,15 +280,87 @@ module IVR =
 
     let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
 
-        // we need to protect the arbiter and handle its death
-        let protectedArbiter state r = 
+        let rev = List.rev
+
+        // if the arbiter crashes, the field will be cancelled.
+        let arbiter state r = 
             try
                 arbiter state r
             with e ->
                 CancelField (e |> Error)
-    
-        fun (h: Host) ->
 
+        /// As long new IVRs need to be added to the field we try to bring them into a state when they
+        /// want to receive events only.
+        /// tbd: waiting seems to be redundant, they can be transferred into field.Processed one at a time.
+        let rec enter (field: Field<'state, 'r>) waiting newIVRs =
+            match newIVRs with
+            | [] -> proceed {field with Processed = waiting @ field.Processed }
+            | ivr :: pending ->
+            match ivr with
+            | Delayed _ -> enter field waiting ((start ivr) :: pending)
+            | Active (Some _ as request, cont) ->
+                Active(request, cont >> fun ivr -> enter field waiting (ivr::pending))
+            | Active (None, _) ->
+                enter field (ivr::waiting) pending
+            | Completed result ->
+            match arbiter field.State result with
+            | ContinueField (newState, moreIVRs) ->
+                enter { field with State = newState } waiting (moreIVRs @ newIVRs)
+            | CancelField result ->
+                // cancel the processed first, then the waiting, and finally the pending ones
+                cancel result (field.Processed @ waiting @ (rev field.Pending))
+        
+        and proceed (field: Field<'state, 'r>) =
+            match field.Event with
+            | None ->
+                assert(field.Pending.IsEmpty)
+                match field.Processed with
+                | [] -> exit (field.State |> Value)
+                | processed -> Active (None, fun ev -> proceed { field with Event = Some ev; Pending = rev processed; Processed = [] })
+            | Some ev ->
+                match field.Pending with
+                | [] -> proceed { field with Event = None }
+                | ivr::pending ->
+                match ivr with
+                | Delayed _
+                | Completed _ -> failwithf "internal error: %A in field pending" ivr
+                | Active (Some _ as request, cont) ->
+                    Active(request, cont >> fun ivr -> proceed {field with Pending = ivr :: pending })
+                | Active (None, cont) ->
+                // deliver the event
+                let ivr = cont ev
+                match ivr with
+                | Delayed _ -> failwithf "internal error: %A after delivering event" ivr
+                | Active _ -> proceed { field with Pending = pending; Processed = ivr::field.Processed }
+                | Completed result ->
+                match arbiter field.State result with
+                | ContinueField (newState, newIVRs) ->
+                    enter { field with State = newState } [] newIVRs
+                | CancelField result ->
+                    cancel result (field.Processed @ (List.rev field.Pending))
+
+        and cancel result pending =
+            match pending with
+            | [] -> exit result
+            | ivr::pending ->
+            match ivr with
+            | Delayed _ -> failwithf "internal error: %A in field cancellation" ivr
+            | Active (Some _ as request, cont) ->
+                Active(request, fun response -> cont response |> fun c -> cancel result (c::pending))
+            | Active (None, cont) ->
+                let ivr = tryCancel ivr
+                cancel result (ivr::pending)
+            | Completed _ ->
+                cancel result pending
+
+        and exit result =
+            result |> Completed               
+                
+        Delayed <|
+        fun () ->
+            enter { State = initial; Event = None; Pending = []; Processed = [] } [] ivrs
+
+#if false
             let rec stepAll stepF (state: FieldState<'state>) active ivrs =
                 match ivrs with
                 | [] -> state, active |> List.rev
@@ -288,7 +384,7 @@ module IVR =
                 let state = FieldActive s
                 // start all new IVRs before putting them on the field.
                 let state, newIVRs = 
-                    newIVRs |> stepAll (start h) state []
+                    newIVRs |> stepAll start state []
                 match state with
                 | FieldCancelling _ ->
                     let active, todo = parCancel' active todo
@@ -313,10 +409,10 @@ module IVR =
                 |> next
 
             ivrs
-            |> stepAll (start h) (FieldActive initial) []
+            |> stepAll start (FieldActive initial) []
             |> next
         |> Delayed
-    
+#endif    
     /// game is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the game so that the game master does not need to handle them.
 
@@ -418,12 +514,9 @@ module IVR =
 
     /// An IVR that synchronously sends a command to a host and ignores its response.
     let post cmd : unit ivr = 
-        fun (h:Host) ->
-            try
-                cmd |> h |> Operators.ignore
-                () |> Value |> Completed
-            with e ->
-                e |> Error |> Completed
+        // tbd: do we need to delay here anymore?
+        fun () ->
+            Active(Some cmd, fun _ -> () |> ofValue)
         |> Delayed
 
     /// Response type interface that is used to tag commands with that return a value. 
@@ -436,14 +529,8 @@ module IVR =
     /// need to implement the ICommand<_> interface so that the returned response value can be typed
     /// properly.
     let send (cmd: ICommand<'r>) : 'r ivr = 
-        fun (h: Host) ->
-            try
-                cmd
-                |> h
-                |> unbox 
-                |> Value |> Completed
-            with e ->
-                e |> Error |> Completed
+        fun () ->
+            Active(Some (box cmd), unbox >> ofValue)
         |> Delayed
 
     //
@@ -579,15 +666,15 @@ module IVR =
 
     /// An IVR that waits for some event given a function that returns (Some result) or None.
     let wait f =
-        let rec waiter (e: Event) =  
-            match e with
+        let rec waiter (ev: Event) =  
+            match ev with
             | :? TryCancel -> Cancelled |> Completed
             | _ ->
-            match f e with
+            match f ev with
             | Some r -> r |> Value |> Completed
-            | None -> Active waiter
+            | None -> Active (None, waiter)
 
-        fun _ -> Active waiter
+        fun _ -> Active (None, waiter)
         |> Delayed
 
     /// Waits for some event by asking a predicate for each event that comes along.
@@ -607,8 +694,8 @@ module IVR =
     /// continues waiting when f returns None
     let waitFor (f : 'e -> 'r option) = 
 
-        let f (e : Event) = 
-            match e with
+        let f (ev : Event) = 
+            match ev with
             | :? 'e as e -> f e
             | _ -> None
 
@@ -617,8 +704,8 @@ module IVR =
     /// Waits for an event of a type derived by the function f that is passed in.
     /// Ends the ivr when f return true. Continues waiting when f returns false.
     let waitFor' (f : 'e -> bool) =
-        let f (e: Event) =
-            match e with
+        let f (ev: Event) =
+            match ev with
             | :? 'e as e -> f e
             | _ -> false
 

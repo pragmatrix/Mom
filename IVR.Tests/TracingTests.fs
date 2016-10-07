@@ -1,5 +1,7 @@
 ﻿module IVR.Tests.TracingTests
 
+#if false
+
 open FsUnit
 open Xunit
 open IVR
@@ -112,3 +114,4 @@ let replayReplaysCommandResponses() =
     report.Incidents |> Seq.iter (printfn "%A")
     report.IsEmpty |> should equal true
 
+#endif

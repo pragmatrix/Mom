@@ -8,6 +8,10 @@ open IVR
 [<AutoOpen>]
 module Helper = 
     let ivr<'r> = IVR.IVR.ivr<'r>
+    let step ev ivr = 
+        match ivr with
+        | Active(None, f) -> f ev
+        | _ -> failwithf "step: invalid state %A" ivr
 
 [<Fact(Skip="brittle")>]
 let longSequentialLoopDoesNotEatUpStackOrMemory() =
@@ -20,9 +24,7 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
         return! endlessLoop()
         }
 
-    let host = fun _ -> null
-
-    let ivr = IVR.start host (endlessLoop())
+    let ivr = IVR.start (endlessLoop())
 
     let count = 10000000
     let memTraces = count / 10000
@@ -38,7 +40,7 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
             GC.Collect()
             let totalMem = GC.GetTotalMemory(true)
             array.[cnt / memTrace] <- totalMem
-        stepLoop (IVR.step null ivr) (cnt+1)
+        stepLoop (step null ivr) (cnt+1)
 
     stepLoop ivr 0
 

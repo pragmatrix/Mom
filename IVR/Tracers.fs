@@ -1,5 +1,7 @@
 ﻿module IVR.Tracers
 
+#if false
+
 open System
 open System.IO
 open System.Diagnostics
@@ -80,4 +82,5 @@ let readFileTrace (fn: string) : Trace =
 let memoryTracer sessionInfo (receiver: Trace -> unit) =
     traceReceiver receiver
     |> entryTracer sessionInfo
-    
+
+#endif
