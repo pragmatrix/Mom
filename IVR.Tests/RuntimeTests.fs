@@ -1,10 +1,38 @@
 ﻿module IVR.Tests.RuntimeTests
 
+open System
+open System.Threading
 open FsUnit
 open Xunit
 open IVR
 
 exception AsyncException of string
+
+[<Fact>]
+let ``host properly cancels its ivr if the runtime gets disposed asynchronously``() =
+    let ct = new IVRTests.CancellationTracker()
+
+    let ivr = ivr {
+        use ct = ct
+        do! IVR.waitFor' (fun _ -> true)
+    }
+
+    let host _ _ = None
+    let runtime = Runtime.newRuntime host
+
+    let ev = new ManualResetEvent(false)
+
+    async {
+        runtime.Run ivr |> should equal None
+        ev.Set() |> ignore
+    } |> Async.Start
+
+    (runtime :> IDisposable).Dispose();
+
+    ev.WaitOne(2000) |> ignore
+        
+    ct.disposed |> should equal true
+
 
 [<Fact>]
 let ``async can be used in ivrs``() = 
