@@ -39,13 +39,6 @@ type 'result ivr =
     | Active of Request option * (Response -> 'result ivr)
     | Completed of 'result result
 
-module internal List =
-    let inline flatten l = List.collect id l
-    let rec revAndPrepend a l = 
-        match a with
-        | next :: rest -> revAndPrepend rest (next::l) 
-        | [] -> l        
-
 [<RequireQualifiedAccess>]
 module IVR = 
 
@@ -347,7 +340,7 @@ module IVR =
             | Delayed _ -> failwithf "internal error: %A in field cancellation" ivr
             | Active (Some _ as request, cont) ->
                 Active(request, fun response -> cont response |> fun c -> cancel result (c::pending))
-            | Active (None, cont) ->
+            | Active (None, _) ->
                 let ivr = tryCancel ivr
                 cancel result (ivr::pending)
             | Completed _ ->

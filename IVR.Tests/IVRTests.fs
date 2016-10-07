@@ -2,7 +2,6 @@
 
 open System
 open System.Collections.Generic
-open System.Threading
 open FsUnit
 open Xunit
 open IVR
@@ -16,9 +15,9 @@ type CancellationTracker() =
     let mutable _disposed = false
     
     interface IDisposable with
-        member this.Dispose() = _disposed <- true
+        member __.Dispose() = _disposed <- true
 
-    member this.disposed = _disposed;
+    member __.Disposed = _disposed;
 
 type Event1 = Event1
 type Event2 = Event2
@@ -47,12 +46,12 @@ module Cancellation =
         let ct = new CancellationTracker()
 
         let a = ivr {
-            use x = ct
+            use __ = ct
             return 0
         }
 
         start a |> IVR.resultValue |> should equal 0
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let disposableProcIsCalledAtStartupTime() = 
@@ -90,7 +89,7 @@ module Cancellation =
         let x() = 
             ivr {
                 t 0
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 return
                     ivr { t 1 } |> IVR.asDisposable
             }
@@ -113,28 +112,28 @@ module Cancellation =
         let ct = new CancellationTracker()
 
         let a = ivr {
-            use x = ct
-            do! IVR.waitFor' (fun (Event1) -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event1) -> true)
             return 0
         }
 
         let started = start a
-        ct.disposed |> should equal false
+        ct.Disposed |> should equal false
         step Event1 started |> ignore
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``join: right ivr is cancelled when left throws an exception``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
-            do! IVR.waitFor' (fun Event1 -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
             failwith "HellNo!"
         }
 
         let right = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun Event2 -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event2) -> true)
         }
 
         IVR.join left right
@@ -143,19 +142,19 @@ module Cancellation =
         |> IVR.isError
         |> should equal true
 
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``par: left ivr is cancelled when right throws an exception``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun Event1 -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
-            do! IVR.waitFor' (fun Event2 -> true)
+            do! IVR.waitFor' (fun (_:Event2) -> true)
             failwith "HellNo!"
         }
 
@@ -165,37 +164,37 @@ module Cancellation =
         |> IVR.isError
         |> should equal true
 
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``par': right ivr is cancelled after left completes``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
-            do! IVR.waitFor' (fun Event1 -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun Event2 -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event2) -> true)
         }
 
         let test = IVR.first left right
         let started = start test
         step Event1 started |> ignore
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``par': right ivr is cancelled after left completes and its finally handler is called``() = 
         let mutable finallyCalled = false
 
         let left = ivr {
-            do! IVR.waitFor' (fun Event1 -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
             try
-                do! IVR.waitFor' (fun Event2 -> true)
+                do! IVR.waitFor' (fun (_:Event2) -> true)
             finally
                 finallyCalled <- true
         }
@@ -213,17 +212,17 @@ module Cancellation =
         let rightResult = 2
 
         let left = ivr {
-            do! IVR.waitFor' (fun Event1 -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
             return leftResult
         }
 
         let right = ivr {
             try
-                do! IVR.waitFor' (fun Event2 -> true)
+                do! IVR.waitFor' (fun (_:Event2) -> true)
                 return rightResult
             finally
                 ivr {
-                    do! IVR.waitFor' (fun Event3 -> true)
+                    do! IVR.waitFor' (fun (_:Event3) -> true)
                     finallyCalled <- true
                 }
         }
@@ -245,18 +244,18 @@ module Cancellation =
         let ct = new CancellationTracker()
 
         let left = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun (Event1) -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
-            do! IVR.waitFor' (fun (Event2) -> true)
+            do! IVR.waitFor' (fun (_:Event2) -> true)
         }
 
         let test = IVR.first left right
         let started = start test
         step Event2 started |> ignore
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
 
     [<Fact>]
@@ -264,8 +263,8 @@ module Cancellation =
         let ct = new CancellationTracker()
 
         let left = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun (Event1) -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
@@ -275,43 +274,43 @@ module Cancellation =
         let test = IVR.first left right
         let started = start test
         IVR.isCompleted started |> should equal true
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``any: first ivr is cancelled when the second one finishes first``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun (Event1) -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
-            do! IVR.waitFor' (fun (Event2) -> true)
+            do! IVR.waitFor' (fun (_:Event2) -> true)
         }
 
         let r = IVR.any [left; right]
         let started = start r
         step Event2 started |> ignore
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``any: second ivr is cancelled when the first one finishes first``() = 
         let ct = new CancellationTracker()
 
         let left = ivr {
-            do! IVR.waitFor' (fun (Event1) -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         let right = ivr {
-            use ct = ct
-            do! IVR.waitFor' (fun (Event2) -> true)
+            use __ = ct
+            do! IVR.waitFor' (fun (_:Event2) -> true)
         }
 
         let r = IVR.any [left; right]
         let started = start r
         step Event1 started |> ignore
-        ct.disposed |> should equal true
+        ct.Disposed |> should equal true
 
     [<Fact>]
     let ``any: cancellation is done in reversed order specified``() = 
@@ -320,35 +319,35 @@ module Cancellation =
 
         let a = ivr {
             try
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['a']
             }
 
         let b = ivr {
             try
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['b']
             }
 
         let c = ivr {
             try
-                do! IVR.waitFor' (fun (Event2) -> true)
+                do! IVR.waitFor' (fun (_:Event2) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['c']
             }
 
         let d = ivr {
             try
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['d']
             }
 
         let e = ivr {
             try
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['e']
             }
@@ -366,8 +365,8 @@ module Cancellation =
 
         let ivr = ivr {
             try
-                do! IVR.waitFor' (fun (Event1) -> true)
-            with e ->
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+            with _ ->
                 failwith "fail"
         }
 
@@ -384,9 +383,8 @@ module Cancellation =
         let mutable continued = false
 
         let ivr = ivr {
-            let mutable f = 0
             while true do
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             continued <- true
         }
 
@@ -405,7 +403,7 @@ module Finally =
 
         let test = ivr {
             try
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             finally
                 x <- true
         }
@@ -423,7 +421,7 @@ module Finally =
 
         let test = ivr {
             try
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
             finally
                 x <- true
@@ -461,7 +459,7 @@ module Finally =
 
         let test = ivr {
             try
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 return 10
             finally
                 finallyIVR
@@ -482,7 +480,7 @@ module Finally =
 
         let test = ivr {
             try
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
                 return 10
             finally
@@ -547,8 +545,7 @@ module Finally =
 module Exceptions =
 
     [<Fact>]
-    let ``computation expression: handle exception at startup time``() =
-        let mutable x = false
+    let ``handle exception at startup time``() =
 
         let test = ivr {
             try
@@ -564,12 +561,11 @@ module Exceptions =
         |> should equal (Value 1)
 
     [<Fact>]
-    let ``computation expression: handle exception at runtime``() =
-        let mutable x = false
+    let ``handle exception at runtime``() =
 
         let test = ivr {
             try
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
                 return 0
             with _ ->
@@ -584,11 +580,10 @@ module Exceptions =
 
     [<Fact>]
     let ``computation expression: handle exception in exception handler after wait``() =
-        let mutable x = false
 
         let test = ivr {
             try
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
                 return 0
             with _ ->
@@ -617,7 +612,7 @@ module CancellationAndFinally =
 
         let ivr = ivr {
             try
-                do! IVR.waitFor' (fun (Event1) -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
             finally
                 runFinally <- true
         }
@@ -634,20 +629,20 @@ module CancellationAndFinally =
 let ``when one part of a parallel ivr gets cancelled, the followup ivr continues while the cancellation is run``() = 
 
     let primaryIVR = ivr {
-            do! IVR.waitFor' (fun (Event1) -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
     // cancellation of the secondary IVR takes forvever
     let secondaryIVR = ivr {
         try
-            do! IVR.waitFor' (fun (Event2) -> true)
+            do! IVR.waitFor' (fun (_:Event2) -> true)
         finally
             IVR.idle
     }
 
     let test = ivr {
             do! IVR.any [primaryIVR; secondaryIVR]
-            do! IVR.waitFor' (fun (Event3) -> true)
+            do! IVR.waitFor' (fun (_:Event3) -> true)
         }
 
     let res = 
@@ -698,7 +693,7 @@ module HostCommunication =
         
         let test = ivr {
             do! IVR.post 0
-            do! IVR.waitFor' (fun Event1 -> true)
+            do! IVR.waitFor' (fun (_:Event1) -> true)
             do! IVR.post 1
         } 
 
@@ -786,7 +781,7 @@ module CompuationExpressionSyntax =
         let test = ivr {
             let mutable f = 0
             while f<3 do
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
                 f <- f + 1
             return f
         }
@@ -803,7 +798,7 @@ module CompuationExpressionSyntax =
     let ``For``() = 
         let test = ivr {
             for _ in [0..2] do
-                do! IVR.waitFor' (fun Event1 -> true)
+                do! IVR.waitFor' (fun (_:Event1) -> true)
         }
 
         test

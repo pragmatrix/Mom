@@ -30,17 +30,17 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
 
     interface IServiceContext with
         member this.ScheduleEvent event = this.ScheduleEvent event
-        member this.PostCommand command = host command |> ignore
+        member __.PostCommand command = host command |> ignore
 
     /// Asynchronously schedules an event to the runtime.
-    member this.ScheduleEvent (event : Event) = 
+    member __.ScheduleEvent (event : Event) = 
         eventQueue.Enqueue event
 
     member private this.Cancel() = 
         this.ScheduleEvent CancelIVR
 
     /// Runs the ivr synchronously. Returns Some value or None if the ivr was cancelled.
-    member this.Run ivr = 
+    member __.Run ivr = 
 
         let rec runLoop ivr =
             match ivr with
@@ -65,7 +65,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
         |> runLoop
 
     member this.Run (ivr, cancellationToken: CancellationToken) = 
-        use c = cancellationToken.Register(fun () -> this.Cancel())
+        use __ = cancellationToken.Register(fun () -> this.Cancel())
         this.Run ivr
 
 /// Defines a service. 

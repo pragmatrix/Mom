@@ -13,7 +13,7 @@ let ``host properly cancels its ivr if the runtime gets disposed asynchronously`
     let ct = new IVRTests.CancellationTracker()
 
     let ivr = ivr {
-        use ct = ct
+        use __ = ct
         do! IVR.waitFor' (fun _ -> true)
     }
 
@@ -31,7 +31,7 @@ let ``host properly cancels its ivr if the runtime gets disposed asynchronously`
 
     ev.WaitOne(2000) |> ignore
         
-    ct.disposed |> should equal true
+    ct.Disposed |> should equal true
 
 
 [<Fact>]
