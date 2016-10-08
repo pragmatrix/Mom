@@ -675,10 +675,10 @@ module IVR =
             | _ ->
             match f ev with
             | Some r -> r |> Value |> Completed
-            | None -> Active (None, waiter)
+            | None -> Active (None, protect waiter)
 
         Delayed <|
-        fun _ -> Active (None, waiter)
+        fun _ -> Active (None, protect waiter)
 
     /// Waits for some event by asking a predicate for each event that comes along.
     /// Continues waiting when the predicate returns false, ends the ivr when the predicate 
