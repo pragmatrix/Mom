@@ -64,7 +64,7 @@ module IVR =
     let dispatch ev ivr =
         match ivr with
         | Active(None, cont) -> cont ev
-        | ivr -> failwithf "IVR.dispatch: can't dispatch and event to an ivr that is not waiting for one: %A" ivr
+        | ivr -> failwithf "IVR.dispatch: can't dispatch an event to an ivr that is not waiting for one: %A" ivr
 
 #if false
     /// Continue an ivr with an event. This requires a host to process all synchronous requests.
@@ -129,7 +129,7 @@ module IVR =
             | Active (req, cont) ->
                 Active (req, cont >> (protect next))
             | Completed r -> 
-                r |> followup |> start
+                followup r |> start
             | Delayed _ ->
                 failwithf "IVR.continueWith, ivr is delayed: %A" state
 
@@ -519,7 +519,7 @@ module IVR =
     let post cmd : unit ivr = 
         // tbd: do we need to delay here anymore?
         fun () ->
-            Active(Some cmd, fun _ -> () |> ofValue)
+            Active(Some cmd, fun _ -> Value () |> Completed)
         |> Delayed
 
     /// Response type interface that is used to tag commands with that return a value. 
@@ -533,7 +533,7 @@ module IVR =
     /// properly.
     let send (cmd: ICommand<'r>) : 'r ivr = 
         fun () ->
-            Active(Some (box cmd), unbox >> ofValue)
+            Active(Some (box cmd), unbox >> Value >> Completed)
         |> Delayed
 
     //

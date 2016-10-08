@@ -595,7 +595,7 @@ module Exceptions =
         |> should equal (Value 1)
 
     [<Fact>]
-    let ``computation expression: handle exception in exception handler after wait``() =
+    let ``handle exception in exception handler after wait``() =
 
         let test = ivr {
             try
@@ -733,10 +733,8 @@ module Delay =
 
         let test = IVR.delay (TimeSpan(1, 0, 0))            
 
-        let state = 
-            test |> start
-            
-        state 
+        test
+        |> start
         |> stepH host
         |> dispatch (IVR.DelayCompleted (Id 1L))
         |> IVR.isCompleted |> should equal true
