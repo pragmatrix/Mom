@@ -243,23 +243,22 @@ module IVR =
 
         /// As long new IVRs need to be added to the field we try to bring them into a state when they
         /// want to receive events only.
-        /// tbd: waiting seems to be redundant, they can be transferred into field.Processed one at a time.
-        let rec enter (field: Field<'state, 'r>) started newIVRs =
+        let rec enter (field: Field<'state, 'r>) newIVRs =
             match newIVRs with
-            | [] -> proceed {field with Processed = started @ field.Processed }
+            | [] -> proceed field
             | ivr :: pending ->
             match ivr with
-            | Delayed _ -> enter field started ((start ivr) :: pending)
+            | Delayed _ -> enter field ((start ivr) :: pending)
             | Active (Some _ as request, cont) ->
-                Active(request, cont >> fun ivr -> enter field started (ivr::pending))
-            | Active (None, _) ->
-                enter field (ivr::started) pending
+                Active(request, cont >> fun ivr -> enter field (ivr::pending))
+            | Active (None, _) -> 
+                enter { field with Processed = ivr :: field.Processed } pending
             | Completed result ->
             match arbiter field.State result with
             | ContinueField (newState, moreIVRs) ->
-                enter { field with State = newState } started (moreIVRs @ newIVRs)
+                enter { field with State = newState } (moreIVRs @ newIVRs)
             | CancelField result ->
-                cancel result [] ((rev field.Pending) @ started @ field.Processed)
+                cancel result [] ((rev field.Pending) @ field.Processed)
         
         and proceed (field: Field<'state, 'r>) =
             match field.Event with
@@ -286,7 +285,7 @@ module IVR =
                 | Completed result ->
                 match arbiter field.State result with
                 | ContinueField (newState, newIVRs) ->
-                    enter { field with State = newState } [] newIVRs
+                    enter { field with State = newState } newIVRs
                 | CancelField result ->
                     cancel result [] ((List.rev pending) @ field.Processed)
 
@@ -323,7 +322,7 @@ module IVR =
                 
         Delayed <|
         fun () ->
-            enter { State = initial; Event = None; Pending = []; Processed = [] } [] ivrs
+            enter { State = initial; Event = None; Pending = []; Processed = [] } ivrs
 
     /// game is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the game so that the game master does not need to handle them.
