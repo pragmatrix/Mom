@@ -46,15 +46,25 @@ module IVR =
     // IVR Primitives Part 1
     //
 
+    /// Protect a function that creates an ivr by returning an ivr error in case of an exception.
+    let private protect f = 
+        fun response ->
+            try
+                f response
+            with e ->
+                e |> Error |> Completed
+
     /// Start up an ivr.
     let start ivr = 
         match ivr with
-        | Delayed f -> 
-            try
-                f()
-            with e ->
-                e |> Error |> Completed
-        | _ -> failwithf "IVR.start: can't start an ivr that is not inactive: %A" ivr
+        | Delayed f -> protect f ()
+        | ivr -> failwithf "IVR.start: can't start an ivr that is not inactive: %A" ivr
+
+    /// Dispatch an event to the ivr that is currently waiting for one.
+    let dispatch ev ivr =
+        match ivr with
+        | Active(None, cont) -> cont ev
+        | ivr -> failwithf "IVR.dispatch: can't dispatch and event to an ivr that is not waiting for one: %A" ivr
 
 #if false
     /// Continue an ivr with an event. This requires a host to process all synchronous requests.
@@ -117,7 +127,7 @@ module IVR =
         let rec next state = 
             match state with
             | Active (req, cont) ->
-                Active (req, cont >> next)
+                Active (req, cont >> (protect next))
             | Completed r -> 
                 r |> followup |> start
             | Delayed _ ->
@@ -667,8 +677,8 @@ module IVR =
             | Some r -> r |> Value |> Completed
             | None -> Active (None, waiter)
 
+        Delayed <|
         fun _ -> Active (None, waiter)
-        |> Delayed
 
     /// Waits for some event by asking a predicate for each event that comes along.
     /// Continues waiting when the predicate returns false, ends the ivr when the predicate 
