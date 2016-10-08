@@ -280,7 +280,8 @@ module IVR =
     ///   The arbiter does not get to be asked again, as soon it cancels the field.
     ///   When the arbiter throws an exception, it's equivalent to canceling the field with 
     ///   that exception as an error result.
-
+    ///   Cancellation is processed in reversed field insertion order.
+    
     let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
 
         let rev = List.rev
@@ -310,8 +311,7 @@ module IVR =
             | ContinueField (newState, moreIVRs) ->
                 enter { field with State = newState } waiting (moreIVRs @ newIVRs)
             | CancelField result ->
-                // cancel the processed first, then the waiting, and finally the pending ones
-                cancel result (field.Processed @ waiting @ (rev field.Pending))
+                cancel result ((rev field.Pending) @ waiting @ field.Processed)
         
         and proceed (field: Field<'state, 'r>) =
             match field.Event with
@@ -340,7 +340,7 @@ module IVR =
                 | ContinueField (newState, newIVRs) ->
                     enter { field with State = newState } [] newIVRs
                 | CancelField result ->
-                    cancel result (field.Processed @ (List.rev field.Pending))
+                    cancel result ((List.rev pending) @ field.Processed)
 
         and cancel result pending =
             match pending with

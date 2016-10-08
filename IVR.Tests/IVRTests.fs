@@ -354,6 +354,8 @@ module Cancellation =
         |> dispatch Event2
         |> ignore
 
+        printfn "%A" finallyTracker
+
         finallyTracker 
         |> should equal ['c';'e';'d';'b';'a']
 
