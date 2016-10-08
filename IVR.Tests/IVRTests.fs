@@ -28,10 +28,7 @@ type Command =
     interface IVR.ICommand<string>
 
 let start = IVR.start
-let step ev ivr = 
-    match ivr with
-    | Active(None, f) -> f ev
-    | _ -> failwithf "step: invalid state %A" ivr
+let dispatch = IVR.dispatch
 let stepH host ivr =
     match ivr with
     | Active (Some r, cont) -> 
@@ -102,7 +99,7 @@ module Cancellation =
 
         p 
         |> start
-        |> step Event1
+        |> dispatch Event1
         |> ignore
 
         trace |> should equal [1;2;0]
@@ -119,7 +116,7 @@ module Cancellation =
 
         let started = start a
         ct.Disposed |> should equal false
-        step Event1 started |> ignore
+        dispatch Event1 started |> ignore
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -138,7 +135,7 @@ module Cancellation =
 
         IVR.join left right
         |> start
-        |> step Event1 
+        |> dispatch Event1 
         |> IVR.isError
         |> should equal true
 
@@ -160,7 +157,7 @@ module Cancellation =
 
         IVR.join left right
         |> start
-        |> step Event2
+        |> dispatch Event2
         |> IVR.isError
         |> should equal true
 
@@ -181,7 +178,7 @@ module Cancellation =
 
         let test = IVR.first left right
         let started = start test
-        step Event1 started |> ignore
+        dispatch Event1 started |> ignore
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -201,7 +198,7 @@ module Cancellation =
 
         let test = IVR.first left right
         let started = start test
-        step Event1 started |> ignore
+        dispatch Event1 started |> ignore
         finallyCalled |> should equal true
 
     [<Fact>]
@@ -231,8 +228,8 @@ module Cancellation =
         let result = 
             test
             |> start 
-            |> step Event1
-            |> step Event3
+            |> dispatch Event1
+            |> dispatch Event3
             
         result 
         |> IVR.resultValue 
@@ -254,7 +251,7 @@ module Cancellation =
 
         let test = IVR.first left right
         let started = start test
-        step Event2 started |> ignore
+        dispatch Event2 started |> ignore
         ct.Disposed |> should equal true
 
 
@@ -291,7 +288,7 @@ module Cancellation =
 
         let r = IVR.any [left; right]
         let started = start r
-        step Event2 started |> ignore
+        dispatch Event2 started |> ignore
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -309,7 +306,7 @@ module Cancellation =
 
         let r = IVR.any [left; right]
         let started = start r
-        step Event1 started |> ignore
+        dispatch Event1 started |> ignore
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -354,7 +351,7 @@ module Cancellation =
 
         let r = IVR.any [a;b;c;d;e]
         start r 
-        |> step Event2
+        |> dispatch Event2
         |> ignore
 
         finallyTracker 
@@ -373,7 +370,7 @@ module Cancellation =
         let res = 
             ivr
             |> start
-            |> step IVR.TryCancel
+            |> dispatch IVR.TryCancel
 
         IVR.isCancelled res |> should be True
 
@@ -391,7 +388,7 @@ module Cancellation =
         let res = 
             ivr
             |> start
-            |> step IVR.TryCancel
+            |> dispatch IVR.TryCancel
     
         IVR.isCancelled res |> should be True
 
@@ -410,7 +407,7 @@ module Finally =
 
         test
         |> start
-        |> step Event1
+        |> dispatch Event1
         |> ignore
 
         x |> should equal true
@@ -429,7 +426,7 @@ module Finally =
 
         test
         |> start
-        |> step Event1
+        |> dispatch Event1
         |> ignore
 
         x |> should equal true
@@ -467,7 +464,7 @@ module Finally =
 
         test
         |> start
-        |> step Event1
+        |> dispatch Event1
         |> ignore
 
         x |> should equal true
@@ -489,7 +486,7 @@ module Finally =
 
         test
         |> start
-        |> step Event1
+        |> dispatch Event1
         |> ignore
 
         x |> should equal true
@@ -561,7 +558,7 @@ module Exceptions =
         |> should equal (Value 1)
 
     [<Fact>]
-    let ``handle exception at runtime``() =
+    let ``handles exception at runtime``() =
 
         let test = ivr {
             try
@@ -574,7 +571,7 @@ module Exceptions =
 
         test
         |> start
-        |> step Event1
+        |> dispatch Event1
         |> IVR.result
         |> should equal (Value 1)
 
@@ -594,7 +591,7 @@ module Exceptions =
         let res = 
             test
             |> start
-            |> step Event1
+            |> dispatch Event1
         
         res |> IVR.isError |> should be True
 
@@ -620,7 +617,7 @@ module CancellationAndFinally =
         let res = 
             ivr
             |> start
-            |> step IVR.TryCancel
+            |> dispatch IVR.TryCancel
     
         runFinally |> should be True
         IVR.isCancelled res |> should be True
@@ -648,8 +645,8 @@ let ``when one part of a parallel ivr gets cancelled, the followup ivr continues
     let res = 
         test
         |> start
-        |> step Event1
-        |> step Event3
+        |> dispatch Event1
+        |> dispatch Event3
 
     res |> IVR.isCompleted |> should be True        
 
@@ -700,7 +697,7 @@ module HostCommunication =
         test
         |> start
         |> stepH queue.Enqueue
-        |> step Event1
+        |> dispatch Event1
         |> stepH queue.Enqueue
         |> ignore
 
@@ -722,7 +719,7 @@ module Delay =
             
         state 
         |> stepH host
-        |> step (IVR.DelayCompleted (Id 1L))
+        |> dispatch (IVR.DelayCompleted (Id 1L))
         |> IVR.isCompleted |> should equal true
 
     [<Fact>]
@@ -788,9 +785,9 @@ module CompuationExpressionSyntax =
 
         test
         |> start
-        |> step Event1
-        |> step Event1
-        |> step Event1
+        |> dispatch Event1
+        |> dispatch Event1
+        |> dispatch Event1
         |> IVR.result
         |> should equal (Value 3) 
 
@@ -803,9 +800,9 @@ module CompuationExpressionSyntax =
 
         test
         |> start
-        |> step Event1
-        |> step Event1
-        |> step Event1
+        |> dispatch Event1
+        |> dispatch Event1
+        |> dispatch Event1
         |> IVR.result
         |> should equal (Value ()) 
      
