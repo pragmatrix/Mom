@@ -296,22 +296,22 @@ module IVR =
         /// As long new IVRs need to be added to the field we try to bring them into a state when they
         /// want to receive events only.
         /// tbd: waiting seems to be redundant, they can be transferred into field.Processed one at a time.
-        let rec enter (field: Field<'state, 'r>) waiting newIVRs =
+        let rec enter (field: Field<'state, 'r>) started newIVRs =
             match newIVRs with
-            | [] -> proceed {field with Processed = waiting @ field.Processed }
+            | [] -> proceed {field with Processed = started @ field.Processed }
             | ivr :: pending ->
             match ivr with
-            | Delayed _ -> enter field waiting ((start ivr) :: pending)
+            | Delayed _ -> enter field started ((start ivr) :: pending)
             | Active (Some _ as request, cont) ->
-                Active(request, cont >> fun ivr -> enter field waiting (ivr::pending))
+                Active(request, cont >> fun ivr -> enter field started (ivr::pending))
             | Active (None, _) ->
-                enter field (ivr::waiting) pending
+                enter field (ivr::started) pending
             | Completed result ->
             match arbiter field.State result with
             | ContinueField (newState, moreIVRs) ->
-                enter { field with State = newState } waiting (moreIVRs @ newIVRs)
+                enter { field with State = newState } started (moreIVRs @ newIVRs)
             | CancelField result ->
-                cancel result ((rev field.Pending) @ waiting @ field.Processed)
+                cancel result [] ((rev field.Pending) @ started @ field.Processed)
         
         and proceed (field: Field<'state, 'r>) =
             match field.Event with
@@ -340,21 +340,35 @@ module IVR =
                 | ContinueField (newState, newIVRs) ->
                     enter { field with State = newState } [] newIVRs
                 | CancelField result ->
-                    cancel result ((List.rev pending) @ field.Processed)
+                    cancel result [] ((List.rev pending) @ field.Processed)
 
-        and cancel result pending =
+        // Cancellation:
+        // send TryCancel as soon they are in waiting state, if not, process host requests until they are.
+        and cancel result cancelled pending =
             match pending with
-            | [] -> exit result
+            | [] -> finalize result cancelled
             | ivr::pending ->
             match ivr with
             | Delayed _ -> failwithf "internal error: %A in field cancellation" ivr
             | Active (Some _ as request, cont) ->
-                Active(request, fun response -> cont response |> fun c -> cancel result (c::pending))
+                Active(request, cont >> fun ivr -> cancel result cancelled (ivr::pending))
             | Active (None, _) ->
                 let ivr = tryCancel ivr
-                cancel result (ivr::pending)
+                cancel result (ivr::cancelled) pending
             | Completed _ ->
-                cancel result pending
+                cancel result cancelled pending
+
+        // Finalization: run them until they are all gone.
+        and finalize result pending =
+            match pending with
+            | [] -> exit result
+            | ivr::pending ->
+            match ivr with
+            | Delayed _ -> failwithf "internal error: %A in field finalization" ivr
+            | Active (request, cont) ->
+                Active(request, cont >> fun ivr -> finalize result (ivr::pending))
+            | Completed _ ->
+                finalize result pending
 
         and exit result =
             result |> Completed               
