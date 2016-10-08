@@ -576,6 +576,25 @@ module Exceptions =
         |> should equal (Value 1)
 
     [<Fact>]
+    let ``a waiter's exception is captured``() =
+
+        let msg = "Waiter Crashed"
+        let test = ivr {
+            try
+                do! IVR.waitFor' (fun (_:Event1) -> failwith msg)
+                return 0
+            with e ->
+                e.Message |> should equal msg
+                return 1
+        }
+
+        test
+        |> start
+        |> dispatch Event1
+        |> IVR.result
+        |> should equal (Value 1)
+
+    [<Fact>]
     let ``computation expression: handle exception in exception handler after wait``() =
 
         let test = ivr {
