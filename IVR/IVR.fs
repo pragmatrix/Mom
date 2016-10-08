@@ -65,30 +65,6 @@ module IVR =
         match ivr with
         | Active(None, cont) -> cont ev
         | ivr -> failwithf "IVR.dispatch: can't dispatch an event to an ivr that is not waiting for one: %A" ivr
-
-#if false
-    /// Continue an ivr with an event. This requires a host to process all synchronous requests.
-    /// tbd: this is used for testing only, so may move it out of the core.
-    let rec step (host: Host) ev ivr = 
-        match ivr with
-        // may be we should start it here, too?
-        //> no: delays are not supported, once an IVR starts, subsequential
-        //> IVRs do have to be started before stepping through
-
-        | Active (None, f) -> 
-            try
-                f ev
-            with e ->
-                e |> Error |> Completed
-        | Active (Some request, f) ->
-            try
-                host request |> f
-            with e ->
-                e |> Error |> Completed
-       
-        | Delayed _ -> failwithf "IVR.step: ivr is inactive"
-        | Completed _ -> failwithf "IVR.step: ivr is completed: %A" ivr
-#endif
         
     /// Returns true if the ivr is completed (i.e. has a result).
     let isCompleted ivr = 
@@ -214,27 +190,6 @@ module IVR =
         ivrs 
         |> List.mapi (f >> map)
 
-#if false
-    // Cancels a pair of ivr lists in the reversed specified order while in the process of 
-    // processing a step for all parallel ivrs.
-    // active are the ones that where already processed (in the reversed order specified).
-    // todo are the ones that have not yet processed for this round (in the specified order).
-    // Returns the ivrs that stay active after the cancellation was sent.
-
-    let private parCancel active todo = 
-        let todo = todo |> List.rev
-        todo @ active
-        |> List.map tryCancel 
-        |> List.filter isActive 
-        |> List.rev
-
-    let private parCancel' active todo = 
-        let cancelIVRs ivrs = ivrs |> List.map tryCancel |> List.filter isActive
-        let todo = todo |> List.rev |> cancelIVRs |> List.rev
-        let active = active |> cancelIVRs
-        (active, todo)
-#endif
-
     //
     // field
     //
@@ -252,13 +207,6 @@ module IVR =
     let continueField state ivrs = ContinueField(state, ivrs)
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
-
-#if false
-    [<NoEquality; NoComparison>]
-    type private FieldState =
-        | FieldActive
-        | FieldCancelling
-#endif
 
     [<NoEquality; NoComparison>]
     type private Field<'state, 'r> = {
@@ -377,59 +325,6 @@ module IVR =
         fun () ->
             enter { State = initial; Event = None; Pending = []; Processed = [] } [] ivrs
 
-#if false
-            let rec stepAll stepF (state: FieldState<'state>) active ivrs =
-                match ivrs with
-                | [] -> state, active |> List.rev
-                | ivr::todo ->
-                let ivr = ivr |> stepF
-                match ivr with
-                | Delayed _ -> failwith "internal error"
-                | Active _ -> stepAll stepF state (ivr::active) todo
-                | Completed r ->
-                match state with
-                | FieldCancelling _ ->
-                    // already cancelling, so we can ignore this result.
-                    stepAll stepF state active todo
-                | FieldActive s ->
-
-                // ask the arbiter what to do next
-                let decision = protectedArbiter s r
-                match decision with
-                | CancelField state -> FieldCancelling state, parCancel active todo
-                | ContinueField (s, newIVRs) ->
-                let state = FieldActive s
-                // start all new IVRs before putting them on the field.
-                let state, newIVRs = 
-                    newIVRs |> stepAll start state []
-                match state with
-                | FieldCancelling _ ->
-                    let active, todo = parCancel' active todo
-                    state, [active |> List.rev; newIVRs; todo] |> List.flatten
-                | FieldActive _ ->
-                // embed by prepending them to the list of already processed IVRs
-                // (don't use the current step function on the new ones)
-                let active = active |> List.revAndPrepend newIVRs
-                stepAll stepF state active todo
-           
-            and next (state: FieldState<'state>, ivrs) = 
-                match ivrs with
-                | [] -> 
-                    match state with
-                    | FieldActive state -> state |> Value |> Completed
-                    | FieldCancelling state -> state |> Completed
-                | ivrs -> active ivrs state |> Active
-
-            and active ivrs s e = 
-                ivrs 
-                |> stepAll (step e) s []
-                |> next
-
-            ivrs
-            |> stepAll start (FieldActive initial) []
-            |> next
-        |> Delayed
-#endif    
     /// game is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the game so that the game master does not need to handle them.
 
