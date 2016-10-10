@@ -226,7 +226,7 @@ module IVR =
     ///   and a number of new ivrs that put on the field.
     /// Notes:
     ///   The arbiter does not get to be asked again, as soon it cancels the field.
-    ///   When the arbiter throws an exception, it's equivalent to canceling the field with 
+    ///   When the arbiter throws an exception, it's equivalent to cancelling the field with 
     ///   that exception as an error result.
     ///   Cancellation is processed in reversed field insertion order.
     
@@ -260,6 +260,7 @@ module IVR =
             | CancelField result ->
                 cancel result [] ((rev field.Pending) @ field.Processed)
         
+        // Move the field forward.
         and proceed (field: Field<'state, 'r>) =
             match field.Event with
             | None ->
@@ -273,21 +274,26 @@ module IVR =
                 | ivr::pending ->
                 match ivr with
                 | Delayed _
-                | Completed _ -> failwithf "internal error: %A in field pending" ivr
-                | Active (Some _ as request, cont) ->
-                    Active(request, cont >> fun ivr -> proceed {field with Pending = ivr :: pending })
+                | Completed _
+                | Active (Some _, _) -> failwithf "internal error: %A in field pending" ivr
                 | Active (None, cont) ->
-                // deliver the event
-                let ivr = cont ev
-                match ivr with
-                | Delayed _ -> failwithf "internal error: %A after delivering event" ivr
-                | Active _ -> proceed { field with Pending = pending; Processed = ivr::field.Processed }
-                | Completed result ->
-                match arbiter field.State result with
-                | ContinueField (newState, newIVRs) ->
-                    enter { field with State = newState } newIVRs
-                | CancelField result ->
-                    cancel result [] ((List.rev pending) @ field.Processed)
+                // remove the ivr from pending and deliver the event
+                cont ev 
+                |> drive (postProcess { field with Pending = pending })
+
+        // Continue processing the field or ask the arbiter what to do if the ivr is completed.
+        and postProcess (field: Field<'state, 'r>) ivr =
+            match ivr with
+            | Delayed _
+            | Active (Some _, _) -> 
+                failwithf "internal error: %A in post processing" ivr
+            | Active (None, _) -> proceed { field with Processed = ivr::field.Processed }
+            | Completed result ->
+            match arbiter field.State result with
+            | ContinueField (newState, newIVRs) ->
+                enter { field with State = newState } newIVRs
+            | CancelField result ->
+                cancel result [] ((rev field.Pending) @ field.Processed)
 
         // Cancellation:
         // send TryCancel as soon they are in waiting state, if not, process host requests until they are.
@@ -319,7 +325,18 @@ module IVR =
 
         and exit result =
             result |> Completed               
-                
+
+        /// Process the ivr until it's completed or waiting for an event, and then call
+        /// the continuation method.
+        and drive followUp ivr = 
+            match ivr with
+            | Delayed _ -> failwithf "internal error: %A in field stall" ivr
+            | Active (Some _ as request, cont) ->
+                Active(request, cont >> drive followUp)
+            | Active (None, _)
+            | Completed _ ->
+                followUp ivr
+
         Delayed <|
         fun () ->
             enter { State = initial; Event = None; Pending = []; Processed = [] } ivrs

@@ -825,3 +825,58 @@ module CompuationExpressionSyntax =
         |> IVR.result
         |> should equal (Value ()) 
      
+module Arbiter = 
+    
+    [<Fact>]
+    let immediateContinuationIsRunOnBothPathsInAParallelIVR() = 
+        let mutable r1 = false
+    
+        let ivr1 = ivr {
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+            r1 <- true
+        }
+
+        let mutable r2 = false
+
+        let ivr2 = ivr {
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+            r2 <- true
+        }
+
+        IVR.all [ivr1;ivr2]
+        |> start
+        |> dispatch Event1
+        |> IVR.resultValue
+        |> should equal [();()]
+        
+        r1 |> should be True
+        r2 |> should be True
+
+    [<Fact>]
+    let hostContinuationIsRunOnBothPathsInAParallelIVR() = 
+
+        let queue = Queue()
+    
+        let ivr1 = ivr {
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! IVR.post 0
+        }
+
+        let mutable r2 = false
+
+        let ivr2 = ivr {
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! IVR.post 1
+        }
+
+        IVR.all [ivr1;ivr2]
+        |> start
+        |> dispatch Event1
+        |> stepH queue.Enqueue
+        |> stepH queue.Enqueue
+        |> IVR.resultValue
+        |> should equal [();()]
+
+        queue |> Seq.toList |> should equal [box 0;box 1]
+        
+
