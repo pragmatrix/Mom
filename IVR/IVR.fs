@@ -280,7 +280,7 @@ module IVR =
                 | Active (None, cont) ->
                 // deliver the event and be sure that the ivr is removed from pending
                 cont ev 
-                |> drive (postProcess { field with Pending = pending })
+                |> drain (postProcess { field with Pending = pending })
 
         // Continue processing the field or ask the arbiter what to do if the ivr is completed.
         and postProcess (field: Field<'state, 'r>) ivr =
@@ -329,11 +329,11 @@ module IVR =
 
         /// Process the ivr until it's completed or waiting for an event, and then call
         /// the continuation method.
-        and drive followUp ivr = 
+        and drain followUp ivr = 
             match ivr with
             | Delayed _ -> failwithf "internal error: %A in field stall" ivr
             | Active (Some _ as request, cont) ->
-                Active(request, cont >> drive followUp)
+                Active(request, cont >> drain followUp)
             | Active (None, _)
             | Completed _ ->
                 followUp ivr
