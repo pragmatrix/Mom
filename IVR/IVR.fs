@@ -252,6 +252,7 @@ module IVR =
             | Active (Some _ as request, cont) ->
                 Active(request, cont >> fun ivr -> enter field (ivr::pending))
             | Active (None, _) -> 
+                // as long new ivrs are added to the field, event processing is delayed.
                 enter { field with Processed = ivr :: field.Processed } pending
             | Completed result ->
             match arbiter field.State result with
@@ -277,7 +278,7 @@ module IVR =
                 | Completed _
                 | Active (Some _, _) -> failwithf "internal error: %A in field pending" ivr
                 | Active (None, cont) ->
-                // remove the ivr from pending and deliver the event
+                // deliver the event and be sure that the ivr is removed from pending
                 cont ev 
                 |> drive (postProcess { field with Pending = pending })
 
