@@ -243,8 +243,8 @@ module IVR =
 
         /// As long new IVRs need to be added to the field we try to bring them into a state when they
         /// want to receive events only.
-        let rec enter (field: Field<'state, 'r>) newIVRs =
-            match newIVRs with
+        let rec enter (field: Field<'state, 'r>) pending =
+            match pending with
             | [] -> proceed field
             | ivr :: pending ->
             match ivr with
@@ -256,7 +256,7 @@ module IVR =
             | Completed result ->
             match arbiter field.State result with
             | ContinueField (newState, moreIVRs) ->
-                enter { field with State = newState } (moreIVRs @ newIVRs)
+                enter { field with State = newState } (moreIVRs @ pending)
             | CancelField result ->
                 cancel result [] ((rev field.Pending) @ field.Processed)
         
