@@ -17,7 +17,7 @@ type CancelIVR = CancelIVR
 /// The stuff a service can do.
 type IServiceContext = 
     abstract ScheduleEvent : Event -> unit
-    abstract PostCommand : Request -> unit
+    abstract PostRequest : Request -> unit
 
 /// This is the runtime that drives the IVR.
 type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceContext -> Host) as this = 
@@ -30,7 +30,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
 
     interface IServiceContext with
         member this.ScheduleEvent event = this.ScheduleEvent event
-        member __.PostCommand command = host command |> ignore
+        member __.PostRequest request = host request |> ignore
 
     /// Asynchronously schedules an event to the runtime.
     member __.ScheduleEvent (event : Event) = 
@@ -72,8 +72,8 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
 /// Note that a service's context is partially applied per Runtime. 
 /// This way the service can associate its own instance variables with the Runtime.
 /// Note that the return value indicates not only the response itself, it also notifies the
-/// runtime if a command is handled, so if the command is asynchronous and can not actually
-/// return a reponse, () should be returned when the command is considered to be processed.
+/// runtime if a request is handled, so if the request is asynchronous and can not actually
+/// return a reponse, () should be returned when the request is considered to be processed.
 type Service = IServiceContext -> Request -> Response option
         
 /// A builder that supports the creation of runtimes and adding services to it.
@@ -109,7 +109,7 @@ let create builder =
             services
             |> List.tryPick (fun s -> s cmd)
             |> function 
-            | None -> failwithf "%A: command unhandled" cmd
+            | None -> failwithf "%A: request unhandled" cmd
             | Some response -> response
 
     new Runtime (builder.EventQueue, serviceHost)
@@ -185,11 +185,11 @@ module Service =
     let protect (responder: ServiceCrashResponder) (service: Service) : Service =
         fun context ->
             let mutable current = service context
-            fun command ->
+            fun request ->
             try
-                current command
+                current request
             with e ->
-                let crashResponse = responder context command e
+                let crashResponse = responder context request e
                 match crashResponse with
                 | ReplaceService service -> current <- service context
                 | ContinueService -> ()
@@ -202,7 +202,7 @@ let defaultBuilder =
     |> withService Service.delay
     |> withService Service.async
 
-/// Builds a default runtime that forwards all commands to the host service. The runtime includes the
+/// Builds a default runtime that forwards all requests to the host service. The runtime includes the
 /// services schedule, delay, and async.
 let newRuntime hostService = 
     defaultBuilder

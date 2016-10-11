@@ -23,9 +23,9 @@ type Event1 = Event1
 type Event2 = Event2
 type Event3 = Event3
 
-type Command = 
-    | Command of int
-    interface IVR.ICommand<string>
+type Request = 
+    | Request of int
+    interface IVR.IRequest<string>
 
 let start = IVR.start
 let dispatch = IVR.dispatch
@@ -673,7 +673,7 @@ let ``when one part of a parallel ivr gets cancelled, the followup ivr continues
 
 module HostCommunication =
     [<Fact>]
-    let ``IVR.post sends a command to the host``() =
+    let ``IVR.post sends a request to the host``() =
         let queue = Queue()
         
         let test = ivr {
@@ -689,7 +689,7 @@ module HostCommunication =
 
 
     [<Fact>]
-    let ``IVR.post sends combined commands to the host in the right order``() =
+    let ``IVR.post sends requests to the host in the right order``() =
         let queue = Queue()
         
         let test = ivr {
@@ -706,7 +706,7 @@ module HostCommunication =
         queue |> Seq.toList |> should equal [box 0; box 1]
 
     [<Fact>]
-    let ``after a wait, IVR.post sends a command to the host``() =
+    let ``after a wait, IVR.post sends a request to the host``() =
         let queue = Queue()
         
         let test = ivr {
@@ -755,15 +755,15 @@ module Delay =
 module CompuationExpressionSyntax =
 
     [<Fact>]
-    let ``Command with return type``() = 
+    let ``Request with response type``() = 
         let test = ivr {
-            let! r = IVR.send (Command 10)
+            let! r = IVR.send (Request 10)
             return r
         }
 
         let host (c:obj) : obj =
             match box c with
-            | :? Command -> "Hello"
+            | :? Request -> "Hello"
             | _ -> ""
             |> box
 
@@ -776,13 +776,13 @@ module CompuationExpressionSyntax =
     [<Fact>]
     let ``Command with return type (implicit send!)``() = 
         let test = ivr {
-            let! r = Command 10
+            let! r = Request 10
             return r
         }
 
         let host (c:obj) : obj =
             match box c with
-            | :? Command -> "Hello"
+            | :? Request -> "Hello"
             | _ -> ""
             |> box
 

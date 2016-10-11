@@ -8,7 +8,7 @@ open System
     - can be paused and ended at any time.
     - can synchronously wait and respond to events.
     - can be combined in parallel or sequentially.
-    - can send any number of commands to a host.
+    - can send any number of requests to a host.
     - can be run in steps.
 *)
 
@@ -433,44 +433,38 @@ module IVR =
         any [ivr1; ivr2; ivr3]
 
     //
-    // Sending and posting commands to the host.
+    // Posting and sending requests to the host.
     //
 
-    /// Command interface. Tag types with ICommand that are commands without a return value.
-    /// Tagging with ICommand is optional, but if not, IVR.post has to be used.
-    type ICommand = 
-        interface end
-
-    /// An IVR that synchronously sends a command to a host and ignores its response.
-    let post cmd : unit ivr = 
+    /// An IVR that synchronously sends a request to a host and ignores its response.
+    let post request : unit ivr = 
         // tbd: do we need to delay here anymore?
         fun () ->
-            Active(Some cmd, fun _ -> Value () |> Completed)
+            Active(Some request, fun _ -> Value () |> Completed)
         |> Delayed
 
-    /// Response type interface that is used to tag commands with that return a value. 
-    /// Tag data types with this interface and use them as a command with IVR.send so that 
-    /// IVR.send can automatically cast the resulting value.
-    type ICommand<'result> = 
+    /// Response type interface that is used to tag requests with that return a value. 
+    /// Tag data types with this interface and use them as a request with IVR.send so that 
+    /// IVR.send is able to cast the resulting value. Use IRequest<unit> for Requests that return
+    /// no value.
+    type IRequest<'response> = 
         interface end
 
-    /// An IVR that synchronously sends a command to a host and returns its response. The commands
-    /// need to implement the ICommand<_> interface so that the returned response value can be typed
+    /// An IVR that synchronously sends a request to a host and returns its response. The requests
+    /// need to implement the IRequest<_> interface so that the returned response value can be typed
     /// properly.
-    let send (cmd: ICommand<'r>) : 'r ivr = 
+    let send (cmd: IRequest<'r>) : 'r ivr = 
         fun () ->
             Active(Some (box cmd), unbox >> Value >> Completed)
         |> Delayed
 
     //
-    // IDisposable, IVR style
+    // IDisposable, Flow style
     //
-    // This is also introducing a new terminology here that should replace 'ivr' in the future,
-    // the proc. proc = small process.
 
-    type IDisposableProc =
+    type IDisposableFlow =
         inherit IDisposable
-        abstract member DisposableProc : unit ivr
+        abstract member DisposableFlow : unit ivr
 
     //
     // Cancellation Helper
@@ -480,7 +474,7 @@ module IVR =
 
     exception NestedCancellationException
 
-    /// Install an cancallation ivr for the ivr body. That cancellation ivr is called 
+    /// Install an cancellation ivr for the ivr body. That cancellation ivr is called 
     /// when the code inside the block gets cancelled. This function can only be used in a use! 
     /// instruction inside of a computation expression.
 
@@ -508,8 +502,7 @@ module IVR =
     type IVRBuilder<'result>() = 
 
         member __.Source(ivr: 'r ivr) : 'r ivr = ivr
-        member __.Source(r: 'r when 'r :> ICommand) = r |> post
-        member __.Source(r: 'r when 'r :> ICommand<'rr>) = r |> send
+        member __.Source(r: 'r when 'r :> IRequest<'rr>) = r |> send
         member __.Source(s: 'e seq) = s
 
         member __.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
@@ -530,8 +523,8 @@ module IVR =
         member this.Using(disposable : 't, body : 't -> 'r ivr when 't :> IDisposable) : 'r ivr =
             let body = body disposable
             match box disposable with
-            | :? IDisposableProc as dp -> 
-                this.TryFinally(body, fun () -> dp.DisposableProc)
+            | :? IDisposableFlow as dp -> 
+                this.TryFinally(body, fun () -> dp.DisposableFlow)
             | _ -> 
                 this.TryFinally(body, disposable.Dispose)
 
@@ -584,9 +577,9 @@ module IVR =
     /// Construct an IDisposableProc from a unit ivr, so that this ivr can be used
     /// with F# 'use' keyword inside a computation expression.
     let asDisposable (ivr: unit ivr) = { 
-        new IDisposableProc with
+        new IDisposableFlow with
             member __.Dispose() = ()
-            member __.DisposableProc = ivr
+            member __.DisposableFlow = ivr
     }
             
     //
@@ -644,12 +637,12 @@ module IVR =
     let idle = wait' (fun _ -> false)
 
     //
-    // IVR System Commands & Events
+    // IVR System Requests & Events
     //
 
     type Delay = 
         | Delay of TimeSpan
-        interface ICommand<Id>
+        interface IRequest<Id>
 
     type DelayCompleted = DelayCompleted of Id
 
@@ -706,7 +699,7 @@ module IVR =
                         e |> Error |> receiver
                 } |> Async.Start
 
-        interface ICommand<Id>
+        interface IRequest<Id>
 
     [<NoComparison>]
     type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: obj result
