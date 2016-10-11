@@ -34,9 +34,11 @@ module Result =
         | Cancelled -> Cancelled
 
 [<NoComparison;NoEquality>]
-type 'result ivr = 
-    | Delayed of (unit -> 'result ivr)
-    | Active of Request option * (Response -> 'result ivr)
+type 'result ivr = unit -> 'result flux
+
+and [<NoComparison;NoEquality>] 
+    'result flux =
+    | Active of Request option * (Response -> 'result flux)
     | Completed of 'result result
 
 [<RequireQualifiedAccess>]
@@ -55,41 +57,42 @@ module IVR =
                 e |> Error |> Completed
 
     /// Start up an ivr.
-    let start ivr = 
-        match ivr with
-        | Delayed f -> protect f ()
-        | ivr -> failwithf "IVR.start: can't start an ivr that is not inactive: %A" ivr
+    let start ivr = protect ivr ()
 
     /// Dispatch an event to the ivr that is currently waiting for one.
-    let dispatch ev ivr =
-        match ivr with
+    let dispatch ev flux =
+        match flux with
         | Active(None, cont) -> cont ev
-        | ivr -> failwithf "IVR.dispatch: can't dispatch an event to an ivr that is not waiting for one: %A" ivr
+        | flux -> failwithf "IVR.dispatch: can't dispatch an event to an ivr that is not waiting for one: %A" flux
         
-    /// Returns true if the ivr is completed (i.e. has a result).
-    let isCompleted ivr = 
-        match ivr with
+    /// Returns true if the flux is completed (i.e. has a result).
+    /// tbd: may remove this method.
+    let isCompleted flux = 
+        match flux with
         | Completed _ -> true
         | _ -> false
 
-    let isActive ivr = 
-        match ivr with
+    /// Returns true if the flux is waiting for an event or a response.
+    /// tbd: may remove this method.
+    let isActive flux = 
+        match flux with
         | Active _ -> true
         | _ -> false
 
-    let isError ivr = 
-        match ivr with
+    let isError flux = 
+        match flux with
         | Completed (Error _) -> true
         | _ -> false
 
-    /// Returns the error of a completed ivr.
-    let error ivr = 
-        match ivr with
+    /// Returns the error of a completed flux.
+    /// tbd: may use an active pattern for that.
+    let error flux = 
+        match flux with
         | Completed (Error e) -> e
-        | _ -> failwithf "IVR.error: ivr is not in error: %A" ivr
+        | _ -> failwithf "IVR.error: flux is not in error: %A" flux
 
-    let isCancelled ivr = 
-        match ivr with
+    let isCancelled flux = 
+        match flux with
         | Completed Cancelled -> true
         | _ -> false
 
@@ -106,10 +109,7 @@ module IVR =
                 Active (req, cont >> (protect next))
             | Completed r -> 
                 followup r |> start
-            | Delayed _ ->
-                failwithf "IVR.continueWith, ivr is delayed: %A" state
 
-        Delayed <|
         fun () ->
             ivr |> start |> next
     
@@ -117,14 +117,12 @@ module IVR =
     /// into the IVR category.
     let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
         let f (r: 'a result) = 
-            fun _ -> r |> Result.map f |> Completed
-            |> Delayed
+            fun () -> r |> Result.map f |> Completed
         continueWith f ivr
     
     /// Lifts a result.
     let ofResult (r: 'r result) : 'r ivr = 
-        fun _ -> r |> Completed
-        |> Delayed
+        fun () -> r |> Completed
 
     /// Lifts a value. Creates an IVR that returns the value.
     let ofValue (v: 'v) : 'v ivr = 
@@ -174,8 +172,6 @@ module IVR =
             failwith "failed to cancel an active IVR that is waiting for a synchronous response"
         | Completed (Error _) -> ivr
         | Completed _ -> Cancelled |> Completed
-        | Delayed _ ->
-            failwith "failed to cancel an IVR that has not been started yet"
 
     //
     // IVR Combinators
@@ -212,9 +208,9 @@ module IVR =
     type private Field<'state, 'r> = {
         State: 'state
         Event: Response option
-        Pending: 'r ivr list
+        Pending: 'r flux list
         /// All ivrs that got the event already or new ivrs, all in reversed order.
-        Processed: 'r ivr list
+        Processed: 'r flux list
     }
 
     /// A generic algorithm for running IVRs in parallel.
@@ -247,13 +243,15 @@ module IVR =
             match pending with
             | [] -> proceed field
             | ivr :: pending ->
-            match ivr with
-            | Delayed _ -> enter field ((start ivr) :: pending)
-            | Active (Some _ as request, cont) ->
-                Active(request, cont >> fun ivr -> enter field (ivr::pending))
+            enter2 field (start ivr) pending
+        
+        and enter2 (field: Field<'state, 'r>) flux pending =
+            match flux with
+            | Active (Some _ as request, cont) -> 
+                Active (request, cont >> fun flux -> enter2 field flux pending)
             | Active (None, _) -> 
                 // as long new ivrs are added to the field, event processing is delayed.
-                enter { field with Processed = ivr :: field.Processed } pending
+                enter { field with Processed = flux::field.Processed } pending
             | Completed result ->
             match arbiter field.State result with
             | ContinueField (newState, moreIVRs) ->
@@ -272,23 +270,20 @@ module IVR =
             | Some ev ->
                 match field.Pending with
                 | [] -> proceed { field with Event = None }
-                | ivr::pending ->
-                match ivr with
-                | Delayed _
+                | flux::pending ->
+                match flux with
                 | Completed _
-                | Active (Some _, _) -> failwithf "internal error: %A in field pending" ivr
+                | Active (Some _, _) -> failwithf "internal error: %A in field pending" flux
                 | Active (None, cont) ->
                 // deliver the event and be sure that the ivr is removed from pending
-                cont ev 
-                |> drain (postProcess { field with Pending = pending })
+                cont ev |> postProcess { field with Pending = pending }
 
         // Continue processing the field or ask the arbiter what to do if the ivr is completed.
-        and postProcess (field: Field<'state, 'r>) ivr =
-            match ivr with
-            | Delayed _
-            | Active (Some _, _) -> 
-                failwithf "internal error: %A in post processing" ivr
-            | Active (None, _) -> proceed { field with Processed = ivr::field.Processed }
+        and postProcess (field: Field<'state, 'r>) flux =
+            match flux with
+            | Active (Some _ as request, cont) -> 
+                Active (request, cont >> fun flux -> postProcess field flux)
+            | Active (None, _) -> proceed { field with Processed = flux::field.Processed }
             | Completed result ->
             match arbiter field.State result with
             | ContinueField (newState, newIVRs) ->
@@ -301,14 +296,12 @@ module IVR =
         and cancel result cancelled pending =
             match pending with
             | [] -> finalize result cancelled
-            | ivr::pending ->
-            match ivr with
-            | Delayed _ -> failwithf "internal error: %A in field cancellation" ivr
+            | flux::pending ->
+            match flux with
             | Active (Some _ as request, cont) ->
-                Active(request, cont >> fun ivr -> cancel result cancelled (ivr::pending))
+                Active(request, cont >> fun flux -> cancel result cancelled (flux::pending))
             | Active (None, _) ->
-                let ivr = tryCancel ivr
-                cancel result (ivr::cancelled) pending
+                cancel result ((tryCancel flux)::cancelled) pending
             | Completed _ ->
                 cancel result cancelled pending
 
@@ -316,29 +309,16 @@ module IVR =
         and finalize result pending =
             match pending with
             | [] -> exit result
-            | ivr::pending ->
-            match ivr with
-            | Delayed _ -> failwithf "internal error: %A in field finalization" ivr
+            | flux::pending ->
+            match flux with
             | Active (request, cont) ->
-                Active(request, cont >> fun ivr -> finalize result (ivr::pending))
+                Active(request, cont >> fun flux -> finalize result (flux::pending))
             | Completed _ ->
                 finalize result pending
 
         and exit result =
             result |> Completed               
 
-        /// Process the ivr until it's completed or waiting for an event, and then call
-        /// the continuation method.
-        and drain followUp ivr = 
-            match ivr with
-            | Delayed _ -> failwithf "internal error: %A in field stall" ivr
-            | Active (Some _ as request, cont) ->
-                Active(request, cont >> drain followUp)
-            | Active (None, _)
-            | Completed _ ->
-                followUp ivr
-
-        Delayed <|
         fun () ->
             enter { State = initial; Event = None; Pending = []; Processed = [] } ivrs
 
@@ -441,7 +421,6 @@ module IVR =
         // tbd: do we need to delay here anymore?
         fun () ->
             Active(Some request, fun _ -> Value () |> Completed)
-        |> Delayed
 
     /// Response type interface that is used to tag requests with that return a value. 
     /// Tag data types with this interface and use them as a request with IVR.send so that 
@@ -456,7 +435,6 @@ module IVR =
     let send (cmd: IRequest<'r>) : 'r ivr = 
         fun () ->
             Active(Some (box cmd), unbox >> Value >> Completed)
-        |> Delayed
 
     //
     // IDisposable, Flow style
@@ -596,8 +574,7 @@ module IVR =
             | Some r -> r |> Value |> Completed
             | None -> Active (None, protect waiter)
 
-        Delayed <|
-        fun _ -> Active (None, protect waiter)
+        fun () -> Active (None, protect waiter)
 
     /// Waits for some event by asking a predicate for each event that comes along.
     /// Continues waiting when the predicate returns false, ends the ivr when the predicate 

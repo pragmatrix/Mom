@@ -42,8 +42,8 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
     /// Runs the ivr synchronously. Returns Some value or None if the ivr was cancelled.
     member __.Run ivr = 
 
-        let rec runLoop ivr =
-            match ivr with
+        let rec runLoop flux =
+            match flux with
             | Completed c -> 
                 match c with 
                 | Value r -> Some r
@@ -54,11 +54,9 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
             | Active (None, cont) ->
                 let event = eventQueue.Dequeue()
                 match event with
-                | :? CancelIVR -> IVR.tryCancel ivr
+                | :? CancelIVR -> IVR.tryCancel flux
                 | event -> cont event
                 |> runLoop 
-
-            | Delayed _ -> failwith "internal error, state transition of an ivr from active -> inactive"
 
         ivr
         |> IVR.start
