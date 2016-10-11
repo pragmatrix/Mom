@@ -8,10 +8,7 @@ open IVR
 [<AutoOpen>]
 module Helper = 
     let ivr<'r> = IVR.IVR.ivr<'r>
-    let step ev ivr = 
-        match ivr with
-        | Active(None, f) -> f ev
-        | _ -> failwithf "step: invalid state %A" ivr
+    let step ev ivr = IVR.dispatch ev ivr
 
 [<Fact(Skip="brittle")>]
 let longSequentialLoopDoesNotEatUpStackOrMemory() =

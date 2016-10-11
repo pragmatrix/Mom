@@ -49,9 +49,9 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
                 | Value r -> Some r
                 | Error e -> raise e
                 | Cancelled -> None
-            | Active (Some request, cont) -> 
+            | Expecting (request, cont) -> 
                 host request |> cont |> runLoop
-            | Active (None, cont) ->
+            | Waiting cont ->
                 let event = eventQueue.Dequeue()
                 match event with
                 | :? CancelIVR -> IVR.tryCancel flux

@@ -31,7 +31,7 @@ let start = IVR.start
 let dispatch = IVR.dispatch
 let stepH host ivr =
     match ivr with
-    | Active (Some r, cont) -> 
+    | Expecting (r, cont) -> 
         host r |> cont
     | _ -> failwithf "stepH: invalid state %A" ivr
 
