@@ -8,6 +8,10 @@ open IVR
 
 exception AsyncException of string
 
+type Request1 =
+    | Request1
+    interface IVR.IRequest<unit>
+
 [<Fact>]
 let ``host properly cancels its ivr if the runtime gets disposed asynchronously``() =
     let ct = new IVRTests.CancellationTracker()
@@ -33,6 +37,23 @@ let ``host properly cancels its ivr if the runtime gets disposed asynchronously`
         
     ct.Disposed |> should equal true
 
+[<Fact>]
+let ``host errors are propagated inside the ivr``() = 
+
+    let host _ req = 
+        failwith "Error"
+
+    let ivr = ivr {
+        try
+            do! IVR.send Request1
+            return false
+        with e ->
+            return true
+    }
+
+    let runtime = Runtime.newRuntime host
+    let result = runtime.Run ivr
+    result |> should equal (Some true)
 
 [<Fact>]
 let ``async can be used in ivrs``() = 

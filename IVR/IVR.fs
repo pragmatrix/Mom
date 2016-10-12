@@ -38,7 +38,7 @@ type 'result ivr = unit -> 'result flux
 
 and [<NoComparison;NoEquality>] 
     'result flux =
-    | Expecting of Request * (Response -> 'result flux)
+    | Expecting of Request * (Response result -> 'result flux)
     | Waiting of (Event -> 'result flux)
     | Completed of 'result result
 
@@ -412,14 +412,8 @@ module IVR =
         any [ivr1; ivr2; ivr3]
 
     //
-    // Posting and sending requests to the host.
+    // Sending requests to the host.
     //
-
-    /// An IVR that synchronously sends a request to a host and ignores its response.
-    let post request : unit ivr = 
-        // tbd: do we need to delay here anymore?
-        fun () ->
-            Expecting (request, fun _ -> Value () |> Completed)
 
     /// Response type interface that is used to tag requests with that return a value. 
     /// Tag data types with this interface and use them as a request with IVR.send so that 
@@ -433,7 +427,7 @@ module IVR =
     /// properly.
     let send (cmd: IRequest<'r>) : 'r ivr = 
         fun () ->
-            Expecting (box cmd, unbox >> Value >> Completed)
+            Expecting (box cmd, Result.map unbox >> Completed)
 
     //
     // IDisposable, Flow style
@@ -640,9 +634,10 @@ module IVR =
     type Schedule = 
         | Schedule of Event
         member this.Event = let (Schedule e) = this in e
+        interface IRequest<unit>
     
     let schedule (e: Event) = 
-        e |> Schedule |> post
+        e |> Schedule |> send
 
     //
     // IVR System combinators

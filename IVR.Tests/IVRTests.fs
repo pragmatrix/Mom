@@ -27,12 +27,16 @@ type Request =
     | Request of int
     interface IVR.IRequest<string>
 
+type RequestU = 
+    | RequestU of int
+    interface IVR.IRequest<unit>
+
 let start = IVR.start
 let dispatch = IVR.dispatch
 let stepH host ivr =
     match ivr with
     | Expecting (r, cont) -> 
-        host r |> cont
+        host r |> unbox |> Value |> cont
     | _ -> failwithf "stepH: invalid state %A" ivr
 
 
@@ -677,7 +681,7 @@ module HostCommunication =
         let queue = Queue()
         
         let test = ivr {
-            do! IVR.post 0
+            do! IVR.send (RequestU 0)
         } 
 
         test
@@ -685,7 +689,7 @@ module HostCommunication =
         |> stepH (fun v -> queue.Enqueue v; null)
         |> ignore
 
-        queue |> Seq.toList |> should equal [box 0]
+        queue |> Seq.toList |> should equal [box (RequestU 0)]
 
 
     [<Fact>]
@@ -693,8 +697,8 @@ module HostCommunication =
         let queue = Queue()
         
         let test = ivr {
-            do! IVR.post 0
-            do! IVR.post 1
+            do! IVR.send (RequestU 0)
+            do! IVR.send (RequestU 1)
         } 
 
         test
@@ -703,16 +707,16 @@ module HostCommunication =
         |> stepH queue.Enqueue
         |> ignore
 
-        queue |> Seq.toList |> should equal [box 0; box 1]
+        queue |> Seq.toList |> should equal [box <| RequestU 0; box <| RequestU 1]
 
     [<Fact>]
     let ``after a wait, IVR.post sends a request to the host``() =
         let queue = Queue()
         
         let test = ivr {
-            do! IVR.post 0
+            do! IVR.send (RequestU 0)
             do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! IVR.post 1
+            do! IVR.send (RequestU 1)
         } 
 
         test
@@ -722,7 +726,7 @@ module HostCommunication =
         |> stepH queue.Enqueue
         |> ignore
 
-        queue |> Seq.toList |> should equal [box 0;box 1]
+        queue |> Seq.toList |> should equal [box <| RequestU 0; box <| RequestU 1]
 
 module Delay =
 
@@ -859,14 +863,12 @@ module Arbiter =
     
         let ivr1 = ivr {
             do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! IVR.post 0
+            do! IVR.send (RequestU 0)
         }
-
-        let mutable r2 = false
 
         let ivr2 = ivr {
             do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! IVR.post 1
+            do! IVR.send (RequestU 1)
         }
 
         IVR.all [ivr1;ivr2]
@@ -877,6 +879,6 @@ module Arbiter =
         |> IVR.resultValue
         |> should equal [();()]
 
-        queue |> Seq.toList |> should equal [box 0;box 1]
+        queue |> Seq.toList |> should equal [box (RequestU 0);box (RequestU 1)]
         
 

@@ -50,7 +50,13 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
                 | Error e -> raise e
                 | Cancelled -> None
             | Expecting (request, cont) -> 
-                host request |> cont |> runLoop
+                let result = 
+                    try
+                        host request 
+                        |> Value
+                    with e ->
+                        e |> Error
+                result |> cont |> runLoop
             | Waiting cont ->
                 let event = eventQueue.Dequeue()
                 match event with
