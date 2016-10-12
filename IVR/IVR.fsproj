@@ -54,7 +54,6 @@
     <Compile Include="Ids.fs" />
     <Compile Include="IVR.fs" />
     <Compile Include="Tracing.fs" />
-    <Compile Include="Tracers.fs" />
     <Compile Include="Runtime.fs" />
     <Content Include="app.config" />
     <Content Include="paket.references" />

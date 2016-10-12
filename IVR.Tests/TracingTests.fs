@@ -1,7 +1,5 @@
 ﻿module IVR.Tests.TracingTests
 
-#if false
-
 open FsUnit
 open Xunit
 open IVR
@@ -9,74 +7,69 @@ open Tracing
 
 type TraceEvent1 = TraceEvent1 of int
 
+type TraceRequest = 
+    | TraceRequest
+    interface IVR.IRequest<unit>
+
 type ConvertIntToStr = 
     | ConvertIntToStr of int
-    interface IVR.ICommand<string>
+    interface IVR.IRequest<string>
 
+// tbd: IVR API candidate!
+let respond r =
+    function 
+    | Expecting (_, cont) -> cont (r |> box |> Value)
+    | _ -> failwith "internal error"
+
+/// IVR under test.
+let ivr p = ivr {
+    let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
+    do! IVR.send TraceRequest
+    return x * p
+}
+
+[<Fact>]
+let createTrace() =
+
+    let traced = ivr |> Tracing.trace 5
+
+    let trace = 
+        traced
+        |> IVR.start
+        |> IVR.dispatch (TraceEvent1 10)
+        |> respond ()
+        |> IVR.resultValue
+
+    trace
 
 [<Fact>]
 let simpleTraceAndReplay() =
 
-    let ivr = ivr {
-        let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
-        do! IVR.post x
-        return x
-    }
+    let trace = createTrace()
 
-
-    let sessionInfo = Tracing.sessionInfo "" (Id 0L) null
-    let mutable trace = None
-    let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
-
-    let traced = 
-        ivr 
-        |> Tracing.trace tracer
-    let host = fun _ -> null
-
-    traced
-    |> IVR.start host
-    |> IVR.step (TraceEvent1 10)
-    |> ignore
-
-    let trace = trace.Value
     trace
     |> Format.trace
     |> Seq.iter (printfn "%s")
 
     trace
-    |> Tracing.replay (fun _ -> ivr)
-    |> fun r -> r.Steps
-    |> Seq.iter (printfn "%A")
-
+    |> Tracing.replay ivr
+    |> printfn "%A"
 
 [<Fact>]
 let simpleTraceBinarySerializationTest() = 
 
-    let ivr = ivr {
-        let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
-        do! IVR.post x
-        return x
-    }
+    let trace = createTrace()
 
-    let sessionInfo = Tracing.sessionInfo "" (Id 0L) null
-    let fn = "test.trace"
-    let tracer = Tracers.fileTracer fn sessionInfo
-    let traced = 
-        ivr 
-        |> Tracing.trace tracer
-    let host = fun _ -> null
+    let t2 : Trace<int, int> = 
+        trace
+        |> Trace.serialize
+        |> Trace.deserialize
 
-    traced
-    |> IVR.start host
-    |> IVR.step (TraceEvent1 10)
-    |> ignore
+    t2 |> should equal trace
 
-    let trace = Tracers.readFileTrace fn
-        
-    trace
-    |> Tracing.replay (fun _ -> ivr)
-    |> (fun r -> r.Steps)
-    |> Seq.iter (printfn "%A")
+#if false
+
+// tbd: Create a more complex tracing / replaying example.
 
 [<Fact>]
 let replayReplaysCommandResponses() = 
