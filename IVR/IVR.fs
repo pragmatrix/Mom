@@ -12,13 +12,10 @@ open System
     - can be run in steps.
 *)
 
-/// None means that the IVR is waiting for an event only.
 type Request = obj
 type Response = obj
 type Event = obj
 type Host = Request -> Response
-
-exception CancelledException
 
 [<NoComparison>]
 type 'result result =
@@ -208,9 +205,9 @@ module IVR =
     /// The arbiter can either decide to cancel the field and set a final result or
     /// continue the field with a 
     ///   an intermediate state/result
-    ///   and a number of new ivrs that put on the field.
+    ///   and a number of new ivrs to add to the field.
     /// Notes:
-    ///   The arbiter does not get to be asked again, as soon it cancels the field.
+    ///   The arbiter does not get to be asked again, after it cancels the field.
     ///   When the arbiter throws an exception, it's equivalent to cancelling the field with 
     ///   that exception as an error result.
     ///   Cancellation is processed in reversed field insertion order.
@@ -357,8 +354,8 @@ module IVR =
         |> map mapToList
     
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
-    /// Note that it may take an arbitrary number of time until the result is finally returned,
-    /// because ivrs may refuse to get cancelled.
+    /// Note that it may take an arbitrary amount of time (steps) until the result is finally 
+    /// returned, because ivrs may refuse to get cancelled.
     let any (ivrs: 'r ivr list) : 'r ivr =
 
         // Note: when an ivr finishes, all the running ones are canceled in the reversed 
@@ -370,12 +367,13 @@ module IVR =
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
-    /// (cancellation or exception),
-    /// the resulting ivr is ended immediately.
+    /// (cancellation or exception), the resulting ivr is ended immediately.
 
     /// Note that join retains the result of the first completed ivr, which
     /// could lead to leaks in nested parallel ivrs of which the result
     /// is never processed.
+
+    // tbd: this does not belong into the core module.
 
     let join (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : ('r1 * 'r2) ivr =
 
@@ -390,6 +388,8 @@ module IVR =
     /// Runs two ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
     /// events are delivered to ivr1 and then to ivr2, so ivr1 has an advantage when both complete in response to
     /// the same event. Note that if ivr1 completes, no event is delivered to ivr2.
+
+    /// tbd: this does not belong into the core module.
     let first (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) : Choice<'r1, 'r2> ivr =
 
         let ivr1 = ivr1 |> map Choice<_,_>.Choice1Of2
@@ -397,6 +397,7 @@ module IVR =
         any [ivr1; ivr2]
 
     /// Runs three ivrs in parallel, the resulting ivr completes with the result of the one that finishes first.
+    /// tbd: this does not belong into the core module.
     let first' (ivr1 : 'r1 ivr) (ivr2 : 'r2 ivr) (ivr3: 'r3 ivr) : Choice<'r1, 'r2, 'r3> ivr =
 
         let ivr1 = ivr1 |> map Choice<_,_,_>.Choice1Of3
