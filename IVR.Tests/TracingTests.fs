@@ -18,7 +18,7 @@ type ConvertIntToStr =
 // tbd: IVR API candidate!
 let respond r =
     function 
-    | Expecting (_, cont) -> cont (r |> box |> Value)
+    | Requesting (_, cont) -> cont (r |> box |> Value)
     | _ -> failwith "internal error"
 
 /// IVR under test.

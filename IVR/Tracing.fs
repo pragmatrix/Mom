@@ -213,8 +213,8 @@ let trace (p: 'param) (f : 'param -> 'r ivr) : Trace<'param, 'r> ivr =
         
         let rec next traces flux =            
             match flux with
-            | Expecting (request, cont) ->
-                Expecting (request, 
+            | Requesting (request, cont) ->
+                Requesting (request, 
                     fun response -> 
                         response 
                         |> cont
@@ -325,7 +325,7 @@ let replay (f: 'param -> 'r ivr) (Trace((_, param), traces, expectedResult)) : R
     
     let rec next traces flux = 
         match flux with
-        | Expecting (request, cont) ->
+        | Requesting (request, cont) ->
             match traces with
             | RequestTrace (r, response) :: traces when r = request ->
                 response |> cont |> next traces

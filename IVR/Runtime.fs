@@ -49,7 +49,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Event>, host: IServiceConte
                 | Value r -> Some r
                 | Error e -> raise e
                 | Cancelled -> None
-            | Expecting (request, cont) -> 
+            | Requesting (request, cont) -> 
                 let result = 
                     try
                         host request 

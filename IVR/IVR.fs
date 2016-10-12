@@ -38,7 +38,7 @@ type 'result ivr = unit -> 'result flux
 
 and [<NoComparison;NoEquality>] 
     'result flux =
-    | Expecting of Request * (Response result -> 'result flux)
+    | Requesting of Request * (Response result -> 'result flux)
     | Waiting of (Event -> 'result flux)
     | Completed of 'result result
 
@@ -103,8 +103,8 @@ module IVR =
 
         let rec next state = 
             match state with
-            | Expecting (req, cont) ->
-                Expecting (req, cont >> next)
+            | Requesting (req, cont) ->
+                Requesting (req, cont >> next)
             | Waiting cont ->
                 Waiting (cont >> next)
             | Completed r -> 
@@ -155,8 +155,8 @@ module IVR =
     /// An ivr that is delayed (not started) or waiting for a synchronous response, can not be cancelled.
     let tryCancel ivr = 
         match ivr with
-        | Expecting _ ->
-            failwith "failed to cancel an active IVR that is expecting a synchronous response"
+        | Requesting _ ->
+            failwith "failed to cancel an active IVR that is requesting a synchronous response"
         | Waiting cont -> 
             cont TryCancel
         | Completed (Error _) -> ivr
@@ -236,8 +236,8 @@ module IVR =
         
         and enter2 (field: Field<'state, 'r>) flux pending =
             match flux with
-            | Expecting (request, cont) -> 
-                Expecting (request, cont >> fun flux -> enter2 field flux pending)
+            | Requesting (request, cont) -> 
+                Requesting (request, cont >> fun flux -> enter2 field flux pending)
             | Waiting _ -> 
                 // as long new ivrs are added to the field, event processing is delayed.
                 enter { field with Processed = flux::field.Processed } pending
@@ -262,7 +262,7 @@ module IVR =
                 | flux::pending ->
                 match flux with
                 | Completed _
-                | Expecting _ -> failwithf "internal error: %A in field pending" flux
+                | Requesting _ -> failwithf "internal error: %A in field pending" flux
                 | Waiting cont ->
                 // deliver the event and be sure that the ivr is removed from pending
                 cont ev |> postProcess { field with Pending = pending }
@@ -270,8 +270,8 @@ module IVR =
         // Continue processing the field or ask the arbiter what to do if the ivr is completed.
         and postProcess (field: Field<'state, 'r>) flux =
             match flux with
-            | Expecting (request, cont) -> 
-                Expecting (request, cont >> fun flux -> postProcess field flux)
+            | Requesting (request, cont) -> 
+                Requesting (request, cont >> fun flux -> postProcess field flux)
             | Waiting _ -> proceed { field with Processed = flux::field.Processed }
             | Completed result ->
             match arbiter field.State result with
@@ -287,8 +287,8 @@ module IVR =
             | [] -> finalize result cancelled
             | flux::pending ->
             match flux with
-            | Expecting (request, cont) ->
-                Expecting(request, cont >> fun flux -> cancel result cancelled (flux::pending))
+            | Requesting (request, cont) ->
+                Requesting(request, cont >> fun flux -> cancel result cancelled (flux::pending))
             | Waiting _ ->
                 cancel result ((tryCancel flux)::cancelled) pending
             | Completed _ ->
@@ -300,8 +300,8 @@ module IVR =
             | [] -> exit result
             | flux::pending ->
             match flux with
-            | Expecting (request, cont) ->
-                Expecting (request, cont >> fun flux -> finalize result (flux::pending))
+            | Requesting (request, cont) ->
+                Requesting (request, cont >> fun flux -> finalize result (flux::pending))
             | Waiting cont ->
                 // actually, this is currently not supported. See issue #4
                 Waiting (cont >> fun flux -> finalize result (flux::pending))
@@ -420,7 +420,7 @@ module IVR =
     /// properly.
     let send (cmd: IRequest<'r>) : 'r ivr = 
         fun () ->
-            Expecting (box cmd, Result.map unbox >> Completed)
+            Requesting (box cmd, Result.map unbox >> Completed)
 
     //
     // IDisposable, Flow style
