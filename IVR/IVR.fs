@@ -49,16 +49,8 @@ module IVR =
     // IVR Primitives Part 1
     //
 
-    /// Protect a function that creates an ivr by returning an ivr error in case of an exception.
-    let private protect f = 
-        fun response ->
-            try
-                f response
-            with e ->
-                e |> Error |> Completed
-
     /// Start up an ivr.
-    let start ivr = protect ivr ()
+    let start ivr = ivr ()
 
     /// Dispatch an event to the ivr that is currently waiting for one.
     let dispatch ev flux =
@@ -93,28 +85,6 @@ module IVR =
     //
     // Primitives Part 2
     //
-
-    /// Continues the ivr with a followup ivr (Monad bind).
-    let continueWith (followup : 'a result -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
-
-        let rec next state = 
-            match state with
-            | Expecting (req, cont) ->
-                Expecting (req, cont >> (protect next))
-            | Waiting cont ->
-                Waiting (cont >> (protect next))
-            | Completed r -> 
-                followup r |> start
-
-        fun () ->
-            ivr |> start |> next
-    
-    /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
-    /// into the IVR category.
-    let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
-        let f (r: 'a result) = 
-            fun () -> r |> Result.map f |> Completed
-        continueWith f ivr
     
     /// Lifts a result.
     let ofResult (r: 'r result) : 'r ivr = 
@@ -127,6 +97,29 @@ module IVR =
     /// Lifts an error.
     let ofError e : 'v ivr =
         e |> Error |> ofResult
+
+    /// Continues the ivr with a followup ivr (Monad bind).
+    let continueWith (followup : 'a result -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
+
+        let rec next state = 
+            match state with
+            | Expecting (req, cont) ->
+                Expecting (req, cont >> next)
+            | Waiting cont ->
+                Waiting (cont >> next)
+            | Completed r -> 
+                try followup r |> start
+                with e -> e |> Error |> Completed
+
+        fun () ->
+            ivr |> start |> next
+    
+    /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
+    /// into the IVR category.
+    let map (f: 'a -> 'b) (ivr: 'a ivr) : 'b ivr = 
+        let f (r: 'a result) = 
+            fun () -> r |> Result.map f |> Completed
+        continueWith f ivr
 
     /// Ignores the ivr's result type.
     let ignore ivr = ivr |> map ignore
@@ -482,8 +475,6 @@ module IVR =
                 | Error err -> err |> ofError
                 | Cancelled -> Cancelled |> ofResult)
 
-        // tbd: this is probably delayed anyway, so we could return an
-        // active ivr here (but then start must handle ivrs with a result)
         member __.Return(v: 'r) : 'r ivr = ofValue v
         member __.ReturnFrom(ivr : 'r ivr) = ivr
         member this.Delay(f : unit -> 'r ivr) : 'r ivr = 
@@ -512,8 +503,8 @@ module IVR =
                     // block's result is Cancelled
                     | Cancelled -> Cancelled |> ofResult
 
-                // note: f is already delayed, so we can run it in place.
-                f() |> continueWith afterFinally
+                // note: f is already delayed
+                f |> start |> continueWith afterFinally
 
             ivr |> continueWith finallyBlock
 
