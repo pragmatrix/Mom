@@ -152,7 +152,7 @@ module Service =
             | _ -> None
 
     /// Forward the msg to _all_ the services specified. These services are a treated as message sinks.
-    /// Only if none of the services processes the message, the delivrity mechanism continues to services outside of this
+    /// Only if none of the services processes the message, the delivery mechanism continues to services outside of this
     /// forwarding group.
     let forward (services: Service list) =
         fun runtime ->
