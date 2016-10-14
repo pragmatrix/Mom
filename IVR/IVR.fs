@@ -599,7 +599,9 @@ module IVR =
         wait' f
 
     /// Waits forever.
-    let idle = wait' (fun _ -> false)
+    let idle<'r> : 'r ivr = 
+        wait' (fun _ -> false)
+        |> map (fun _ -> Unchecked.defaultof<'r>)
 
     //
     // IVR System Requests & Events
