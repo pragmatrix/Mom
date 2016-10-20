@@ -178,14 +178,15 @@ module IVR =
 
     [<NoComparison;NoEquality>]
     type ArbiterDecision<'state, 'r> = 
-        /// Cancel all remaining IVRs and set the result of the field ivr
         | CancelField of 'state result
-        /// Continue the field with a new state and optionally add some new players / IVRs to it.
-        /// Note: when the field does not contain any more active ivrs, the 'state is returned
-        /// as a final result of the field ivr.
         | ContinueField of 'state * 'r ivr list
 
+    /// Cancel all remaining IVRs and set the result of the field ivr
     let cancelField r = CancelField r
+
+    /// Continue the field with a new state and optionally add some new players / IVRs to it.
+    /// Note: when the field does not contain any more active ivrs, the 'state is returned
+    /// as a final result of the field ivr.
     let continueField state ivrs = ContinueField(state, ivrs)
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
