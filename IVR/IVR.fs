@@ -604,6 +604,15 @@ module IVR =
         wait' (fun _ -> false)
         |> map (fun _ -> Unchecked.defaultof<'r>)
 
+    /// Combine a number of unit ivrs so that they are run in sequence, one after another.
+    let rec sequence (ivrs: unit ivr list) : unit ivr = ivr {
+        match ivrs with
+        | [] -> ()
+        | next::rest ->
+            do! next
+            return! sequence rest
+    }
+
     //
     // IVR System Requests & Events
     //
