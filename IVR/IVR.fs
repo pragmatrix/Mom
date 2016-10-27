@@ -252,8 +252,10 @@ module IVR =
             | None ->
                 assert(field.Pending.IsEmpty)
                 match field.Processed with
-                | [] -> exit (field.State |> Value)
-                | processed -> Waiting (fun ev -> proceed { field with Event = Some ev; Pending = rev processed; Processed = [] })
+                | [] -> 
+                    exit (field.State |> Value)
+                | processed -> 
+                    Waiting (fun ev -> proceed { field with Event = Some ev; Pending = rev processed; Processed = [] })
             | Some ev ->
                 match field.Pending with
                 | [] -> proceed { field with Event = None }
@@ -307,7 +309,7 @@ module IVR =
                 finalize result pending
 
         and exit result =
-            result |> Completed               
+            result |> Completed
 
         fun () ->
             enter { State = initial; Event = None; Pending = []; Processed = [] } ivrs
@@ -552,7 +554,7 @@ module IVR =
 
     /// An IVR that waits for some event given a function that returns (Some result) or None.
     let wait f =
-        let rec waiter (ev: Event) =  
+        let rec waiter (ev: Event) =
             match ev with
             | :? TryCancel -> Cancelled |> Completed
             | _ ->
