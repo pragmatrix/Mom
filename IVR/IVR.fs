@@ -348,8 +348,9 @@ module IVR =
 
         // and at last, convert the map to a list.
         let mapToList m = 
+            // note: Map.toList returns a list that is ordered by the keys.
             m 
-            |> Map.toList
+            |> Map.toList 
             |> List.map snd
 
         ivrs 
@@ -622,6 +623,10 @@ module IVR =
     type Delay = 
         | Delay of TimeSpan
         interface IRequest<Id>
+    
+    type CancelDelay = 
+        | CancelDelay of Id
+        interface IRequest<unit>
 
     type DelayCompleted = DelayCompleted of Id
 
@@ -631,8 +636,11 @@ module IVR =
             if ts < TimeSpan.Zero then
                 failwithf "IVR.delay: unsupported negative time span: %s" (ts |> string)
             if ts <> TimeSpan.Zero then
-                let! id = Delay ts |> send
-                do! waitFor' (fun (DelayCompleted id') -> id' = id)
+                let! id = Delay ts
+                try
+                    do! waitFor' (fun (DelayCompleted id') -> id' = id)
+                finally
+                    CancelDelay id |> send
         }
 
     /// Deliver an event to the currently active processes.

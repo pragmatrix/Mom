@@ -733,22 +733,27 @@ module Delay =
     [<Fact>]
     let ``IVR.delay (simulated)``() = 
 
-        let host (c: obj) = 
+        let expectDelay (c: obj) = 
             c |> should equal (IVR.Delay (TimeSpan(1, 0, 0)))
             Id 1L |> box // return the 64 bit id of the Delay
 
-        let test = IVR.delay (TimeSpan(1, 0, 0))            
+        let expectCancelDelay (c: obj) = 
+            c |> should equal (IVR.CancelDelay (Id 1L))
+            () |> box
+
+        let test = IVR.delay (TimeSpan(1, 0, 0))
 
         test
         |> start
-        |> stepH host
+        |> stepH expectDelay
         |> dispatch (IVR.DelayCompleted (Id 1L))
+        |> stepH expectCancelDelay
         |> IVR.isCompleted |> should equal true
 
     [<Fact>]
     let ``IVR.delay completes immediately in case of a zero delay``() = 
 
-        let test = IVR.delay TimeSpan.Zero            
+        let test = IVR.delay TimeSpan.Zero
 
         let state = 
             test |> start

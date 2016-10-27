@@ -129,14 +129,20 @@ module Service =
 
     let delay (context: IServiceContext) =
         let delayIdGenerator = Ids.newGenerator()
+        let mutable activeTimers = Map.empty
         fun (cmd : Request) ->
             match cmd with
             | :? IVR.Delay as d -> 
                 let (IVR.Delay timespan) = d
                 let id = delayIdGenerator.GenerateId()
                 let callback _ = context.ScheduleEvent (IVR.DelayCompleted id)
-                new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L) |> Operators.ignore
+                let t = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
+                activeTimers <- Map.add id t activeTimers
                 id |> box |> Some
+            | :? IVR.CancelDelay as cd ->
+                let (IVR.CancelDelay id) = cd
+                activeTimers <- Map.remove id activeTimers
+                () |> box |> Some
             | _ -> None
 
     let async (context: IServiceContext) =
