@@ -661,8 +661,10 @@ module IVR =
     /// timeout after the given timespan and return None.
     let timeoutAfter (ts: TimeSpan) ivr = 
         any [
-            ivr |> map Some
+            // The delay gets started first, to ensure that
+            // startup times of ivr are included in the measurement.
             delay ts |> map (fun () -> None)
+            ivr |> map Some
         ]
 
     //
