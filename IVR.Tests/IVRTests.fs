@@ -885,7 +885,29 @@ module AsyncRequest =
         |> should equal (Cancelled : string IVR.result)
 
         cancelled |> should be True
-    
+
+    [<Fact>]
+    let ``AsyncRequest exceptions can be catched``() = 
+        let test = ivr {
+            try
+                let! r = AsyncRequest
+                return ""
+            with :? InvalidOperationException ->
+                return "Catched"
+        }
+
+        let host (c:obj) : obj =
+            match c with
+            | :? AsyncRequest ->
+                Id 10L |> box
+            | _ -> () |> box
+
+        test
+        |> start
+        |> stepH host
+        |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Error (InvalidOperationException())) : IVR.AsyncResponse<string>)
+        |> IVR.result
+        |> should equal (Value "Catched")
      
 module Arbiter = 
     
