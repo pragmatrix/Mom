@@ -849,7 +849,7 @@ module AsyncRequest =
 
         let host (c:obj) : obj =
             match c with
-            | :? AsyncRequest as ar ->
+            | :? AsyncRequest ->
                 Id 10L |> box
             | _ -> () |> box
 
@@ -865,7 +865,7 @@ module AsyncRequest =
         let mutable cancelled = false
         let test = ivr {
             try
-                let! r = AsyncRequest
+                let! _ = AsyncRequest
                 return ""
             finally
                 cancelled <- true
@@ -890,7 +890,7 @@ module AsyncRequest =
     let ``AsyncRequest exceptions can be catched``() = 
         let test = ivr {
             try
-                let! r = AsyncRequest
+                let! _ = AsyncRequest
                 return ""
             with :? InvalidOperationException ->
                 return "Catched"
