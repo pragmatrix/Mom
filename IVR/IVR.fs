@@ -110,6 +110,12 @@ module IVR =
 
         fun () ->
             ivr |> start |> next
+
+    let private bind body ivr = 
+        ivr |> continueWith (function 
+            | Value r -> body r
+            | Error err -> err |> ofError
+            | Cancelled -> Cancelled |> ofResult)
     
     /// Maps the ivr's result. In other words: lifts a function that converts a value from a to b
     /// into the IVR category.
@@ -419,13 +425,17 @@ module IVR =
     /// no value.
     type IRequest<'response> = 
         interface end
+    
+    /// An IVR that synchronously sends a request to a host and returns its response. 
+    let private sendUnsafe request : 'r ivr = 
+        fun () ->
+            Requesting (box request, Result.map unbox >> Completed)
 
     /// An IVR that synchronously sends a request to a host and returns its response. The requests
     /// need to implement the IRequest<_> interface so that the returned response value can be typed
     /// properly.
-    let send (cmd: IRequest<'r>) : 'r ivr = 
-        fun () ->
-            Requesting (box cmd, Result.map unbox >> Completed)
+    let send (request: IRequest<'r>) : 'r ivr = 
+        sendUnsafe request
 
     //
     // IDisposable, Flow style
@@ -465,23 +475,101 @@ module IVR =
         |> continueWith afterBody
 
     //
-    // Simple computation expression to build sequential IVR processes
+    // Wait primitives
+    //
+
+    /// An IVR that waits for some event given a function that returns (Some result) or None.
+    let wait f =
+        let rec waiter (ev: Event) =
+            match ev with
+            | :? TryCancel -> Cancelled |> Completed
+            | _ ->
+            try
+                match f ev with
+                | Some r -> r |> Value |> Completed
+                | None -> Waiting waiter
+            with e ->
+                e |> Error |> Completed
+
+        fun () -> Waiting waiter
+
+    /// Waits for some event by asking a predicate for each event that comes along.
+    /// Continues waiting when the predicate returns false, ends the ivr when the predicate 
+    /// returns true.
+    let wait' predicate = 
+        let f e = 
+            let r = predicate e
+            match r with 
+            | true -> Some ()
+            | false -> None
+
+        wait f
+
+    /// Waits for an event of a type derived by the function f that is passed in. 
+    /// Ends the ivr with the value returned by the function if it returns (Some value), 
+    /// continues waiting when f returns None
+    let waitFor (f : 'e -> 'r option) = 
+
+        let f (ev : Event) = 
+            match ev with
+            | :? 'e as e -> f e
+            | _ -> None
+
+        wait f
+
+    /// Waits for an event of a type derived by the function f that is passed in.
+    /// Ends the ivr when f return true. Continues waiting when f returns false.
+    let waitFor' (f : 'e -> bool) =
+        let f (ev: Event) =
+            match ev with
+            | :? 'e as e -> f e
+            | _ -> false
+
+        wait' f
+
+    /// Waits forever.
+    let idle<'r> : 'r ivr = 
+        wait' (fun _ -> false)
+        |> map (fun _ -> Unchecked.defaultof<'r>)
+
+    //
+    // Async Requests can be used for service based request response scenarios. 
+    // These are preferable to inline async commands, because they can be made
+    // serializable and traceable.
+    //
+
+    type IAsyncRequest<'response> = 
+        interface end
+
+    [<NoComparison>]
+    type AsyncResponse<'response> = 
+        | AsyncResponse of Id * 'response result
+
+    let sendAsync (cmd: IAsyncRequest<'response>) : 'response ivr =
+        sendUnsafe cmd
+        |> bind (fun id -> 
+            waitFor (fun (AsyncResponse(responseId, result)) -> 
+                if responseId = id then Some result else None))
+        |> bind ofResult
+        
+    //
+    // Computation expression builder for sequential IVR processes.
     //
 
     type IVRBuilder<'result>() = 
 
-        member __.Source(ivr: 'r ivr) : 'r ivr = ivr
-        member __.Source(r: 'r when 'r :> IRequest<'rr>) = r |> send
-        member __.Source(s: 'e seq) = s
+        member __.Source(ivr: _ ivr) : _ ivr = ivr
+        member __.Source(r: IRequest<_>) = r |> send
+        member __.Source(r: IAsyncRequest<_>) = r |> sendAsync
+        member __.Source(s: _ seq) = s
 
         member __.Bind(ivr: 'r ivr, body: 'r -> 'r2 ivr) : 'r2 ivr = 
-            ivr |> continueWith (function 
-                | Value r -> body r
-                | Error err -> err |> ofError
-                | Cancelled -> Cancelled |> ofResult)
+            ivr |> bind body
 
-        member __.Return(v: 'r) : 'r ivr = ofValue v
-        member __.ReturnFrom(ivr : 'r ivr) = ivr
+        member __.Return(v: 'r) : 'r ivr = 
+            ofValue v
+        member __.ReturnFrom(ivr : 'r ivr) = 
+            ivr
         member this.Delay(f : unit -> 'r ivr) : 'r ivr = 
             this.Bind(this.Return(), f)
         member this.Zero () : unit ivr = 
@@ -549,64 +637,6 @@ module IVR =
             member __.DisposableFlow = ivr
     }
             
-    //
-    // Wait primitives
-    //
-
-    /// An IVR that waits for some event given a function that returns (Some result) or None.
-    let wait f =
-        let rec waiter (ev: Event) =
-            match ev with
-            | :? TryCancel -> Cancelled |> Completed
-            | _ ->
-            try
-                match f ev with
-                | Some r -> r |> Value |> Completed
-                | None -> Waiting waiter
-            with e ->
-                e |> Error |> Completed
-
-        fun () -> Waiting waiter
-
-    /// Waits for some event by asking a predicate for each event that comes along.
-    /// Continues waiting when the predicate returns false, ends the ivr when the predicate 
-    /// returns true.
-    let wait' predicate = 
-        let f e = 
-            let r = predicate e
-            match r with 
-            | true -> Some ()
-            | false -> None
-
-        wait f
-
-    /// Waits for an event of a type derived by the function f that is passed in. 
-    /// Ends the ivr with the value returned by the function if it returns (Some value), 
-    /// continues waiting when f returns None
-    let waitFor (f : 'e -> 'r option) = 
-
-        let f (ev : Event) = 
-            match ev with
-            | :? 'e as e -> f e
-            | _ -> None
-
-        wait f
-
-    /// Waits for an event of a type derived by the function f that is passed in.
-    /// Ends the ivr when f return true. Continues waiting when f returns false.
-    let waitFor' (f : 'e -> bool) =
-        let f (ev: Event) =
-            match ev with
-            | :? 'e as e -> f e
-            | _ -> false
-
-        wait' f
-
-    /// Waits forever.
-    let idle<'r> : 'r ivr = 
-        wait' (fun _ -> false)
-        |> map (fun _ -> Unchecked.defaultof<'r>)
-
     /// Combine a number of unit ivrs so that they are run in sequence, one after another.
     let rec sequence (ivrs: unit ivr list) : unit ivr = ivr {
         match ivrs with

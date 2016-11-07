@@ -677,7 +677,7 @@ let ``when one part of a parallel ivr gets cancelled, the followup ivr continues
 
 module HostCommunication =
     [<Fact>]
-    let ``IVR.post sends a request to the host``() =
+    let ``IVR.send sends a request to the host``() =
         let queue = Queue()
         
         let test = ivr {
@@ -693,7 +693,7 @@ module HostCommunication =
 
 
     [<Fact>]
-    let ``IVR.post sends requests to the host in the right order``() =
+    let ``IVR.send sends requests to the host in the right order``() =
         let queue = Queue()
         
         let test = ivr {
@@ -710,7 +710,7 @@ module HostCommunication =
         queue |> Seq.toList |> should equal [box <| RequestU 0; box <| RequestU 1]
 
     [<Fact>]
-    let ``after a wait, IVR.post sends a request to the host``() =
+    let ``after a wait, IVR.send sends a request to the host``() =
         let queue = Queue()
         
         let test = ivr {
@@ -833,6 +833,59 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> IVR.result
         |> should equal (Value ()) 
+
+module AsyncRequest = 
+
+    type AsyncRequest =
+        | AsyncRequest
+        interface IVR.IAsyncRequest<string>
+    
+    [<Fact>]
+    let ``AsyncRequest works``() = 
+        let test = ivr {
+            let! r = AsyncRequest
+            return r
+        }
+
+        let host (c:obj) : obj =
+            match c with
+            | :? AsyncRequest as ar ->
+                Id 10L |> box
+            | _ -> () |> box
+
+        test
+        |> start
+        |> stepH host
+        |> dispatch (IVR.AsyncResponse(Id 10L, Value "Hello"))
+        |> IVR.result
+        |> should equal (Value "Hello")
+
+    [<Fact>]
+    let ``AsyncRequest cancellation works``() = 
+        let mutable cancelled = false
+        let test = ivr {
+            try
+                let! r = AsyncRequest
+                return ""
+            finally
+                cancelled <- true
+        }
+
+        let host (c:obj) : obj =
+            match c with
+            | :? AsyncRequest ->
+                Id 10L |> box
+            | _ -> () |> box
+
+        test
+        |> start
+        |> stepH host
+        |> dispatch (IVR.AsyncResponse(Id 10L, Cancelled) : IVR.AsyncResponse<string>)
+        |> IVR.result
+        |> should equal (Cancelled : string IVR.result)
+
+        cancelled |> should be True
+    
      
 module Arbiter = 
     
