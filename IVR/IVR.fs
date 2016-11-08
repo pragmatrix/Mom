@@ -111,7 +111,7 @@ module IVR =
         fun () ->
             ivr |> start |> next
 
-    let private bind body ivr = 
+    let bind body ivr = 
         ivr |> continueWith (function 
             | Value r -> body r
             | Error err -> err |> ofError
