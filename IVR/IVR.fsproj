@@ -55,6 +55,7 @@
     <Compile Include="IVR.fs" />
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />
+    <Compile Include="AsyncService.fs" />
     <Content Include="app.config" />
     <Content Include="paket.references" />
   </ItemGroup>
