@@ -499,7 +499,7 @@ module IVR =
     let wait' predicate = 
         let f e = 
             let r = predicate e
-            match r with 
+            match r with
             | true -> Some ()
             | false -> None
 
