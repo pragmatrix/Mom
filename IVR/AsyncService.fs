@@ -32,14 +32,18 @@ let add (f: 'e -> Async<'response> when 'e :> IVR.IAsyncRequest<'response>) (bui
         function
         | :? 'e as r -> 
             let id = builder.IdGenerator.GenerateId()
+            let scheduleResponse (r: 'response IVR.result)  = 
+                IVR.AsyncResponse(id, r)
+                |> context.ScheduleEvent
+                
             Async.Start <| async {
                 try
                     let! response = f r
-                    IVR.AsyncResponse(id, Value response)
-                    |> context.ScheduleEvent
+                    Value response
+                    |> scheduleResponse
                 with e ->
-                    IVR.AsyncResponse(id, Error e)
-                    |> context.ScheduleEvent
+                    Error e
+                    |> scheduleResponse
             }
             Some <| box id
         | _ -> 
@@ -49,7 +53,7 @@ let add (f: 'e -> Async<'response> when 'e :> IVR.IAsyncRequest<'response>) (bui
 
 /// Add an async service function that is considered unsafe, meaning that
 /// its result is ignored. This is useful for situations in which
-/// and async service function may be used in a finalizer (which can never
+/// an async service function may be used in a finalizer (which can never
 /// wait for an event / result), _and_ it's failure is not considered fatal.
 let addUnsafe (f: 'e -> Async<unit> when 'e :> IVR.IRequest<unit>) =
 
