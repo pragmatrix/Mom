@@ -219,7 +219,7 @@ module IVR =
     ///   that exception as an error result.
     ///   Cancellation is processed in reversed field insertion order.
     
-    let field (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
+    let field' (arbiter: Arbiter<'state, 'r>) (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
 
         let rev = List.rev
 
@@ -320,17 +320,17 @@ module IVR =
         fun () ->
             enter { State = initial; Event = None; Pending = []; Processed = [] } ivrs
 
-    /// game is a simpler version of the field, in which errors automatically lead to
-    /// the cancellation of the game so that the game master does not need to handle them.
+    /// field is a simpler version of the field, in which errors automatically lead to
+    /// the cancellation of the field so that the arbiter does not need to handle them.
 
-    let game master (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
+    let field arbiter (initial: 'state) (ivrs: 'r ivr list) : 'state ivr = 
         let arbiter state (r: 'r result) = 
             match r with
-            | Value v -> master state v
+            | Value v -> arbiter state v
             | Error e -> cancelField (Error e)
             | Cancelled -> cancelField Cancelled
 
-        field arbiter initial ivrs
+        field' arbiter initial ivrs
 
     /// Combine a list of ivrs so that they run in parallel. The resulting ivr ends when 
     /// all ivrs ended. When an error occurs in one of the ivrs, the resulting ivr ends with
@@ -344,13 +344,9 @@ module IVR =
         let ivrs = ivrs |> lmapi (fun i r -> i, r)
         
         // arbiter collects the results in a map
-        let arbiter state (r: (int * 'r) result) = 
-            match r with
-            | Value (i, r) -> 
-                let state = state |> Map.add i r
-                continueField state []
-            | Error r -> cancelField (Error r)
-            | Cancelled -> cancelField Cancelled
+        let arbiter state (i, r) = 
+            let state = state |> Map.add i r
+            continueField state []
 
         // and at last, convert the map to a list.
         let mapToList m = 
@@ -373,7 +369,7 @@ module IVR =
         // (independent of how many of them already received the current event)!
 
         let arbiter _ = cancelField
-        field arbiter Unchecked.defaultof<'r> ivrs
+        field' arbiter Unchecked.defaultof<'r> ivrs
 
     /// Runs two ivrs in parallel, the resulting ivr completes, when both ivrs are completed.
     /// Events are delivered first to ivr1, then to ivr2. When one of the ivrs terminates without a result 
