@@ -56,17 +56,17 @@ module private UnsafeRegistry =
         // tbd: make this simpler (probably by polling)!
         // this is the standard condition variable wait pattern
         // https://en.wikipedia.org/wiki/Monitor_(synchronization) (Monitor usage)
-        lock registry.SyncRoot 
-        <| fun () ->
-            let rec loop() =
-                if registry.Active = 0 then Completed else
-                let now = Stopwatch.GetTimestamp()
-                if timeoutAt <= now then JoinResult.Timeout else
-                let maxWait = timeoutAt - now
-                if Monitor.Wait(registry.SyncRoot, TimeSpan.FromSeconds(float maxWait / ticksPerSecond)) 
-                then loop()
-                else JoinResult.Timeout
-            loop()
+        lock registry.SyncRoot <| 
+        fun () ->
+        let rec loop() =
+            if registry.Active = 0 then Completed else
+            let now = Stopwatch.GetTimestamp()
+            if timeoutAt <= now then JoinResult.Timeout else
+            let maxWait = timeoutAt - now
+            if Monitor.Wait(registry.SyncRoot, TimeSpan.FromSeconds(float maxWait / ticksPerSecond)) 
+            then loop()
+            else JoinResult.Timeout
+        loop()
 
     /// Wait for all async jobs to be completed within the given timeout. Cancel them
     /// and wait again if they did not complete.
