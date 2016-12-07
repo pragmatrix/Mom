@@ -4,12 +4,14 @@ module IVR.AsyncService
 open System
 open System.Threading
 open System.Diagnostics
+open System.Runtime.ExceptionServices
 
 [<NoEquality; NoComparison>]
 type internal UnsafeRegistry = {
     Cancellation: CancellationTokenSource
     SyncRoot: obj
     mutable Active: int
+    OnException: exn -> unit
 }
 
 type JoinResult = 
@@ -23,6 +25,7 @@ module private UnsafeRegistry =
         Cancellation = new CancellationTokenSource()
         SyncRoot = obj()
         Active = 0
+        OnException = fun e -> ExceptionDispatchInfo.Capture(e).Throw()
     }
 
     let register registry = 
@@ -46,9 +49,12 @@ module private UnsafeRegistry =
 
         let registeredJob = async {
             try
-                do! job()
-            finally
-                unregister registry
+                try
+                    do! job()
+                finally
+                    unregister registry
+            with e ->
+                registry.OnException e
         }
 
         Async.Start(registeredJob, registry.Cancellation.Token)
@@ -153,3 +159,8 @@ let addUnsafe (f: 'e -> Async<unit> when 'e :> IVR.IRequest<unit>) builder =
             None
 
     addDispatcher dispatch builder
+
+/// Track exceptions of unsafe functions. Call this function before adding any 
+/// unsafe functions that need their exceptions to be tracked.
+let trackException f builder = 
+    { builder with Registry = { builder.Registry with OnException = f } }
