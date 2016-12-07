@@ -450,9 +450,7 @@ module IVR =
     exception NestedCancellationException
 
     /// Install an cancellation ivr for the ivr body. That cancellation ivr is called 
-    /// when the code inside the block gets cancelled. This function can only be used in a use! 
-    /// instruction inside of a computation expression.
-
+    /// when the code inside the block gets cancelled. 
     let onCancel cancelIVR body = 
         let afterBody rBody =
             let afterCancel rCancellation = 
