@@ -38,12 +38,15 @@ module private UnsafeRegistry =
         registry.Active <- registry.Active - 1
         Monitor.PulseAll registry.SyncRoot
 
-    let run (job: Async<unit>) registry = 
+    /// Run an async job in the context of the registry. Note that the
+    /// job itself must be deferred, so that the registration covers the
+    /// complete dispatching process of a message.
+    let run (job: unit -> Async<unit>) registry = 
         register registry
 
         let registeredJob = async {
             try
-                do! job
+                do! job()
             finally
                 unregister registry
         }
@@ -144,7 +147,7 @@ let addUnsafe (f: 'e -> Async<unit> when 'e :> IVR.IRequest<unit>) builder =
     let dispatch _ : (Request -> Response option) =
         function
         | :? 'e as r -> 
-            UnsafeRegistry.run (f r) registry
+            UnsafeRegistry.run (fun () -> f r) registry
             Some <| box ()
         | _ -> 
             None
