@@ -655,17 +655,16 @@ module IVR =
     type DelayCompleted = DelayCompleted of Id
 
     /// Wait for the given time span and continue then.
-    let delay (ts: TimeSpan) =
-        ivr {
-            if ts < TimeSpan.Zero then
-                failwithf "IVR.delay: unsupported negative time span: %s" (ts |> string)
-            if ts <> TimeSpan.Zero then
-                let! id = Delay ts
-                try
-                    do! waitFor' (fun (DelayCompleted id') -> id' = id)
-                finally
-                    CancelDelay id |> send
-        }
+    let delay (ts: TimeSpan) = ivr {
+        if ts < TimeSpan.Zero then
+            failwithf "IVR.delay: unsupported negative time span: %s" (ts |> string)
+        if ts <> TimeSpan.Zero then
+            let! id = Delay ts
+            try
+                do! waitFor' (fun (DelayCompleted id') -> id' = id)
+            finally
+                CancelDelay id |> send
+    }
 
     /// Deliver an event to the currently active processes.
     [<NoComparison>]
@@ -719,15 +718,14 @@ module IVR =
     type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: obj result
 
     /// Waits for an F# asynchronous computation.
-    let await (computation: Async<'r>) : 'r ivr = 
-        ivr {
-            let! id = AsyncComputation(computation) |> send
-            let! result = 
-                waitFor(
-                    fun (AsyncComputationCompleted (id', result)) -> 
-                        if id' = id then Some result else None)
-            return! (result |> Result.map unbox) |> ofResult
-        }
+    let await (computation: Async<'r>) : 'r ivr = ivr {
+        let! id = AsyncComputation(computation) |> send
+        let! result = 
+            waitFor(
+                fun (AsyncComputationCompleted (id', result)) -> 
+                    if id' = id then Some result else None)
+        return! (result |> Result.map unbox) |> ofResult
+    }
 
 /// Helpers for mapping values of IVR lists
 module IVRs = 
