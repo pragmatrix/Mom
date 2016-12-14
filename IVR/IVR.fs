@@ -449,24 +449,37 @@ module IVR =
 
     exception NestedCancellationException
 
-    /// Install an cancellation ivr for the ivr body. That cancellation ivr is called 
+    /// Attach a compensating ivr for the ivr body. That cancellation ivr is called 
     /// when the code inside the block gets cancelled. 
-    let onCancel cancelIVR body = 
-        let afterBody rBody =
-            let afterCancel rCancellation = 
-                match rCancellation with
-                | Value _ -> rBody |> ofResult
-                | Error e -> e |> ofError
-                // the cancellation ivr got cancelled! This is an error for now!
-                // tbd: An cancellation ivr must be protected from further cancellation.
-                | Cancelled -> NestedCancellationException |> ofError
+    let onCancel (compensation: unit ivr) = 
+        continueWith <| function
+        | Cancelled -> compensation |> continueWith (function
+            | Value _ -> Cancelled |> ofResult
+            | Error e -> e |> ofError
+            // the compensation ivr got cancelled! This is an error for now!
+            // tbd: An cancellation ivr must be protected from further cancellation.
+            | Cancelled -> NestedCancellationException |> ofError)
+        | r -> r |> ofResult
+
+    /// Attach an compensating ivr for the ivr body that is called when a cancellation or an error
+    /// happened.
+    /// The compensating ivr receives (Some Exception) in case of an error, and None in case
+    /// of a cancelation.
+    let onCancelOrError (compensation: exn option -> unit ivr) body = 
+        let compensate rBody =
+            let afterCancel = function
+            | Value _ -> rBody |> ofResult
+            | Error e -> e |> ofError
+            // the compensation ivr got cancelled! This is an error for now!
+            // tbd: An cancellation ivr must be protected from further cancellation.
+            | Cancelled -> NestedCancellationException |> ofError
 
             match rBody with
-            | Cancelled -> cancelIVR |> continueWith afterCancel
-            | _ -> rBody |> ofResult
+            | Error e -> compensation (Some e) |> continueWith afterCancel
+            | Cancelled -> compensation None |> continueWith afterCancel
+            | r -> r |> ofResult
 
-        body
-        |> continueWith afterBody
+        body |> continueWith compensate
 
     //
     // Wait primitives
