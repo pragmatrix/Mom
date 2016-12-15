@@ -35,8 +35,8 @@ let start = IVR.start
 let dispatch = IVR.dispatch
 let stepH host ivr =
     match ivr with
-    | Requesting (r, cont) -> 
-        host r |> unbox |> Value |> cont
+    | IVR.Requesting (r, cont) -> 
+        host r |> unbox |> IVR.Value |> cont
     | _ -> failwithf "stepH: invalid state %A" ivr
 
 
@@ -561,7 +561,7 @@ module Exceptions =
         test
         |> start
         |> IVR.result
-        |> should equal (Value 1)
+        |> should equal (IVR.Value 1)
 
     [<Fact>]
     let ``handles exception at runtime``() =
@@ -579,7 +579,7 @@ module Exceptions =
         |> start
         |> dispatch Event1
         |> IVR.result
-        |> should equal (Value 1)
+        |> should equal (IVR.Value 1)
 
     [<Fact>]
     let ``a waiter's exception is captured``() =
@@ -598,7 +598,7 @@ module Exceptions =
         |> start
         |> dispatch Event1
         |> IVR.result
-        |> should equal (Value 1)
+        |> should equal (IVR.Value 1)
 
     [<Fact>]
     let ``handle exception in exception handler after wait``() =
@@ -621,7 +621,7 @@ module Exceptions =
         res |> IVR.isError |> should be True
 
         res 
-        |> IVR.result       
+        |> IVR.result
         |> sprintf "%A"
         |> should haveSubstring "AGAIN"
 
@@ -817,7 +817,7 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> IVR.result
-        |> should equal (Value 3) 
+        |> should equal (IVR.Value 3) 
 
     [<Fact>]
     let ``For``() = 
@@ -832,7 +832,7 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> IVR.result
-        |> should equal (Value ()) 
+        |> should equal (IVR.Value ()) 
 
 module AsyncRequest = 
 
@@ -856,9 +856,9 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (IVR.AsyncResponse(Id 10L, Value "Hello"))
+        |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Value "Hello"))
         |> IVR.result
-        |> should equal (Value "Hello")
+        |> should equal (IVR.Value "Hello")
 
     [<Fact>]
     let ``AsyncRequest cancellation works``() = 
@@ -880,9 +880,9 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (IVR.AsyncResponse(Id 10L, Cancelled) : IVR.AsyncResponse<string>)
+        |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Cancelled) : IVR.AsyncResponse<string>)
         |> IVR.result
-        |> should equal (Cancelled : string IVR.result)
+        |> should equal (IVR.Cancelled : string IVR.result)
 
         cancelled |> should be True
 
@@ -907,7 +907,7 @@ module AsyncRequest =
         |> stepH host
         |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Error (InvalidOperationException())) : IVR.AsyncResponse<string>)
         |> IVR.result
-        |> should equal (Value "Catched")
+        |> should equal (IVR.Value "Catched")
      
 module Arbiter = 
     

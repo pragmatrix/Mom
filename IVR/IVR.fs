@@ -12,42 +12,42 @@ open System
     - can be run in steps.
 *)
 
-type Request = obj
-type Response = obj
-type Event = obj
-type Host = Request -> Response
-
-[<NoComparison>]
-type 'result result =
-    | Value of 'result
-    | Error of exn
-    | Cancelled
-
-module Result =
-    let map f r =
-        match r with
-        | Value r -> Value (f r)
-        | Error e -> Error e
-        | Cancelled -> Cancelled
-
-[<NoComparison;NoEquality>]
-type 'result ivr = unit -> 'result flux
-
-and [<NoComparison;NoEquality>] 
-    'result flux =
-    | Requesting of Request * (Response result -> 'result flux)
-    | Waiting of (Event -> 'result flux)
-    | Completed of 'result result
-
 [<RequireQualifiedAccess>]
 module IVR = 
+
+    type Request = obj
+    type Response = obj
+    type Event = obj
+    type Host = Request -> Response
+
+    [<NoComparison>]
+    type 'result result =
+        | Value of 'result
+        | Error of exn
+        | Cancelled
+
+    module Result =
+        let map f r =
+            match r with
+            | Value r -> Value (f r)
+            | Error e -> Error e
+            | Cancelled -> Cancelled
+
+    [<NoComparison;NoEquality>]
+    type 'result ivr = unit -> 'result flux
+
+    and [<NoComparison;NoEquality>] 
+        'result flux =
+        | Requesting of Request * (Response result -> 'result flux)
+        | Waiting of (Event -> 'result flux)
+        | Completed of 'result result
 
     // 
     // IVR Primitives Part 1
     //
 
     /// Start up an ivr.
-    let start ivr = ivr ()
+    let start (ivr : _ ivr) = ivr ()
 
     /// Dispatch an event to the ivr that is currently waiting for one.
     let dispatch ev flux =
@@ -604,7 +604,7 @@ module IVR =
                     | Cancelled -> Cancelled |> ofResult
 
                 // note: f is already delayed
-                f |> start |> continueWith afterFinally
+                f() |> continueWith afterFinally
 
             ivr |> continueWith finallyBlock
 
@@ -745,9 +745,9 @@ module IVRs =
     let map f ivrs = IVR.lmap f ivrs
     let mapi f ivrs = IVR.lmapi f ivrs
 
-module BuilderExtensions = 
+module GlobalExports = 
     let ivr<'r> = IVR.ivr<'r>
+    type ivr<'r> = IVR.ivr<'r>
 
-// a little inception may not do any harm :)
-[<assembly:AutoOpen("IVR.BuilderExtensions")>]
+[<assembly:AutoOpen("IVR.GlobalExports")>]
 do ()

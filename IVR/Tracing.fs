@@ -6,15 +6,20 @@ open System.Globalization
 open System.Diagnostics
 open MBrace.FsPickler
 
+open IVR.GlobalExports
+
 //
 // IVR Tracing support.
 //
 
+type result<'r> = IVR.result<'r>
+type flux<'r> = IVR.flux<'r>
+
 /// A step trace represents a trace for a single step of an IVR. 
 [<NoComparison>]
 type StepTrace = 
-    | EventTrace of Event
-    | RequestTrace of Request * obj result
+    | EventTrace of IVR.Event
+    | RequestTrace of IVR.Request * obj result
 
 [<NoComparison>]
 type Trace<'param, 'r> = 
@@ -28,26 +33,26 @@ let trace (p: 'param) (f : 'param -> 'r ivr) : Trace<'param, 'r> ivr =
         let startTime = DateTimeOffset.UtcNow
         let stopwatch = Stopwatch.StartNew()
         
-        let rec next traces flux =            
+        let rec next traces flux =
             match flux with
-            | Requesting (request, cont) ->
-                Requesting (request, 
+            | IVR.Requesting (request, cont) ->
+                IVR.Requesting (request, 
                     fun response -> 
                         response 
                         |> cont
                         |> next ((stopwatch.Elapsed, RequestTrace (request, response)) :: traces))
 
-            | Waiting (cont) ->
-                Waiting (
+            | IVR.Waiting (cont) ->
+                IVR.Waiting (
                     fun event ->
                     event 
                     |> cont 
                     |> next ((stopwatch.Elapsed, EventTrace event) :: traces))
 
-            | Completed r ->
+            | IVR.Completed r ->
                 Trace((startTime, p), traces |> List.rev, r)
-                |> Value 
-                |> Completed
+                |> IVR.Value
+                |> IVR.Completed
         
         f p |> IVR.start |> next []
 
@@ -63,17 +68,17 @@ let replay (f: 'param -> 'r ivr) (Trace((_, param), traces, expectedResult)) : R
     
     let rec next traces flux = 
         match flux with
-        | Requesting (request, cont) ->
+        | IVR.Requesting (request, cont) ->
             match traces with
             | RequestTrace (r, response) :: traces when r = request ->
                 response |> cont |> next traces
             | traces -> ReplayReport.Diverged(traces, flux)
-        | Waiting (cont) ->
+        | IVR.Waiting (cont) ->
             match traces with
             | EventTrace e :: traces ->
                 e |> cont |> next traces
             | traces -> ReplayReport.Diverged(traces, flux)
-        | Completed r ->
+        | IVR.Completed r ->
             match traces with
             | [] when r = expectedResult ->
                 ReplayReport.Completed

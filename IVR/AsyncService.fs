@@ -91,7 +91,7 @@ module private UnsafeRegistry =
 type AsyncServiceBuilder = internal {
     IdGenerator: Ids.Generator
     Registry: UnsafeRegistry
-    Service: Runtime.IServiceContext -> Request -> Response option
+    Service: Runtime.IServiceContext -> IVR.Request -> IVR.Response option
 }
 
 /// Create a new async service builder.
@@ -119,7 +119,7 @@ let private addDispatcher dispatcher (builder: AsyncServiceBuilder) =
 /// Add an async service function to the builder.
 let add (f: 'e -> Async<'response> when 'e :> IVR.IAsyncRequest<'response>) (builder: AsyncServiceBuilder) =
         
-    let dispatch (context: Runtime.IServiceContext) : (Request -> Response option) =
+    let dispatch (context: Runtime.IServiceContext) : (IVR.Request -> IVR.Response option) =
         function
         | :? 'e as r -> 
             let id = builder.IdGenerator.GenerateId()
@@ -130,10 +130,10 @@ let add (f: 'e -> Async<'response> when 'e :> IVR.IAsyncRequest<'response>) (bui
             Async.Start <| async {
                 try
                     let! response = f r
-                    Value response
+                    IVR.Value response
                     |> scheduleResponse
                 with e ->
-                    Error e
+                    IVR.Error e
                     |> scheduleResponse
             }
             Some <| box id
@@ -150,7 +150,7 @@ let addUnsafe (f: 'e -> Async<unit> when 'e :> IVR.IRequest<unit>) builder =
 
     let registry = builder.Registry
 
-    let dispatch _ : (Request -> Response option) =
+    let dispatch _ : (IVR.Request -> IVR.Response option) =
         function
         | :? 'e as r -> 
             UnsafeRegistry.run (fun () -> f r) registry
