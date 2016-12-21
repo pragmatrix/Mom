@@ -21,7 +21,7 @@ let create<'message>(name) : 'message sender * 'message receiver =
     { Name = name }, { Name = name }
 
 /// Post a message to a channel.
-let post message (channel: 'message sender) = ivr {
+let post (message: 'message) (channel: 'message sender) = ivr {
     do! IVR.schedule (Message(channel.Name, message))
 }
 
