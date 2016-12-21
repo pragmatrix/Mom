@@ -12,8 +12,8 @@ type 'message sender = {
     Name: string
 }
 
-/// The (internal) message that is sent.
-type internal Message<'message> =
+/// The message that is sent.
+type Message<'message> =
     | Message of channel: string * 'message
 
 /// Create a named channel, returns a sender and a receiver pair.
