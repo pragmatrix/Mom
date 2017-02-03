@@ -126,6 +126,9 @@ module IVR =
 
     /// Ignores the ivr's result.
     let ignore ivr = ivr |> map ignore
+
+    /// Runs the ivr, ignores its result, and then changes the ivr's return value to the value given. 
+    let force value ivr = ivr |> map (fun _ -> value)
             
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
