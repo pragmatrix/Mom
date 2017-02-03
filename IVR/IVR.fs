@@ -124,7 +124,7 @@ module IVR =
             fun () -> r |> Result.map f |> Completed
         continueWith f ivr
 
-    /// Ignores the ivr's result type.
+    /// Ignores the ivr's result.
     let ignore ivr = ivr |> map ignore
             
     /// Invokes a function when the ivr is completed.
@@ -360,8 +360,8 @@ module IVR =
         |> map mapToList
     
     /// Runs a list of ivrs in parallel and finish with the first one that completes.
-    /// Note that it may take an arbitrary amount of time (steps) until the result is finally 
-    /// returned, because ivrs may refuse to get cancelled.
+    /// If one ivr completes, it may take an arbitrary amount of time (steps) until the result is finally 
+    /// returned, because the remaining ivrs may refuse to get cancelled.
     let any (ivrs: 'r ivr list) : 'r ivr =
 
         // Note: when an ivr finishes, all the running ones are canceled in the reversed 
