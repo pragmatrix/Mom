@@ -57,6 +57,7 @@
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
+    <Compile Include="InlineAsyncService.fs" />
     <Content Include="app.config" />
     <Content Include="paket.references" />
   </ItemGroup>
