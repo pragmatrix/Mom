@@ -5,7 +5,7 @@
 /// To implement that, it installs a mailbox processor for each type. 
 /// If the async functions need to run in parallel, use another type.
 
-module IVR.InlineAsyncService
+namespace IVR
 
 open System
 open System.Reflection
@@ -116,42 +116,44 @@ module private ExecuteWrapper =
             :?> Func<Id, obj, obj>
         f.Invoke
 
-/// Create a service that is able to support IInlineAsyncService<'response>
-let create() : Runtime.IServiceContext -> IVR.Request -> IVR.Response option = 
+module InlineAsyncRequestService =
 
-    fun (service : Runtime.IServiceContext) ->
+    /// Create a service that is able to support IInlineAsyncService<'response>
+    let create() : Runtime.IServiceContext -> IVR.Request -> IVR.Response option = 
 
-    let helperTable = Dictionary<Type, ExecuteF * Processor * ResponseF>()
-    let resolveHelper t =
-        match helperTable.TryGetValue t with
-        | true, helper -> helper
-        | _ ->
-        let responseType = resolveResponseType t
-        let helper = createBoxedExecute responseType, createProcessor(), createBoxedResponse responseType
-        helperTable.Add(t, helper)
-        helper
+        fun (service : Runtime.IServiceContext) ->
 
-    function
-    | :? IInlineAsyncRequest as r ->
-        let execute, processor, createResponse = resolveHelper (r.GetType())
-        let f = execute r
+        let helperTable = Dictionary<Type, ExecuteF * Processor * ResponseF>()
+        let resolveHelper t =
+            match helperTable.TryGetValue t with
+            | true, helper -> helper
+            | _ ->
+            let responseType = resolveResponseType t
+            let helper = createBoxedExecute responseType, createProcessor(), createBoxedResponse responseType
+            helperTable.Add(t, helper)
+            helper
+
+        function
+        | :? IInlineAsyncRequest as r ->
+            let execute, processor, createResponse = resolveHelper (r.GetType())
+            let f = execute r
             
-        let id = IVR.generateAsyncRequestId()
+            let id = IVR.generateAsyncRequestId()
 
-        Async.Start <| async {
-            let! reply = 
-                processor.PostAndAsyncReply 
-                <| fun replyChannel -> RunAsync(f, replyChannel)
+            Async.Start <| async {
+                let! reply = 
+                    processor.PostAndAsyncReply 
+                    <| fun replyChannel -> RunAsync(f, replyChannel)
 
-            let result =
-                match reply with
-                | Ok response -> IVR.Value response
-                | Error e -> IVR.Error e.SourceException
+                let result =
+                    match reply with
+                    | Ok response -> IVR.Value response
+                    | Error e -> IVR.Error e.SourceException
 
-            service.ScheduleEvent(Some <| createResponse(id, result))
-        }
+                service.ScheduleEvent(Some <| createResponse(id, result))
+            }
 
-        Some (box id)
+            Some (box id)
 
-    | _ -> None
+        | _ -> None
         
