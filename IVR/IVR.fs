@@ -555,6 +555,9 @@ module IVR =
     type AsyncResponse<'response> = 
         | AsyncResponse of Id * 'response result
 
+    /// Every IAsyncRequest handler needs to use this shared, thread-safe Id generator.
+    let generateAsyncRequestId = Ids.newGenerator().GenerateId
+
     let sendAsync (cmd: IAsyncRequest<'response>) : 'response ivr =
         sendUnsafe cmd
         |> bind (fun id -> 
