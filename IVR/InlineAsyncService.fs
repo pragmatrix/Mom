@@ -8,7 +8,6 @@
 namespace IVR
 
 open System
-open System.Reflection
 open System.Collections.Generic
 open System.Runtime.ExceptionServices
 open Microsoft.FSharp.Quotations
@@ -65,30 +64,33 @@ module private ExecuteWrapper =
     // the generic function to resolve the async function.
 
     let wrap<'response> (request: IInlineAsyncRequest) : unit -> Async<obj> =
-        fun () -> async {
-            let request = request :?> IInlineAsyncRequest<'response>
-            let! r = request.Execute()
-            return box r
-        }
+        // can't return this as a fun / lambda, somehow these screws up the method
+        // extractor below.
+        let f() =
+            async {
+                let request = request :?> IInlineAsyncRequest<'response>
+                let! r = request.Execute()
+                return box r
+            }
+        f
 
     // the generic function to create a typed AsyncResponse.
-    let createResponse<'response> (id: Id, response: obj) : obj =
-        box <| IVR.AsyncResponse(id, unbox response)
-
-    type Req() = 
-        interface IInlineAsyncRequest
+    let createResponse<'response> (id: Id, result: obj) : obj =
+        let unboxedResult : IVR.result<obj> = unbox result
+        let r : IVR.AsyncResponse<'response> = IVR.AsyncResponse(id, unboxedResult |> IVR.Result.map unbox)
+        box r
 
     // use Quotations to get out the MethodInfo of the wrap function.
     let wrapMethodInfo = 
         let exp = <@@ wrap<obj>((box null) :?> IInlineAsyncRequest) @@>
         match exp with
-        | Patterns.Call(_, mi, _) -> mi
+        | Patterns.Call(_, mi, _) -> mi.GetGenericMethodDefinition()
         | _ -> failwith "internal error"
 
     let responseMethodInfo = 
         let exp = <@@ createResponse<obj>(Id 0L, null) @@>
         match exp with
-        | Patterns.Call(_, mi, _) -> mi
+        | Patterns.Call(_, mi, _) -> mi.GetGenericMethodDefinition()
         | _ -> failwith "internal error"
 
     type ExecuteF = IInlineAsyncRequest -> unit -> Async<obj>
@@ -144,13 +146,14 @@ module InlineAsyncRequestService =
                 let! reply = 
                     processor.PostAndAsyncReply 
                     <| fun replyChannel -> RunAsync(f, replyChannel)
-
+                
                 let result =
                     match reply with
                     | Ok response -> IVR.Value response
                     | Error e -> IVR.Error e.SourceException
 
-                service.ScheduleEvent(Some <| createResponse(id, result))
+                createResponse(id, result)
+                |> service.ScheduleEvent
             }
 
             Some (box id)
