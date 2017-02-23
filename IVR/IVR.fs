@@ -710,7 +710,7 @@ module IVR =
         ]
 
     //
-    // Async interopability
+    // Async interoperability
     //
 
     // async computations are scheduled on the threadpool by default.
