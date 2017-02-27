@@ -754,6 +754,10 @@ module IVRs =
 module GlobalExports = 
     let ivr<'r> = IVR.ivr<'r>
     type ivr<'r> = IVR.ivr<'r>
+    /// Monadic bind, process a, and then process b with the result of a.
+    let inline (>>=) a b = a |> IVR.bind b
+    /// Same as >>=, but ignores the result of a.
+    let inline (>>=.) a b = a |> IVR.bind (fun _ -> b)
 
 [<assembly:AutoOpen("IVR.GlobalExports")>]
 do ()
