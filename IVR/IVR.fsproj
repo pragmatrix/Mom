@@ -54,7 +54,7 @@
     <Compile Include="Ids.fs" />
     <Compile Include="IVR.fs" />
     <Compile Include="Channel.fs" />
-    <Compile Include="Promiscuous.fs" />
+    <Compile Include="Interruptible.fs" />
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
