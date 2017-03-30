@@ -646,34 +646,53 @@ module CancellationAndFinally =
     
         runFinally |> should be True
         IVR.isCancelled res |> should be True
+
+    [<Fact>]
+    let ``cancelled ivrs may propagate errors``() =
+
+        let ivr = ivr {
+            try
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+            finally
+                failwith "error" |> ignore
+        }
+
+        let res = 
+            ivr
+            |> start
+            |> dispatch IVR.TryCancel
+
+        IVR.isError res |> should be True
+
+module UnresolvedIssues =
         
-[<Fact(Skip="See issue #4")>]
-let ``when one part of a parallel ivr gets cancelled, the followup ivr continues while the cancellation is run``() = 
+    [<Fact(Skip="See issue #4")>]
+    let ``when one part of a parallel ivr gets cancelled, the followup ivr continues while the cancellation is run``() = 
 
-    let primaryIVR = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let primaryIVR = ivr {
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+            }
+
+        // cancellation of the secondary IVR takes forvever
+        let secondaryIVR = ivr {
+            try
+                do! IVR.waitFor' (fun (_:Event2) -> true)
+            finally
+                IVR.idle
         }
 
-    // cancellation of the secondary IVR takes forvever
-    let secondaryIVR = ivr {
-        try
-            do! IVR.waitFor' (fun (_:Event2) -> true)
-        finally
-            IVR.idle
-    }
+        let test = ivr {
+                do! IVR.any [primaryIVR; secondaryIVR]
+                do! IVR.waitFor' (fun (_:Event3) -> true)
+            }
 
-    let test = ivr {
-            do! IVR.any [primaryIVR; secondaryIVR]
-            do! IVR.waitFor' (fun (_:Event3) -> true)
-        }
+        let res = 
+            test
+            |> start
+            |> dispatch Event1
+            |> dispatch Event3
 
-    let res = 
-        test
-        |> start
-        |> dispatch Event1
-        |> dispatch Event3
-
-    res |> IVR.isCompleted |> should be True        
+        res |> IVR.isCompleted |> should be True        
 
 module HostCommunication =
     [<Fact>]
