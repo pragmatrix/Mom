@@ -980,4 +980,166 @@ module Arbiter =
 
         queue |> Seq.toList |> should equal [box (RequestU 0);box (RequestU 1)]
         
+module Sideshow =
+
+    [<Fact>]
+    let goodCase() =
+
+        // this tests replacement while the sideshow is running.
+    
+        let mutable sideshowStarted = 0
+        let mutable nestedContinued = 0
+        let mutable sideshowFinalized = 0
+
+        let sideshow = ivr {
+            try
+                sideshowStarted <- sideshowStarted + 1
+                do! IVR.waitFor' (fun (_:Event2) -> true)
+            finally
+                sideshowFinalized <- sideshowFinalized + 1
+        }
+
+        let nested (control: Sideshow.Control) = ivr {
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! control.Replace sideshow
+            nestedContinued <- nestedContinued + 1
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! control.Replace sideshow
+            nestedContinued <- nestedContinued + 1
+            do! IVR.waitFor' (fun (_:Event1) -> true)
+        }
+
+        let state =
+            Sideshow.run nested
+            |> start
+            |> dispatch Event1
+        
+        (sideshowStarted, nestedContinued, sideshowFinalized) |> should equal (1, 1, 0)
+
+        let state =
+            state
+            |> dispatch Event1
+
+        (sideshowStarted, nestedContinued, sideshowFinalized) |> should equal (2, 2, 1)
+
+        let state = 
+            state
+            |> dispatch Event2
+
+        (sideshowStarted, nestedContinued, sideshowFinalized) |> should equal (2, 2, 2)
+
+    module ErrorPropagation =
+
+        [<Fact>]
+        let ``sideshow error while starting is propagated into the nested ivr``() = 
+
+            // the rule here is
+            // we start it, we control it!
+        
+            let sideshow = ivr {
+                failwith "error"
+            }
+
+            let nested (control: Sideshow.Control) = ivr {
+                try
+                    do! control.Replace sideshow
+                    return false
+                with e ->
+                    return true
+            }
+
+            let state =
+                Sideshow.run nested |> start
+
+            IVR.resultValue state |> should equal true
+
+        [<Fact>]
+        let ``sideshow error after an event is propagated to a subsequent replace``() = 
+
+            let sideshow = ivr {
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+                failwith "error" |> ignore
+            }
+
+            let nested (control: Sideshow.Control) = ivr {
+                do! control.Replace sideshow
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+                try
+                    do! control.Replace sideshow
+                    return false
+                with e ->
+                    return true
+            }
+
+            let state =
+                Sideshow.run nested |> start
+                |> dispatch Event1
+
+            IVR.resultValue state |> should equal true
+
+
+        [<Fact>]
+        let ``sideshow error while cancelling is propagated in a subsequent replace``() = 
+
+            let sideshow = ivr {
+                try
+                    do! IVR.waitFor' (fun (_:Event2) -> true)
+                finally
+                    failwith "error" |> ignore
+            }
+
+            let nested (control: Sideshow.Control) = ivr {
+                do! control.Replace sideshow
+                try
+                    do! control.Replace sideshow
+                    return false
+                with e ->
+                    return true
+            }
+
+            let state =
+                Sideshow.run nested |> start
+
+            IVR.resultValue state |> should equal true
+
+        [<Fact>]
+        let ``pending sideshow error overrides successful value``() = 
+
+            let sideshow = ivr {
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+                failwith "error" |> ignore
+            }
+
+            let nested (control: Sideshow.Control) = ivr {
+                do! control.Replace sideshow
+                do! IVR.waitFor' (fun (_:Event1) -> true)
+            }
+
+            let state =
+                Sideshow.run nested |> start
+                |> dispatch Event1
+
+            IVR.isError state |> should equal true
+
+        [<Fact>]
+        let ``pending sideshow cancellation error overrides successful value``() = 
+
+            let sideshow = ivr {
+                try
+                    do! IVR.waitFor' (fun (_:Event1) -> true)
+                finally
+                    failwith "error" |> ignore
+            }
+
+            let nested (control: Sideshow.Control) = ivr {
+                do! control.Replace sideshow
+            }
+
+            let state =
+                Sideshow.run nested |> start
+
+            IVR.isError state |> should equal true
+
+
+        
 
