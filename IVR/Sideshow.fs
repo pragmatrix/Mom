@@ -3,8 +3,12 @@
 /// The coordination should not be processed via channels, because it does not have to
 /// pollute the trace and should not require a host.
 ///
-/// The features we want:
-/// - Synchronously replace the sideshow ivr.
+/// There are two ivrs, The sideshow ivr and the control ivr. The control ivr can start and
+/// replace the sideshow ivr. The control ivr receives the propagated errors from the side
+/// show ivr. When a sideshow ivr is started or replaced, the replace command does not
+/// return until either the sideshow is in a waiting state or completed. This guarantees that
+/// the control ivr can be sure that all teardown of the old sideshow ivr and startup of the
+/// new one is processed when the control is returned to it.
 
 [<RequireQualifiedAccess>]
 module IVR.Sideshow
@@ -32,7 +36,7 @@ module private Private =
     type 'r flux = 'r IVR.flux
 
 /// Run a nested ivr that can control a sideshow ivr.
-let run (nested: Control -> 'r ivr) : 'r ivr =
+let run (control: Control -> 'r ivr) : 'r ivr =
 
     let communicationId = generateId()
 
@@ -50,7 +54,7 @@ let run (nested: Control -> 'r ivr) : 'r ivr =
 
             IVR.Requesting (request, processResponse)
 
-    let control = {
+    let sideshowControl = {
         Replace = replace
     }
 
@@ -65,34 +69,34 @@ let run (nested: Control -> 'r ivr) : 'r ivr =
                 IVR.tryCancel flux |> cancel
             | IVR.Requesting(r, cont) ->
                 IVR.Requesting(r, cont >> cancel)
-            | IVR.Completed _ ->
-                continuation()
+            | IVR.Completed result ->
+                continuation result
 
         cancel flux
 
     // we wrap the nested ivr so that we can process the requests.
 
     fun () ->
-        let nested = 
-            nested control 
+        let control = 
+            control sideshowControl 
             |> IVR.start
 
-        let rec next (sideshow: unit flux) (nested: 'r flux) = 
+        let rec next (sideshow: unit flux) (control: 'r flux) = 
             // sideshow has priority, so run it as long we can.
             match sideshow with 
             | IVR.Requesting(r, cont) -> 
-                IVR.Requesting(r, cont >> fun sideshow -> next sideshow nested)
+                IVR.Requesting(r, cont >> fun sideshow -> next sideshow control)
             | _ ->
             // sideshow is either waiting or completed, run nested
             // (note: sideshow errors are currently ignored)
-            match nested with
+            match control with
             | IVR.Requesting(:? Request as request, cont) when isOurs request ->
                 let (Replace(_, newSideshow)) = request
                 replace sideshow newSideshow cont
             | IVR.Requesting(r, cont) ->
                 IVR.Requesting(r, cont >> next sideshow)
             | IVR.Completed result ->
-                sideshow |> cancelAndContinueWith (fun () -> IVR.Completed result)
+                sideshow |> cancelAndContinueWith (fun _ -> IVR.Completed result)
             | IVR.Waiting cont ->
                 IVR.Waiting (fun event ->
                     match sideshow with
@@ -109,13 +113,28 @@ let run (nested: Control -> 'r ivr) : 'r ivr =
                 match sideshow with
                 | IVR.Requesting(r, cont) ->
                     IVR.Requesting(r, cont >> startNew)
-                | _ ->
+                | IVR.Waiting _ ->
                     box ()
                     |> IVR.Value
                     |> contNested
                     |> next sideshow
+                | IVR.Completed result ->
+                    result 
+                    |> IVR.Result.map (fun _ -> box ())
+                    |> contNested
+                    |> next sideshow
 
             sideshow
-            |> cancelAndContinueWith (fun () -> startNew (newSideshow()))
+            |> cancelAndContinueWith
+                (function
+                | IVR.Error err ->
+                    // sideshow was in error before or after the cancellation, 
+                    // we propagate this to the Replace invoker and ignore the
+                    // new sideshow
+                    IVR.Error err
+                    |> contNested
+                    |> next (IVR.Completed (IVR.Value ()))
 
-        next (IVR.Completed (IVR.Value ())) nested
+                | _ -> startNew (newSideshow()))
+
+        next (IVR.Completed (IVR.Value ())) control
