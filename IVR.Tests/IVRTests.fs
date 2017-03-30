@@ -1149,18 +1149,18 @@ module Sideshow =
                 try
                     do! IVR.waitFor' (fun (_:Event1) -> true)
                 finally
-                    failwith "error" |> ignore
+                    failwith "error-sideshow" |> ignore
             }
 
             let control (control: Sideshow.Control) = ivr {
                 do! control.Replace sideshow
-                failwith "error2"
+                failwith "error-control"
             }
 
             let state =
                 Sideshow.run control |> start
 
-            IVR.error state |> should equal (exn "error2")
+            (IVR.error state).Message |> should equal "error-control"
 
 
         
