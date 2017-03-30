@@ -61,6 +61,8 @@ let run (control: Control -> 'r ivr) : 'r ivr =
     let isOurs (Replace(cid, _)) =
         communicationId = cid
 
+    let idleSideshow = IVR.Completed (IVR.Value ())
+
     // tbd: Flux module candidate!
     let cancelAndContinueWith continuation flux =
         let rec cancel flux =
@@ -94,8 +96,15 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                 replace sideshow newSideshow cont
             | IVR.Requesting(r, cont) ->
                 IVR.Requesting(r, cont >> next sideshow)
-            | IVR.Completed result ->
-                sideshow |> cancelAndContinueWith (fun _ -> IVR.Completed result)
+            | IVR.Completed cResult ->
+                sideshow |> cancelAndContinueWith (fun sResult ->
+                    IVR.Completed <| 
+                        // be sure errors of the control ivr have precendence!
+                        match cResult, sResult with
+                        | IVR.Error c, _ -> IVR.Error c
+                        | _, IVR.Error s -> IVR.Error s
+                        | _ -> cResult
+                    )
             | IVR.Waiting cont ->
                 IVR.Waiting (fun event ->
                     match sideshow with
@@ -113,15 +122,13 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                 | IVR.Requesting(r, cont) ->
                     IVR.Requesting(r, cont >> startNew)
                 | IVR.Waiting _ ->
-                    box ()
-                    |> IVR.Value
-                    |> contControl
+                    contControl (IVR.Value (box ()))
                     |> next sideshow
                 | IVR.Completed result ->
                     result 
                     |> IVR.Result.map (fun _ -> box ())
                     |> contControl
-                    |> next sideshow
+                    |> next idleSideshow
 
             sideshow
             |> cancelAndContinueWith
@@ -132,8 +139,8 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                     // new sideshow
                     IVR.Error err
                     |> contControl
-                    |> next (IVR.Completed (IVR.Value ()))
+                    |> next idleSideshow
 
                 | _ -> startNew (newSideshow()))
 
-        next (IVR.Completed (IVR.Value ())) control
+        next idleSideshow control
