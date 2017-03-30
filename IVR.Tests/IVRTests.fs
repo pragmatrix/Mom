@@ -1031,16 +1031,15 @@ module Sideshow =
     module ErrorPropagation =
 
         [<Fact>]
-        let ``sideshow error while starting is propagated into the nested ivr``() = 
+        let ``sideshow error while starting is propagated into the control ivr``() = 
 
-            // the rule here is
             // we start it, we control it!
         
             let sideshow = ivr {
                 failwith "error"
             }
 
-            let nested (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = ivr {
                 try
                     do! control.Replace sideshow
                     return false
@@ -1049,7 +1048,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run nested |> start
+                Sideshow.run control |> start
 
             IVR.resultValue state |> should equal true
 
@@ -1061,7 +1060,7 @@ module Sideshow =
                 failwith "error" |> ignore
             }
 
-            let nested (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = ivr {
                 do! control.Replace sideshow
                 do! IVR.waitFor' (fun (_:Event1) -> true)
                 try
@@ -1072,7 +1071,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run nested |> start
+                Sideshow.run control |> start
                 |> dispatch Event1
 
             IVR.resultValue state |> should equal true
@@ -1088,7 +1087,7 @@ module Sideshow =
                     failwith "error" |> ignore
             }
 
-            let nested (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = ivr {
                 do! control.Replace sideshow
                 try
                     do! control.Replace sideshow
@@ -1098,7 +1097,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run nested |> start
+                Sideshow.run control |> start
 
             IVR.resultValue state |> should equal true
 
@@ -1110,13 +1109,13 @@ module Sideshow =
                 failwith "error" |> ignore
             }
 
-            let nested (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = ivr {
                 do! control.Replace sideshow
                 do! IVR.waitFor' (fun (_:Event1) -> true)
             }
 
             let state =
-                Sideshow.run nested |> start
+                Sideshow.run control |> start
                 |> dispatch Event1
 
             IVR.isError state |> should equal true
@@ -1131,12 +1130,12 @@ module Sideshow =
                     failwith "error" |> ignore
             }
 
-            let nested (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = ivr {
                 do! control.Replace sideshow
             }
 
             let state =
-                Sideshow.run nested |> start
+                Sideshow.run control |> start
 
             IVR.isError state |> should equal true
 
@@ -1153,13 +1152,13 @@ module Sideshow =
                     failwith "error" |> ignore
             }
 
-            let nested (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = ivr {
                 do! control.Replace sideshow
                 failwith "error2"
             }
 
             let state =
-                Sideshow.run nested |> start
+                Sideshow.run control |> start
 
             IVR.error state |> should equal (exn "error2")
 
