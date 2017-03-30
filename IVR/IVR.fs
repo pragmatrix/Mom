@@ -33,14 +33,14 @@ module IVR =
             | Error e -> Error e
             | Cancelled -> Cancelled
 
-    [<NoComparison;NoEquality>]
-    type 'result ivr = unit -> 'result flux
-
-    and [<NoComparison;NoEquality>] 
-        'result flux =
+    [<NoComparison;NoEquality>] 
+    type 'result flux =
         | Requesting of Request * (Response result -> 'result flux)
         | Waiting of (Event -> 'result flux)
         | Completed of 'result result
+
+    [<NoComparison;NoEquality>]
+    type 'result ivr = unit -> 'result flux
 
     // 
     // IVR Primitives Part 1
