@@ -35,8 +35,8 @@ module private Private =
 
     type 'r flux = 'r IVR.flux
 
-/// Run a control ivr that can control a sideshow ivr.
-let run (control: Control -> 'r ivr) : 'r ivr =
+/// Attach a sideshow to a control ivr that can control a sideshow ivr.
+let attachTo (control: Control -> 'r ivr) : 'r ivr =
 
     let communicationId = generateId()
 
@@ -144,3 +144,11 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                 | _ -> startNew (newSideshow()))
 
         next idleSideshow control
+
+module Extensions = 
+    module IVR =
+        let withSideshow = attachTo
+
+[<assembly:AutoOpen("IVR.Sideshow.Extensions")>]
+do ()
+

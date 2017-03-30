@@ -999,7 +999,7 @@ module Sideshow =
                 sideshowFinalized <- sideshowFinalized + 1
         }
 
-        let nested (control: Sideshow.Control) = ivr {
+        let control (control: Sideshow.Control) = ivr {
             do! IVR.waitFor' (fun (_:Event1) -> true)
             do! control.Begin sideshow
             nestedContinued <- nestedContinued + 1
@@ -1010,7 +1010,7 @@ module Sideshow =
         }
 
         let state =
-            Sideshow.run nested
+            Sideshow.attachTo control
             |> start
             |> dispatch Event1
         
@@ -1048,7 +1048,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run control |> start
+                Sideshow.attachTo control |> start
 
             IVR.resultValue state |> should equal true
 
@@ -1071,7 +1071,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run control |> start
+                Sideshow.attachTo control |> start
                 |> dispatch Event1
 
             IVR.resultValue state |> should equal true
@@ -1097,7 +1097,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run control |> start
+                Sideshow.attachTo control |> start
 
             IVR.resultValue state |> should equal true
 
@@ -1115,7 +1115,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run control |> start
+                Sideshow.attachTo control |> start
                 |> dispatch Event1
 
             IVR.isError state |> should equal true
@@ -1135,7 +1135,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run control |> start
+                Sideshow.attachTo control |> start
 
             IVR.isError state |> should equal true
 
@@ -1158,7 +1158,7 @@ module Sideshow =
             }
 
             let state =
-                Sideshow.run control |> start
+                Sideshow.attachTo control |> start
 
             (IVR.error state).Message |> should equal "error-control"
 
