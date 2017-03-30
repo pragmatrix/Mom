@@ -1140,6 +1140,29 @@ module Sideshow =
 
             IVR.isError state |> should equal true
 
+        [<Fact>]
+        let ``if both sideshow and control are in error, the control error has precedence``() = 
+            
+            // the nested error is the control ivr for the sideshow ivr, so if there happens
+            // and error there, it should be considered as more important.
+            
+            let sideshow = ivr {
+                try
+                    do! IVR.waitFor' (fun (_:Event1) -> true)
+                finally
+                    failwith "error" |> ignore
+            }
+
+            let nested (control: Sideshow.Control) = ivr {
+                do! control.Replace sideshow
+                failwith "error2"
+            }
+
+            let state =
+                Sideshow.run nested |> start
+
+            IVR.error state |> should equal (exn "error2")
+
 
         
 
