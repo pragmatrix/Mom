@@ -35,7 +35,7 @@ module private Private =
 
     type 'r flux = 'r IVR.flux
 
-/// Run a nested ivr that can control a sideshow ivr.
+/// Run a control ivr that can control a sideshow ivr.
 let run (control: Control -> 'r ivr) : 'r ivr =
 
     let communicationId = generateId()
@@ -74,7 +74,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
 
         cancel flux
 
-    // we wrap the nested ivr so that we can process the requests.
+    // we wrap the control ivr so that we can process the requests.
 
     fun () ->
         let control = 
@@ -87,8 +87,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
             | IVR.Requesting(r, cont) -> 
                 IVR.Requesting(r, cont >> fun sideshow -> next sideshow control)
             | _ ->
-            // sideshow is either waiting or completed, run nested
-            // (note: sideshow errors are currently ignored)
+            // sideshow is either waiting or completed, proceed with the control ivr
             match control with
             | IVR.Requesting(:? Request as request, cont) when isOurs request ->
                 let (Replace(_, newSideshow)) = request
@@ -106,7 +105,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                     | _ ->
                         next sideshow (cont event))
 
-        and replace sideshow newSideshow contNested =
+        and replace sideshow newSideshow contControl =
 
             // start the new sideshow (until we are in a waiting or completed state)
             let rec startNew sideshow =
@@ -116,12 +115,12 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                 | IVR.Waiting _ ->
                     box ()
                     |> IVR.Value
-                    |> contNested
+                    |> contControl
                     |> next sideshow
                 | IVR.Completed result ->
                     result 
                     |> IVR.Result.map (fun _ -> box ())
-                    |> contNested
+                    |> contControl
                     |> next sideshow
 
             sideshow
@@ -132,7 +131,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                     // we propagate this to the Replace invoker and ignore the
                     // new sideshow
                     IVR.Error err
-                    |> contNested
+                    |> contControl
                     |> next (IVR.Completed (IVR.Value ()))
 
                 | _ -> startNew (newSideshow()))
