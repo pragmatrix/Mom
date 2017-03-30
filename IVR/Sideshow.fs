@@ -22,7 +22,7 @@ type Control = {
     /// Cancel and replace the side show ivr. This ivr returns after the
     /// currently running side show ivr is cancelled and the new one is started (gets into
     /// a waiting state or completed). Errors are propagated to the ivr of the caller.
-    Replace: unit ivr -> unit ivr
+    Begin: unit ivr -> unit ivr
 }
 
 [<AutoOpen>]
@@ -55,7 +55,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
             IVR.Requesting (request, processResponse)
 
     let sideshowControl = {
-        Replace = replace
+        Begin = replace
     }
 
     let isOurs (Replace(cid, _)) =
@@ -93,7 +93,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
             match control with
             | IVR.Requesting(:? Request as request, cont) when isOurs request ->
                 let (Replace(_, newSideshow)) = request
-                replace sideshow newSideshow cont
+                beginSideshow sideshow newSideshow cont
             | IVR.Requesting(r, cont) ->
                 IVR.Requesting(r, cont >> next sideshow)
             | IVR.Completed cResult ->
@@ -114,7 +114,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                     | _ ->
                         next sideshow (cont event))
 
-        and replace sideshow newSideshow contControl =
+        and beginSideshow sideshow newSideshow contControl =
 
             // start the new sideshow (until we are in a waiting or completed state)
             let rec startNew sideshow =
@@ -126,7 +126,7 @@ let run (control: Control -> 'r ivr) : 'r ivr =
                     |> next sideshow
                 | IVR.Completed result ->
                     result 
-                    |> IVR.Result.map (fun _ -> box ())
+                    |> IVR.Result.map box
                     |> contControl
                     |> next idleSideshow
 

@@ -1001,10 +1001,10 @@ module Sideshow =
 
         let nested (control: Sideshow.Control) = ivr {
             do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! control.Replace sideshow
+            do! control.Begin sideshow
             nestedContinued <- nestedContinued + 1
             do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! control.Replace sideshow
+            do! control.Begin sideshow
             nestedContinued <- nestedContinued + 1
             do! IVR.waitFor' (fun (_:Event1) -> true)
         }
@@ -1041,7 +1041,7 @@ module Sideshow =
 
             let control (control: Sideshow.Control) = ivr {
                 try
-                    do! control.Replace sideshow
+                    do! control.Begin sideshow
                     return false
                 with e ->
                     return true
@@ -1061,10 +1061,10 @@ module Sideshow =
             }
 
             let control (control: Sideshow.Control) = ivr {
-                do! control.Replace sideshow
+                do! control.Begin sideshow
                 do! IVR.waitFor' (fun (_:Event1) -> true)
                 try
-                    do! control.Replace sideshow
+                    do! control.Begin sideshow
                     return false
                 with e ->
                     return true
@@ -1088,9 +1088,9 @@ module Sideshow =
             }
 
             let control (control: Sideshow.Control) = ivr {
-                do! control.Replace sideshow
+                do! control.Begin sideshow
                 try
-                    do! control.Replace sideshow
+                    do! control.Begin sideshow
                     return false
                 with e ->
                     return true
@@ -1110,7 +1110,7 @@ module Sideshow =
             }
 
             let control (control: Sideshow.Control) = ivr {
-                do! control.Replace sideshow
+                do! control.Begin sideshow
                 do! IVR.waitFor' (fun (_:Event1) -> true)
             }
 
@@ -1131,7 +1131,7 @@ module Sideshow =
             }
 
             let control (control: Sideshow.Control) = ivr {
-                do! control.Replace sideshow
+                do! control.Begin sideshow
             }
 
             let state =
@@ -1153,7 +1153,7 @@ module Sideshow =
             }
 
             let control (control: Sideshow.Control) = ivr {
-                do! control.Replace sideshow
+                do! control.Begin sideshow
                 failwith "error-control"
             }
 
