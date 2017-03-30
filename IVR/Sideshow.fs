@@ -29,9 +29,6 @@ module private Private =
     type Request = 
         | Replace of Id * unit ivr
 
-    type Response = 
-        | Response of Id
-
     type 'r flux = 'r IVR.flux
 
 /// Run a nested ivr that can control a sideshow ivr.
@@ -46,9 +43,7 @@ let run (nested: Control -> 'r ivr) : 'r ivr =
             let processResponse (response: obj IVR.result) =
                 let result = 
                     match response with
-                    | IVR.Value (:? Response as response) when (Response communicationId = response) ->
-                        IVR.Value ()
-                    | IVR.Value _ -> failwith "internal error, expected a dedicated response"
+                    | IVR.Value _ -> IVR.Value ()
                     | IVR.Error e -> IVR.Error e
                     | IVR.Cancelled -> IVR.Cancelled
                 IVR.Completed result
@@ -115,8 +110,7 @@ let run (nested: Control -> 'r ivr) : 'r ivr =
                 | IVR.Requesting(r, cont) ->
                     IVR.Requesting(r, cont >> startNew)
                 | _ ->
-                    Response communicationId
-                    |> box
+                    box ()
                     |> IVR.Value
                     |> contNested
                     |> next sideshow
