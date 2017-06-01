@@ -1166,7 +1166,7 @@ module Sideshow =
         [<Fact>] 
         let ``state is initially set to None``() = 
             let control (control: Sideshow.Control) = ivr {
-                return! control.State()
+                return! control.State
             }
 
             let state =
@@ -1185,7 +1185,7 @@ module Sideshow =
 
             let control (control: Sideshow.Control) = ivr {
                 do! control.Begin(sideshow)
-                return! control.State()
+                return! control.State
             }
 
             let state =
@@ -1202,7 +1202,7 @@ module Sideshow =
 
             let control (control: Sideshow.Control) = ivr {
                 do! control.Begin(sideshow)
-                return! control.State()
+                return! control.State
             }
 
             let state =
@@ -1220,11 +1220,11 @@ module Sideshow =
 
             let control (control: Sideshow.Control<int>) = ivr {
                 do! control.Begin(1, sideshow)
-                let! state1 = control.State()
+                let! state1 = control.State
                 do! control.Begin(2, sideshow)
-                let! state2 = control.State()
+                let! state2 = control.State
                 do! control.Begin(3, sideshowNone)
-                let! state3 = control.State()
+                let! state3 = control.State
                 return state1, state2, state3
             }
 

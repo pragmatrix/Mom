@@ -25,7 +25,7 @@ type Control<'state>(doBegin: 'state * unit ivr -> unit ivr, getState: unit -> '
     member this.Begin(ivr: unit ivr) : unit ivr =
         this.Begin(Unchecked.defaultof<'state>, ivr)
     member this.Begin(state, ivr) = doBegin(state, ivr)
-    member this.State = getState
+    member this.State with get() = getState()
 
 type State<'state> = 
     | Active of 'state
