@@ -17,49 +17,69 @@ open IVR.GlobalExports
 
 /// This is the control for the side show.
 
-[<NoEquality; NoComparison>]
-type Control = {
-    /// Cancel and replace the side show ivr. This ivr returns after the
+type Control<'state>(doBegin: 'state * unit ivr -> unit ivr, getState: unit -> 'state option ivr) =
+    /// Cancel and replace the side show ivr that is tagged with the given state. 
+    /// This ivr returns after the
     /// currently running side show ivr is cancelled and the new one is started (gets into
     /// a waiting state or completed). Errors are propagated to the ivr of the caller.
-    Begin: unit ivr -> unit ivr
-}
+    member this.Begin(ivr: unit ivr) : unit ivr =
+        this.Begin(Unchecked.defaultof<'state>, ivr)
+    member this.Begin(state, ivr) = doBegin(state, ivr)
+    member this.State = getState
+
+type State<'state> = 
+    | Active of 'state
+    | Idle
 
 [<AutoOpen>]
 module private Private = 
     let generateId = Ids.newGenerator().GenerateId
 
     [<NoEquality;NoComparison>]
-    type Request = 
-        | Replace of Id * unit ivr
+    type Request<'state> = 
+        | Replace of Id * ('state * unit ivr)
+        | GetState of Id
 
     type 'r flux = 'r IVR.flux
 
 /// Attach a sideshow to a control ivr that can control a sideshow ivr.
-let attachTo (control: Control -> 'r ivr) : 'r ivr =
+let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
 
     let communicationId = generateId()
 
-    let replace (toReplace : unit ivr) : unit ivr = 
+    let replace (state : 'state, toReplace : unit ivr) : unit ivr = 
         fun () ->
-            let request = Replace(communicationId, toReplace)
+            let request = Replace(communicationId, (state, toReplace))
 
             let processResponse (response: obj IVR.result) =
-                let result = 
-                    match response with
-                    | IVR.Value _ -> IVR.Value ()
-                    | IVR.Error e -> IVR.Error e
-                    | IVR.Cancelled -> IVR.Cancelled
-                IVR.Completed result
+                match response with
+                | IVR.Value _ -> IVR.Value ()
+                | IVR.Error e -> IVR.Error e
+                | IVR.Cancelled -> IVR.Cancelled
+                |> IVR.Completed
 
             IVR.Requesting (request, processResponse)
 
-    let sideshowControl = {
-        Begin = replace
-    }
+    let getState() : 'state option ivr = 
+        fun () ->
+            let request : Request<'state> = GetState(communicationId)
 
-    let isOurs (Replace(cid, _)) =
-        communicationId = cid
+            let processResponse (response: obj IVR.result) =
+                match response with
+                | IVR.Value v -> IVR.Value (unbox v)
+                | IVR.Error e -> IVR.Error e
+                | IVR.Cancelled -> IVR.Cancelled
+                |> IVR.Completed
+
+            IVR.Requesting(request, processResponse)            
+
+    let sideshowControl = Control<'state>(replace, getState)
+
+    let isOurs = function
+        | Replace(cid, _)
+        | GetState(cid) when communicationId = cid 
+            -> true
+        | _ -> false
 
     let idleSideshow = IVR.Completed (IVR.Value ())
 
@@ -83,21 +103,27 @@ let attachTo (control: Control -> 'r ivr) : 'r ivr =
             control sideshowControl 
             |> IVR.start
 
-        let rec next (sideshow: unit flux) (control: 'r flux) = 
+        let rec next (sideshow: 'state option * unit flux) (control: 'r flux) = 
             // sideshow has priority, so run it as long we can.
-            match sideshow with 
+            let state, flux = sideshow
+            match flux with 
             | IVR.Requesting(r, cont) -> 
-                IVR.Requesting(r, cont >> fun sideshow -> next sideshow control)
+                IVR.Requesting(r, cont >> fun flux -> next (state, flux) control)
             | _ ->
             // sideshow is either waiting or completed, proceed with the control ivr
             match control with
-            | IVR.Requesting(:? Request as request, cont) when isOurs request ->
-                let (Replace(_, newSideshow)) = request
-                beginSideshow sideshow newSideshow cont
+            | IVR.Requesting(:? Request<'state> as request, cont) when isOurs request ->
+                match request with
+                | Replace(_, newSideshow) ->
+                    beginSideshow sideshow newSideshow cont
+                | GetState(_) ->
+                    cont (IVR.Value (box state)) 
+                    |> next sideshow
+                    
             | IVR.Requesting(r, cont) ->
                 IVR.Requesting(r, cont >> next sideshow)
             | IVR.Completed cResult ->
-                sideshow |> cancelAndContinueWith (fun sResult ->
+                flux |> cancelAndContinueWith (fun sResult ->
                     IVR.Completed <| 
                         // be sure errors of the control ivr have precendence!
                         match cResult, sResult with
@@ -107,30 +133,30 @@ let attachTo (control: Control -> 'r ivr) : 'r ivr =
                     )
             | IVR.Waiting cont ->
                 IVR.Waiting (fun event ->
-                    match sideshow with
+                    match flux with
                     | IVR.Waiting sideshowCont ->
                         // deliver the event to both.
-                        next (sideshowCont event) (cont event)
+                        next (state, sideshowCont event) (cont event)
                     | _ ->
                         next sideshow (cont event))
 
-        and beginSideshow sideshow newSideshow contControl =
+        and beginSideshow sideshow (newState, newSideshow) contControl =
 
             // start the new sideshow (until we are in a waiting or completed state)
-            let rec startNew sideshow =
+            let rec startNew (state, sideshow) =
                 match sideshow with
                 | IVR.Requesting(r, cont) ->
-                    IVR.Requesting(r, cont >> startNew)
+                    IVR.Requesting(r, cont >> (fun flux -> startNew(state, flux)))
                 | IVR.Waiting _ ->
                     contControl (IVR.Value (box ()))
-                    |> next sideshow
+                    |> next (state, sideshow)
                 | IVR.Completed result ->
                     result 
                     |> IVR.Result.map box
                     |> contControl
-                    |> next idleSideshow
+                    |> next (None, idleSideshow)
 
-            sideshow
+            snd sideshow
             |> cancelAndContinueWith
                 (function
                 | IVR.Error err ->
@@ -139,11 +165,13 @@ let attachTo (control: Control -> 'r ivr) : 'r ivr =
                     // new sideshow
                     IVR.Error err
                     |> contControl
-                    |> next idleSideshow
+                    |> next (None, idleSideshow)
 
-                | _ -> startNew (newSideshow()))
+                | _ -> startNew (Some newState, newSideshow()))
 
-        next idleSideshow control
+        next (None, idleSideshow) control
+
+type Control = Control<unit>
 
 module Extensions = 
     module IVR =

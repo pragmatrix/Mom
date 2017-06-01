@@ -1162,6 +1162,77 @@ module Sideshow =
 
             (IVR.error state).Message |> should equal "error-control"
 
+    module State = 
+        [<Fact>] 
+        let ``state is initially set to None``() = 
+            let control (control: Sideshow.Control) = ivr {
+                return! control.State()
+            }
 
-        
+            let state =
+                Sideshow.attachTo control |> start
 
+            state
+            |> IVR.resultValue
+            |> should equal None
+
+        [<Fact>]
+        let ``if sideshow terminates immediately, state stays at None``() = 
+
+            let sideshow = ivr {
+                return ()
+            }
+
+            let control (control: Sideshow.Control) = ivr {
+                do! control.Begin(sideshow)
+                return! control.State()
+            }
+
+            let state =
+                Sideshow.attachTo control |> start
+
+            state
+            |> IVR.resultValue
+            |> should equal None
+
+        [<Fact>]
+        let ``if sideshow takes time , state is set ``() = 
+
+            let sideshow = IVR.idle
+
+            let control (control: Sideshow.Control) = ivr {
+                do! control.Begin(sideshow)
+                return! control.State()
+            }
+
+            let state =
+                Sideshow.attachTo control |> start
+
+            state
+            |> IVR.resultValue
+            |> should equal (Some ())
+
+        [<Fact>]
+        let ``sideshow state changes``() = 
+
+            let sideshow = IVR.idle
+            let sideshowNone = IVR.ofValue ()
+
+            let control (control: Sideshow.Control<int>) = ivr {
+                do! control.Begin(1, sideshow)
+                let! state1 = control.State()
+                do! control.Begin(2, sideshow)
+                let! state2 = control.State()
+                do! control.Begin(3, sideshowNone)
+                let! state3 = control.State()
+                return state1, state2, state3
+            }
+
+            let state =
+                Sideshow.attachTo control |> start
+
+            let noneInt: Option<int> = None
+
+            state
+            |> IVR.resultValue
+            |> should equal (Some 1, Some 2, noneInt)
