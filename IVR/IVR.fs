@@ -19,17 +19,9 @@ module IVR =
     [<NoComparison;NoEquality>]
     type 'result ivr = unit -> 'result flux
 
-    // 
-    // IVR Primitives Part 1
-    //
-
     /// Start up an ivr.
     let start (ivr : _ ivr) = ivr ()
 
-    //
-    // Primitives Part 2
-    //
-    
     /// Lifts a result.
     let ofResult (r: 'r result) : 'r ivr = 
         fun () -> r |> Completed
