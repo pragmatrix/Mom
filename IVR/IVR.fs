@@ -1,6 +1,7 @@
 ﻿namespace IVR
 
 open System
+open IVR.Flux
 
 (*
     An IVR is a definition of an asynchronous process with the following properties:
@@ -15,30 +16,6 @@ open System
 [<RequireQualifiedAccess>]
 module IVR = 
 
-    type Request = obj
-    type Response = obj
-    type Event = obj
-    type Host = Request -> Response
-
-    [<NoComparison>]
-    type 'result result =
-        | Value of 'result
-        | Error of exn
-        | Cancelled
-
-    module Result =
-        let map f r =
-            match r with
-            | Value r -> Value (f r)
-            | Error e -> Error e
-            | Cancelled -> Cancelled
-
-    [<NoComparison;NoEquality>] 
-    type 'result flux =
-        | Requesting of Request * (Response result -> 'result flux)
-        | Waiting of (Event -> 'result flux)
-        | Completed of 'result result
-
     [<NoComparison;NoEquality>]
     type 'result ivr = unit -> 'result flux
 
@@ -48,36 +25,6 @@ module IVR =
 
     /// Start up an ivr.
     let start (ivr : _ ivr) = ivr ()
-
-    /// Dispatch an event to the ivr that is currently waiting for one.
-    let dispatch ev flux =
-        match flux with
-        | Waiting cont -> cont ev
-        | flux -> failwithf "IVR.dispatch: can't dispatch an event to an ivr that is not waiting for one: %A" flux
-        
-    /// Returns true if the flux is completed (i.e. has a result).
-    /// tbd: may remove this method.
-    let isCompleted flux = 
-        match flux with
-        | Completed _ -> true
-        | _ -> false
-
-    let isError flux = 
-        match flux with
-        | Completed (Error _) -> true
-        | _ -> false
-
-    /// Returns the error of a completed flux.
-    /// tbd: may use an active pattern for that.
-    let error flux = 
-        match flux with
-        | Completed (Error e) -> e
-        | _ -> failwithf "IVR.error: flux is not in error: %A" flux
-
-    let isCancelled flux = 
-        match flux with
-        | Completed Cancelled -> true
-        | _ -> false
 
     //
     // Primitives Part 2
@@ -133,40 +80,6 @@ module IVR =
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
         continueWith (fun r -> f(); r |> ofResult)
-
-    /// The result of a completed ivr.
-    let result ivr = 
-        match ivr with
-        | Completed r -> r
-        | _ -> failwithf "IVR.result: ivr is not completed: %A" ivr
-
-    /// Returns the resulting value of a completed ivr.
-    let resultValue ivr = 
-        match ivr with
-        | Completed (Value r) -> r
-        | Completed _ -> failwithf "IVR.resultValue ivr has not been completed with a resulting value: %A" ivr
-        | _ -> failwithf "IVR.resultValue: ivr is not completed: %A" ivr
-
-    /// The event that is sent to an active IVR when it gets cancelled. Note that this is basically a hint to 
-    /// the IVR to begin cancellation and does not need to be respected and also it may take an arbitrary 
-    /// amount of time until the IVR finally completes.
-    type TryCancel = TryCancel
-
-    /// Tries to cancels the ivr. This actually sends a Cancel event to the ivr, but otherwise
-    /// does nothing. The ivr is responsible to react on Cancel events (for example every wait function does that).
-    /// Also note that ivrs can continue after cancellation was successful. For example finally
-    /// handlers can run ivrs.
-    /// If an ivr is completed, the result is overwritten (freed indirectly) with a Cancelled error,
-    /// but an error is not, to avoid shadowing the error.
-    /// An ivr that is delayed (not started) or waiting for a synchronous response, can not be cancelled.
-    let tryCancel ivr = 
-        match ivr with
-        | Requesting _ ->
-            failwith "failed to cancel an active IVR that is requesting a synchronous response"
-        | Waiting cont -> 
-            cont TryCancel
-        | Completed (Error _) -> ivr
-        | Completed _ -> Cancelled |> Completed
 
     //
     // IVR Combinators

@@ -18,7 +18,7 @@ type ConvertIntToStr =
 // tbd: IVR API candidate!
 let respond r =
     function 
-    | IVR.Requesting (_, cont) -> cont (r |> box |> IVR.Value)
+    | Flux.Requesting (_, cont) -> cont (r |> box |> IVR.Value)
     | _ -> failwith "internal error"
 
 /// IVR under test.
@@ -36,9 +36,9 @@ let createTrace() =
     let trace = 
         traced
         |> IVR.start
-        |> IVR.dispatch (TraceEvent1 10)
+        |> Flux.dispatch (TraceEvent1 10)
         |> respond ()
-        |> IVR.resultValue
+        |> Flux.resultValue
 
     trace
 

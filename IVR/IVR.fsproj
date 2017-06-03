@@ -52,6 +52,7 @@
   <ItemGroup>
     <Compile Include="Threading.fs" />
     <Compile Include="Ids.fs" />
+    <Compile Include="Flux.fs" />
     <Compile Include="IVR.fs" />
     <Compile Include="Channel.fs" />
     <Compile Include="Sideshow.fs" />
