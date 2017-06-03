@@ -27,8 +27,12 @@ module IVR =
         fun () -> r |> Completed
 
     /// Lifts a value. Creates an IVR that returns the value.
-    let ofValue (v: 'v) : 'v ivr = 
+    let unit (v: 'v) : 'v ivr =
         v |> Value |> ofResult
+
+    /// Another way to lift a value.
+    let ofValue (v: 'v) : 'v ivr = 
+        unit v
     
     /// Lifts an error.
     let ofError e : 'v ivr =

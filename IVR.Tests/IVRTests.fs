@@ -1216,7 +1216,7 @@ module Sideshow =
         let ``sideshow state changes``() = 
 
             let sideshow = IVR.idle
-            let sideshowNone = IVR.ofValue ()
+            let sideshowNone = IVR.unit()
 
             let control (control: Sideshow.Control<int>) = ivr {
                 do! control.Begin(1, sideshow)
