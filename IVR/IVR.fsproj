@@ -54,7 +54,6 @@
     <Compile Include="Ids.fs" />
     <Compile Include="IVR.fs" />
     <Compile Include="Channel.fs" />
-    <Compile Include="Interruptible.fs" />
     <Compile Include="Sideshow.fs" />
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />
