@@ -121,7 +121,7 @@ module private ExecuteWrapper =
 module InlineAsyncRequestService =
 
     /// Create a service that is able to support IInlineAsyncService<'response>
-    let create() : Runtime.IServiceContext -> IVR.Request -> IVR.Response option = 
+    let create() : Runtime.IServiceContext -> Flux.Request -> Flux.Response option = 
 
         fun (service : Runtime.IServiceContext) ->
 

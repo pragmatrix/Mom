@@ -35,7 +35,7 @@ let start = IVR.start
 let dispatch = IVR.dispatch
 let stepH host ivr =
     match ivr with
-    | IVR.Requesting (r, cont) -> 
+    | Flux.Requesting (r, cont) -> 
         host r |> unbox |> IVR.Value |> cont
     | _ -> failwithf "stepH: invalid state %A" ivr
 

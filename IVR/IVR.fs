@@ -1,6 +1,7 @@
 ﻿namespace IVR
 
 open System
+open IVR.Flux
 
 (*
     An IVR is a definition of an asynchronous process with the following properties:
@@ -14,30 +15,6 @@ open System
 
 [<RequireQualifiedAccess>]
 module IVR = 
-
-    type Request = obj
-    type Response = obj
-    type Event = obj
-    type Host = Request -> Response
-
-    [<NoComparison>]
-    type 'result result =
-        | Value of 'result
-        | Error of exn
-        | Cancelled
-
-    module Result =
-        let map f r =
-            match r with
-            | Value r -> Value (f r)
-            | Error e -> Error e
-            | Cancelled -> Cancelled
-
-    [<NoComparison;NoEquality>] 
-    type 'result flux =
-        | Requesting of Request * (Response result -> 'result flux)
-        | Waiting of (Event -> 'result flux)
-        | Completed of 'result result
 
     [<NoComparison;NoEquality>]
     type 'result ivr = unit -> 'result flux

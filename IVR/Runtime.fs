@@ -16,11 +16,13 @@ type CancelIVR = CancelIVR
 
 /// The stuff a service can do.
 type IServiceContext = 
-    abstract ScheduleEvent : IVR.Event -> unit
-    abstract PostRequest : IVR.Request -> unit
+    abstract ScheduleEvent : Flux.Event -> unit
+    abstract PostRequest : Flux.Request -> unit
+
+type Host = Flux.Request -> Flux.Response
 
 /// This is the runtime that drives the IVR.
-type Runtime internal (eventQueue: SynchronizedQueue<IVR.Event>, host: IServiceContext -> IVR.Host) as this = 
+type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IServiceContext -> Host) as this = 
 
     // Partially apply the runtime to the host, so that hosts can initialize.
     let host = host this
@@ -33,7 +35,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<IVR.Event>, host: IServiceC
         member __.PostRequest request = host request |> ignore
 
     /// Asynchronously schedules an event to the runtime.
-    member __.ScheduleEvent (event : IVR.Event) = 
+    member __.ScheduleEvent (event : Flux.Event) = 
         eventQueue.Enqueue event
 
     member private this.Cancel() = 
@@ -44,12 +46,12 @@ type Runtime internal (eventQueue: SynchronizedQueue<IVR.Event>, host: IServiceC
 
         let rec runLoop flux =
             match flux with
-            | IVR.Completed c -> 
+            | Flux.Completed c -> 
                 match c with 
                 | IVR.Value r -> Some r
                 | IVR.Error e -> raise e
                 | IVR.Cancelled -> None
-            | IVR.Requesting (request, cont) -> 
+            | Flux.Requesting (request, cont) -> 
                 let result = 
                     try
                         host request 
@@ -57,7 +59,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<IVR.Event>, host: IServiceC
                     with e ->
                         e |> IVR.Error
                 result |> cont |> runLoop
-            | IVR.Waiting cont ->
+            | Flux.Waiting cont ->
                 let event = eventQueue.Dequeue()
                 match event with
                 | :? CancelIVR -> IVR.tryCancel flux
@@ -78,17 +80,17 @@ type Runtime internal (eventQueue: SynchronizedQueue<IVR.Event>, host: IServiceC
 /// Note that the return value indicates not only the response itself, it also notifies the
 /// runtime if a request is handled, so if the request is asynchronous and can not actually
 /// return a reponse, () should be returned when the request is considered to be processed.
-type Service = IServiceContext -> IVR.Request -> IVR.Response option
+type Service = IServiceContext -> Flux.Request -> Flux.Response option
         
 /// A builder that supports the creation of runtimes and adding services to it.
 [<NoComparison;NoEquality>]
 type Builder = {
-    EventQueue: SynchronizedQueue<IVR.Event>
+    EventQueue: SynchronizedQueue<Flux.Event>
     Services: Service list
     Closed: bool
 }
 
-let builder = { EventQueue = SynchronizedQueue<IVR.Event>(); Services = []; Closed = false }
+let builder = { EventQueue = SynchronizedQueue<Flux.Event>(); Services = []; Closed = false }
 
 let withEventQueue queue builder = 
     { builder with EventQueue = queue }
@@ -109,7 +111,7 @@ let create builder =
     let serviceHost runtime =
         // parameterize services with the runtime
         let services = services |> List.map ((|>) runtime)
-        fun (cmd: IVR.Request) ->
+        fun (cmd: Flux.Request) ->
             services
             |> List.tryPick (fun s -> s cmd)
             |> function 
@@ -122,7 +124,7 @@ let create builder =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Service = 
 
-    let schedule (context: IServiceContext) (cmd: IVR.Request) = 
+    let schedule (context: IServiceContext) (cmd: Flux.Request) = 
         match cmd with
         | :? IVR.Schedule as s -> s.Event |> context.ScheduleEvent; () |> box |> Some
         | _ -> None
@@ -130,7 +132,7 @@ module Service =
     let delay (context: IServiceContext) =
         let delayIdGenerator = Ids.newGenerator()
         let mutable activeTimers = Map.empty
-        fun (cmd : IVR.Request) ->
+        fun (cmd : Flux.Request) ->
             match cmd with
             | :? IVR.Delay as d -> 
                 let (IVR.Delay timespan) = d
@@ -147,7 +149,7 @@ module Service =
 
     let async (context: IServiceContext) =
         let asyncIdGenerator = Ids.newGenerator()
-        fun (cmd: IVR.Request) ->
+        fun (cmd: Flux.Request) ->
             match cmd with
             | :? IVR.IAsyncComputation as ac -> 
                 let id = asyncIdGenerator.GenerateId()
@@ -190,7 +192,7 @@ module Service =
     /// Disable the service that crashed
     let DisableService = ReplaceService disabled
 
-    type ServiceCrashResponder = IServiceContext -> IVR.Request -> exn -> ServiceCrashResponse
+    type ServiceCrashResponder = IServiceContext -> Flux.Request -> exn -> ServiceCrashResponse
 
     let protect (responder: ServiceCrashResponder) (service: Service) : Service =
         fun context ->

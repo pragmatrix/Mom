@@ -40,7 +40,7 @@ module private Private =
         | Replace of Id * ('state * unit ivr)
         | GetState of Id
 
-    type 'r flux = 'r IVR.flux
+    type 'r flux = 'r Flux.flux
 
 /// Attach a sideshow to a control ivr that can control a sideshow ivr.
 let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
@@ -56,9 +56,9 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
                 | IVR.Value _ -> IVR.Value ()
                 | IVR.Error e -> IVR.Error e
                 | IVR.Cancelled -> IVR.Cancelled
-                |> IVR.Completed
+                |> Flux.Completed
 
-            IVR.Requesting (request, processResponse)
+            Flux.Requesting (request, processResponse)
 
     let getState() : 'state option ivr = 
         fun () ->
@@ -69,9 +69,9 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
                 | IVR.Value v -> IVR.Value (unbox v)
                 | IVR.Error e -> IVR.Error e
                 | IVR.Cancelled -> IVR.Cancelled
-                |> IVR.Completed
+                |> Flux.Completed
 
-            IVR.Requesting(request, processResponse)            
+            Flux.Requesting(request, processResponse)            
 
     let sideshowControl = Control<'state>(replace, getState)
 
@@ -81,17 +81,17 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
             -> true
         | _ -> false
 
-    let idleSideshow = IVR.Completed (IVR.Value ())
+    let idleSideshow = Flux.Completed (IVR.Value ())
 
     // tbd: Flux module candidate!
     let cancelAndContinueWith continuation flux =
         let rec cancel flux =
             match flux with
-            | IVR.Waiting _ ->
+            | Flux.Waiting _ ->
                 IVR.tryCancel flux |> cancel
-            | IVR.Requesting(r, cont) ->
-                IVR.Requesting(r, cont >> cancel)
-            | IVR.Completed result ->
+            | Flux.Requesting(r, cont) ->
+                Flux.Requesting(r, cont >> cancel)
+            | Flux.Completed result ->
                 continuation result
 
         cancel flux
@@ -107,12 +107,12 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
             // sideshow has priority, so run it as long we can.
             let state, flux = sideshow
             match flux with 
-            | IVR.Requesting(r, cont) -> 
-                IVR.Requesting(r, cont >> fun flux -> next (state, flux) control)
+            | Flux.Requesting(r, cont) -> 
+                Flux.Requesting(r, cont >> fun flux -> next (state, flux) control)
             | _ ->
             // sideshow is either waiting or completed, proceed with the control ivr
             match control with
-            | IVR.Requesting(:? Request<'state> as request, cont) when isOurs request ->
+            | Flux.Requesting(:? Request<'state> as request, cont) when isOurs request ->
                 match request with
                 | Replace(_, newSideshow) ->
                     beginSideshow sideshow newSideshow cont
@@ -120,21 +120,21 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
                     cont (IVR.Value (box state)) 
                     |> next sideshow
                     
-            | IVR.Requesting(r, cont) ->
-                IVR.Requesting(r, cont >> next sideshow)
-            | IVR.Completed cResult ->
+            | Flux.Requesting(r, cont) ->
+                Flux.Requesting(r, cont >> next sideshow)
+            | Flux.Completed cResult ->
                 flux |> cancelAndContinueWith (fun sResult ->
-                    IVR.Completed <| 
+                    Flux.Completed <| 
                         // be sure errors of the control ivr have precendence!
                         match cResult, sResult with
                         | IVR.Error c, _ -> IVR.Error c
                         | _, IVR.Error s -> IVR.Error s
                         | _ -> cResult
                     )
-            | IVR.Waiting cont ->
-                IVR.Waiting (fun event ->
+            | Flux.Waiting cont ->
+                Flux.Waiting (fun event ->
                     match flux with
-                    | IVR.Waiting sideshowCont ->
+                    | Flux.Waiting sideshowCont ->
                         // deliver the event to both.
                         next (state, sideshowCont event) (cont event)
                     | _ ->
@@ -145,12 +145,12 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
             // start the new sideshow (until we are in a waiting or completed state)
             let rec startNew (state, sideshow) =
                 match sideshow with
-                | IVR.Requesting(r, cont) ->
-                    IVR.Requesting(r, cont >> (fun flux -> startNew(state, flux)))
-                | IVR.Waiting _ ->
+                | Flux.Requesting(r, cont) ->
+                    Flux.Requesting(r, cont >> (fun flux -> startNew(state, flux)))
+                | Flux.Waiting _ ->
                     contControl (IVR.Value (box ()))
                     |> next (state, sideshow)
-                | IVR.Completed result ->
+                | Flux.Completed result ->
                     result 
                     |> IVR.Result.map box
                     |> contControl
