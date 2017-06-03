@@ -88,7 +88,7 @@ let attachTo (control: Control<'state> -> 'r ivr) : 'r ivr =
         let rec cancel flux =
             match flux with
             | Flux.Waiting _ ->
-                IVR.tryCancel flux |> cancel
+                Flux.tryCancel flux |> cancel
             | Flux.Requesting(r, cont) ->
                 Flux.Requesting(r, cont >> cancel)
             | Flux.Completed result ->

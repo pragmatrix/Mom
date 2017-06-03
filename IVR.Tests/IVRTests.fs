@@ -32,7 +32,7 @@ type RequestU =
     interface IVR.IRequest<unit>
 
 let start = IVR.start
-let dispatch = IVR.dispatch
+let dispatch = Flux.dispatch
 let stepH host ivr =
     match ivr with
     | Flux.Requesting (r, cont) -> 
@@ -51,7 +51,7 @@ module Cancellation =
             return 0
         }
 
-        start a |> IVR.resultValue |> should equal 0
+        start a |> Flux.resultValue |> should equal 0
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -140,7 +140,7 @@ module Cancellation =
         IVR.join left right
         |> start
         |> dispatch Event1 
-        |> IVR.isError
+        |> Flux.isError
         |> should equal true
 
         ct.Disposed |> should equal true
@@ -162,7 +162,7 @@ module Cancellation =
         IVR.join left right
         |> start
         |> dispatch Event2
-        |> IVR.isError
+        |> Flux.isError
         |> should equal true
 
         ct.Disposed |> should equal true
@@ -236,7 +236,7 @@ module Cancellation =
             |> dispatch Event3
             
         result 
-        |> IVR.resultValue 
+        |> Flux.resultValue 
         |> should equal (Choice<int,int>.Choice1Of2 leftResult)
         finallyCalled |> should equal true
 
@@ -274,7 +274,7 @@ module Cancellation =
 
         let test = IVR.first left right
         let started = start test
-        IVR.isCompleted started |> should equal true
+        Flux.isCompleted started |> should equal true
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -376,9 +376,9 @@ module Cancellation =
         let res = 
             ivr
             |> start
-            |> dispatch IVR.TryCancel
+            |> dispatch Flux.TryCancel
 
-        IVR.isCancelled res |> should be True
+        Flux.isCancelled res |> should be True
 
     [<Fact>]
     let ``when an ivr gets cancelled in a while loop, it does not continue outside of it``() = 
@@ -394,9 +394,9 @@ module Cancellation =
         let res = 
             ivr
             |> start
-            |> dispatch IVR.TryCancel
+            |> dispatch Flux.TryCancel
     
-        IVR.isCancelled res |> should be True
+        Flux.isCancelled res |> should be True
 
 module Finally =
 
@@ -509,7 +509,7 @@ module Finally =
 
         test
         |> start
-        |> IVR.isError
+        |> Flux.isError
         |> should equal true
         
     [<Fact>]
@@ -525,7 +525,7 @@ module Finally =
 
         test
         |> start
-        |> IVR.isError
+        |> Flux.isError
         |> should equal true
         
     [<Fact>]
@@ -542,7 +542,7 @@ module Finally =
 
         test
         |> start
-        |> IVR.isError
+        |> Flux.isError
         |> should equal true
 
 module Exceptions =
@@ -560,7 +560,7 @@ module Exceptions =
 
         test
         |> start
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value 1)
 
     [<Fact>]
@@ -578,7 +578,7 @@ module Exceptions =
         test
         |> start
         |> dispatch Event1
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value 1)
 
     [<Fact>]
@@ -597,7 +597,7 @@ module Exceptions =
         test
         |> start
         |> dispatch Event1
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value 1)
 
     [<Fact>]
@@ -618,10 +618,10 @@ module Exceptions =
             |> start
             |> dispatch Event1
         
-        res |> IVR.isError |> should be True
+        res |> Flux.isError |> should be True
 
         res 
-        |> IVR.result
+        |> Flux.result
         |> sprintf "%A"
         |> should haveSubstring "AGAIN"
 
@@ -642,10 +642,10 @@ module CancellationAndFinally =
         let res = 
             ivr
             |> start
-            |> dispatch IVR.TryCancel
+            |> dispatch Flux.TryCancel
     
         runFinally |> should be True
-        IVR.isCancelled res |> should be True
+        Flux.isCancelled res |> should be True
 
     [<Fact>]
     let ``cancelled ivrs may propagate errors``() =
@@ -660,9 +660,9 @@ module CancellationAndFinally =
         let res = 
             ivr
             |> start
-            |> dispatch IVR.TryCancel
+            |> dispatch Flux.TryCancel
 
-        IVR.isError res |> should be True
+        Flux.isError res |> should be True
 
 module UnresolvedIssues =
         
@@ -692,7 +692,7 @@ module UnresolvedIssues =
             |> dispatch Event1
             |> dispatch Event3
 
-        res |> IVR.isCompleted |> should be True        
+        res |> Flux.isCompleted |> should be True        
 
 module HostCommunication =
     [<Fact>]
@@ -767,7 +767,7 @@ module Delay =
         |> stepH expectDelay
         |> dispatch (IVR.DelayCompleted (Id 1L))
         |> stepH expectCancelDelay
-        |> IVR.isCompleted |> should equal true
+        |> Flux.isCompleted |> should equal true
 
     [<Fact>]
     let ``IVR.delay completes immediately in case of a zero delay``() = 
@@ -778,7 +778,7 @@ module Delay =
             test |> start
             
         state 
-        |> IVR.isCompleted |> should be True
+        |> Flux.isCompleted |> should be True
 
 module CompuationExpressionSyntax =
 
@@ -798,7 +798,7 @@ module CompuationExpressionSyntax =
         test
         |> start
         |> stepH host
-        |> IVR.resultValue
+        |> Flux.resultValue
         |> should equal "Hello"
 
     [<Fact>]
@@ -817,7 +817,7 @@ module CompuationExpressionSyntax =
         test
         |> start
         |> stepH host
-        |> IVR.resultValue
+        |> Flux.resultValue
         |> should equal "Hello"
         
     [<Fact>]
@@ -835,7 +835,7 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> dispatch Event1
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value 3) 
 
     [<Fact>]
@@ -850,7 +850,7 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> dispatch Event1
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value ()) 
 
 module AsyncRequest = 
@@ -876,7 +876,7 @@ module AsyncRequest =
         |> start
         |> stepH host
         |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Value "Hello"))
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value "Hello")
 
     [<Fact>]
@@ -900,7 +900,7 @@ module AsyncRequest =
         |> start
         |> stepH host
         |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Cancelled) : IVR.AsyncResponse<string>)
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Cancelled : string IVR.result)
 
         cancelled |> should be True
@@ -925,7 +925,7 @@ module AsyncRequest =
         |> start
         |> stepH host
         |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Error (InvalidOperationException())) : IVR.AsyncResponse<string>)
-        |> IVR.result
+        |> Flux.result
         |> should equal (IVR.Value "Catched")
      
 module Arbiter = 
@@ -949,7 +949,7 @@ module Arbiter =
         IVR.all [ivr1;ivr2]
         |> start
         |> dispatch Event1
-        |> IVR.resultValue
+        |> Flux.resultValue
         |> should equal [();()]
         
         r1 |> should be True
@@ -975,7 +975,7 @@ module Arbiter =
         |> dispatch Event1
         |> stepH queue.Enqueue
         |> stepH queue.Enqueue
-        |> IVR.resultValue
+        |> Flux.resultValue
         |> should equal [();()]
 
         queue |> Seq.toList |> should equal [box (RequestU 0);box (RequestU 1)]
@@ -1050,7 +1050,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            IVR.resultValue state |> should equal true
+            Flux.resultValue state |> should equal true
 
         [<Fact>]
         let ``sideshow error after an event is propagated to a subsequent replace``() = 
@@ -1074,7 +1074,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
                 |> dispatch Event1
 
-            IVR.resultValue state |> should equal true
+            Flux.resultValue state |> should equal true
 
 
         [<Fact>]
@@ -1099,7 +1099,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            IVR.resultValue state |> should equal true
+            Flux.resultValue state |> should equal true
 
         [<Fact>]
         let ``pending sideshow error overrides successful value``() = 
@@ -1118,7 +1118,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
                 |> dispatch Event1
 
-            IVR.isError state |> should equal true
+            Flux.isError state |> should equal true
 
         [<Fact>]
         let ``pending sideshow cancellation error overrides successful value``() = 
@@ -1137,7 +1137,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            IVR.isError state |> should equal true
+            Flux.isError state |> should equal true
 
         [<Fact>]
         let ``if both sideshow and control are in error, the control error has precedence``() = 
@@ -1160,7 +1160,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            (IVR.error state).Message |> should equal "error-control"
+            (Flux.error state).Message |> should equal "error-control"
 
     module State = 
         [<Fact>] 
@@ -1173,7 +1173,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
 
             state
-            |> IVR.resultValue
+            |> Flux.resultValue
             |> should equal None
 
         [<Fact>]
@@ -1192,7 +1192,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
 
             state
-            |> IVR.resultValue
+            |> Flux.resultValue
             |> should equal None
 
         [<Fact>]
@@ -1209,7 +1209,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
 
             state
-            |> IVR.resultValue
+            |> Flux.resultValue
             |> should equal (Some ())
 
         [<Fact>]
@@ -1234,5 +1234,5 @@ module Sideshow =
             let noneInt: Option<int> = None
 
             state
-            |> IVR.resultValue
+            |> Flux.resultValue
             |> should equal (Some 1, Some 2, noneInt)

@@ -36,9 +36,9 @@ let createTrace() =
     let trace = 
         traced
         |> IVR.start
-        |> IVR.dispatch (TraceEvent1 10)
+        |> Flux.dispatch (TraceEvent1 10)
         |> respond ()
-        |> IVR.resultValue
+        |> Flux.resultValue
 
     trace
 

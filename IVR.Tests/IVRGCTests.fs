@@ -8,7 +8,7 @@ open IVR
 [<AutoOpen>]
 module Helper = 
     let ivr<'r> = IVR.IVR.ivr<'r>
-    let step ev ivr = IVR.dispatch ev ivr
+    let step ev ivr = Flux.dispatch ev ivr
 
 [<Fact(Skip="brittle")>]
 let longSequentialLoopDoesNotEatUpStackOrMemory() =
