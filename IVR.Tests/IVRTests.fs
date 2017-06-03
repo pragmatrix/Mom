@@ -51,7 +51,7 @@ module Cancellation =
             return 0
         }
 
-        start a |> Flux.resultValue |> should equal 0
+        start a |> Flux.value |> should equal 0
         ct.Disposed |> should equal true
 
     [<Fact>]
@@ -236,7 +236,7 @@ module Cancellation =
             |> dispatch Event3
             
         result 
-        |> Flux.resultValue 
+        |> Flux.value 
         |> should equal (Choice<int,int>.Choice1Of2 leftResult)
         finallyCalled |> should equal true
 
@@ -798,7 +798,7 @@ module CompuationExpressionSyntax =
         test
         |> start
         |> stepH host
-        |> Flux.resultValue
+        |> Flux.value
         |> should equal "Hello"
 
     [<Fact>]
@@ -817,7 +817,7 @@ module CompuationExpressionSyntax =
         test
         |> start
         |> stepH host
-        |> Flux.resultValue
+        |> Flux.value
         |> should equal "Hello"
         
     [<Fact>]
@@ -949,7 +949,7 @@ module Arbiter =
         IVR.all [ivr1;ivr2]
         |> start
         |> dispatch Event1
-        |> Flux.resultValue
+        |> Flux.value
         |> should equal [();()]
         
         r1 |> should be True
@@ -975,7 +975,7 @@ module Arbiter =
         |> dispatch Event1
         |> stepH queue.Enqueue
         |> stepH queue.Enqueue
-        |> Flux.resultValue
+        |> Flux.value
         |> should equal [();()]
 
         queue |> Seq.toList |> should equal [box (RequestU 0);box (RequestU 1)]
@@ -1050,7 +1050,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            Flux.resultValue state |> should equal true
+            Flux.value state |> should equal true
 
         [<Fact>]
         let ``sideshow error after an event is propagated to a subsequent replace``() = 
@@ -1074,7 +1074,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
                 |> dispatch Event1
 
-            Flux.resultValue state |> should equal true
+            Flux.value state |> should equal true
 
 
         [<Fact>]
@@ -1099,7 +1099,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            Flux.resultValue state |> should equal true
+            Flux.value state |> should equal true
 
         [<Fact>]
         let ``pending sideshow error overrides successful value``() = 
@@ -1173,7 +1173,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
 
             state
-            |> Flux.resultValue
+            |> Flux.value
             |> should equal None
 
         [<Fact>]
@@ -1192,7 +1192,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
 
             state
-            |> Flux.resultValue
+            |> Flux.value
             |> should equal None
 
         [<Fact>]
@@ -1209,7 +1209,7 @@ module Sideshow =
                 Sideshow.attachTo control |> start
 
             state
-            |> Flux.resultValue
+            |> Flux.value
             |> should equal (Some ())
 
         [<Fact>]
@@ -1234,5 +1234,5 @@ module Sideshow =
             let noneInt: Option<int> = None
 
             state
-            |> Flux.resultValue
+            |> Flux.value
             |> should equal (Some 1, Some 2, noneInt)

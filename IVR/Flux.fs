@@ -57,11 +57,11 @@ module Flux =
         | _ -> failwithf "Flux.result: flux is not completed: %A" flux
 
     /// Returns the resulting value of a completed flux.
-    let resultValue flux = 
+    let value flux = 
         match flux with
         | Completed (Value r) -> r
-        | Completed _ -> failwithf "Flux.resultValue flux has not been completed with a resulting value: %A" flux
-        | _ -> failwithf "Flux.resultValue: flux is not completed: %A" flux
+        | Completed _ -> failwithf "Flux.value: flux has not been completed with a resulting value: %A" flux
+        | _ -> failwithf "Flux.value: flux is not completed: %A" flux
 
     //
     // Cancellation
