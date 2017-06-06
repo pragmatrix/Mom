@@ -205,6 +205,10 @@ module Cancellation =
         dispatch Event1 started |> ignore
         finallyCalled |> should equal true
 
+#if false
+
+    // This test is currently not possible, because of #13. 
+
     [<Fact>]
     let ``par': right ivr is cancelled after left completes and its finally ivr is run``() = 
         let mutable finallyCalled = false
@@ -239,6 +243,8 @@ module Cancellation =
         |> Flux.value 
         |> should equal (Choice<int,int>.Choice1Of2 leftResult)
         finallyCalled |> should equal true
+
+#endif
 
     [<Fact>]
     let ``par': left ivr is cancelled after right completes``() = 
