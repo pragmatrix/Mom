@@ -73,23 +73,34 @@ module Flux =
         | _ -> false
 
 
-    /// The event that is sent to a flux when it gets cancelled. Note that this is basically a hint to 
-    /// the flux to begin cancellation and does not need to be respected and also it may take an arbitrary 
-    /// amount of time until the flux finally completes.
-    type TryCancel = TryCancel
+    /// The event that is sent to a flux when it gets cancelled.
+    type Cancel = Cancel
 
-    /// Tries to cancels the flux. This actually sends a Cancel event to the flux, but otherwise
-    /// does nothing. The flux is responsible to react on Cancel events (for example every wait function does that).
-    /// Also note that a flux can continue after cancellation was successful. For example finally
-    /// handlers can run ivrs.
-    /// If a flix is completed, the result is overwritten (freed indirectly) with a Cancelled error,
+    exception AsynchronousCancellationException with
+        override this.ToString() =
+            sprintf "an IVR got into a waiting state, even though it is being cancelled and expected to run only synchronously"
+
+    /// Cancels the flux. This actually sends a Cancel event to the flux, and expects it to get
+    /// either in the Error or Cancelled state.
+    /// The flux is required to react on Cancel events (for example every wait function does that)
+    /// immediately and synchronously.
+    /// If a flux is completed, the result is overwritten (freed indirectly) with a Cancelled error,
     /// but an error is not, to avoid shadowing the error.
-    /// An flux that is delayed (not started yet) or waiting for a synchronous response, can not be cancelled.
-    let tryCancel ivr = 
-        match ivr with
+    /// A flux that is delayed (not started yet) or waiting for a synchronous response, can not be cancelled.
+    let cancel flux = 
+        let rec next flux = 
+            match flux with
+            | Requesting (req, cont) -> 
+                Requesting(req, cont >> next)
+            | Waiting _ ->
+                raise AsynchronousCancellationException
+            | Completed (Error _) -> flux
+            | Completed _ -> Cancelled |> Completed
+
+        match flux with
         | Requesting _ ->
             failwith "failed to cancel a flux that is requesting a synchronous response"
         | Waiting cont -> 
-            cont TryCancel
-        | Completed (Error _) -> ivr
+            cont Cancel |> next
+        | Completed (Error _) -> flux
         | Completed _ -> Cancelled |> Completed

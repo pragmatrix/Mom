@@ -62,7 +62,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
             | Flux.Waiting cont ->
                 let event = eventQueue.Dequeue()
                 match event with
-                | :? CancelIVR -> Flux.tryCancel flux
+                | :? CancelIVR -> Flux.cancel flux
                 | event -> cont event
                 |> runLoop 
 

@@ -41,8 +41,7 @@ module IVR =
     /// Continues the ivr with a followup ivr (Monad bind).
     let continueWith (followup : 'a result -> 'b ivr) (ivr: 'a ivr) : 'b ivr =
 
-        let rec next state = 
-            match state with
+        let rec next = function
             | Requesting (req, cont) ->
                 Requesting (req, cont >> next)
             | Waiting cont ->
@@ -76,6 +75,29 @@ module IVR =
     /// Invokes a function when the ivr is completed.
     let whenCompleted f =
         continueWith (fun r -> f(); r |> ofResult)
+
+    exception AsynchronousException of Why: string with
+        override this.ToString() =
+            sprintf "an IVR got into a waiting state, even though it is expected to run only synchronously(%s)" this.Why
+
+    /// Test if the IVR runs only synchronously (never gets into a waiting state). This
+    /// function is only active for DEBUG builds.
+    let synchronous (why: string) (ivr: 'a ivr) : 'a ivr = 
+#if DEBUG
+        let rec next flux =
+            match flux with
+            | Requesting(req, cont) ->
+                Requesting(req, cont >> next)
+            | Waiting _ ->
+                raise (AsynchronousException why)
+            | Completed _ ->
+                flux
+
+        fun () ->
+            ivr |> start |> next
+#else
+        ivr
+#endif
 
     //
     // IVR Combinators
@@ -199,7 +221,7 @@ module IVR =
                 cancel result [] ((rev field.Pending) @ field.Processed)
 
         // Cancellation:
-        // send TryCancel as soon they are in waiting state, if not, process host requests until they are.
+        // send Cancel as soon they are in waiting state, if not, process host requests until they are.
         and cancel result cancelled pending =
             match pending with
             | [] -> finalize result cancelled
@@ -208,11 +230,11 @@ module IVR =
             | Requesting (request, cont) ->
                 Requesting(request, cont >> fun flux -> cancel result cancelled (flux::pending))
             | Waiting _ ->
-                cancel result ((tryCancel flux)::cancelled) pending
+                cancel result ((Flux.cancel flux)::cancelled) pending
             | Completed _ ->
                 cancel result cancelled pending
 
-        // Finalization: run them until they are all gone.
+        // Finalization: run them until they are all completed.
         and finalize result pending =
             match pending with
             | [] -> exit result
@@ -220,9 +242,10 @@ module IVR =
             match flux with
             | Requesting (request, cont) ->
                 Requesting (request, cont >> fun flux -> finalize result (flux::pending))
-            | Waiting cont ->
-                // actually, this is currently not supported. See issue #4
-                Waiting (cont >> fun flux -> finalize result (flux::pending))
+            | Waiting _ ->
+                // See issue #4 why Waiting can not be supported.
+                raise AsynchronousCancellationException
+                // Waiting (cont >> fun flux -> finalize result (flux::pending))
             | Completed _ ->
                 finalize result pending
 
@@ -401,7 +424,7 @@ module IVR =
     let wait f =
         let rec waiter (ev: Event) =
             match ev with
-            | :? TryCancel -> Cancelled |> Completed
+            | :? Cancel -> Cancelled |> Completed
             | _ ->
             try
                 match f ev with
@@ -509,19 +532,20 @@ module IVR =
             let finallyBlock tryResult =
 
                 // if the finally ivr results in an error or cancellation, 
-                // this is our result, otherwise return the result.
+                // this _is_ our result, otherwise return the result.
                 let afterFinally finallyResult =
                     match finallyResult with
                     | Value _ -> tryResult |> ofResult
                     | Error e -> e |> ofError
-                    // if the finallly {} got cancelled, our whole
+                    // if the finally {} got cancelled, our whole
                     // block's result is Cancelled
                     | Cancelled -> Cancelled |> ofResult
 
                 // note: f is already delayed
                 f() |> continueWith afterFinally
 
-            ivr |> continueWith finallyBlock
+            ivr 
+            |> continueWith (finallyBlock >> synchronous "finally")
 
         member __.TryFinally(ivr: 'r ivr, f: unit -> unit) : 'r ivr =
             ivr |> whenCompleted f

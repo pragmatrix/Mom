@@ -382,7 +382,7 @@ module Cancellation =
         let res = 
             ivr
             |> start
-            |> dispatch Flux.TryCancel
+            |> dispatch Flux.Cancel
 
         Flux.isCancelled res |> should be True
 
@@ -400,7 +400,7 @@ module Cancellation =
         let res = 
             ivr
             |> start
-            |> dispatch Flux.TryCancel
+            |> dispatch Flux.Cancel
     
         Flux.isCancelled res |> should be True
 
@@ -648,7 +648,7 @@ module CancellationAndFinally =
         let res = 
             ivr
             |> start
-            |> dispatch Flux.TryCancel
+            |> dispatch Flux.Cancel
     
         runFinally |> should be True
         Flux.isCancelled res |> should be True
@@ -666,9 +666,27 @@ module CancellationAndFinally =
         let res = 
             ivr
             |> start
-            |> dispatch Flux.TryCancel
+            |> dispatch Flux.Cancel
 
         Flux.isError res |> should be True
+
+module Synchronous =
+
+    [<Fact>]
+    let ``asynchronous finally handler leads to an error``() =
+
+        let ivr = ivr {
+            try
+                ()
+            finally
+                ivr { do! IVR.waitFor' (fun (_: Event1) -> true) }
+        }
+
+        let res = 
+            ivr
+            |> start
+
+        Flux.error res |> should equal (IVR.AsynchronousException("finally"))
 
 module UnresolvedIssues =
         
