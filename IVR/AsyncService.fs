@@ -18,7 +18,6 @@ type JoinResult =
     | Timeout
     | Completed
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module private UnsafeRegistry = 
 
     let initial = {

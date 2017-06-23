@@ -1,4 +1,3 @@
-﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 [<RequireQualifiedAccess>]
 module IVR.Runtime
 
@@ -121,7 +120,6 @@ let create builder =
     new Runtime (builder.EventQueue, serviceHost)
 
 /// Some predefined services that should be supported by every runtime.
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Service = 
 
     let schedule (context: IServiceContext) (cmd: Flux.Request) = 
