@@ -3,7 +3,8 @@
 module IVR.Runtime
 
 open System
-open Threading
+open System.Threading
+open IVR.Threading
 
 ///
 /// The IVR runtime.
