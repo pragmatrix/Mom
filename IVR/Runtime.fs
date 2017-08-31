@@ -101,9 +101,21 @@ let withService (service: Service) builder =
         Services = service :: builder.Services }
 
 let private flip f a b = f b a
-    
+
+/// Adds a number of services.    
 let withServices (services: Service list) builder = 
     services |> List.fold (flip withService) builder
+
+/// Adds a function that gets run when the particular request was
+/// invoked inside the IVR with the type of the function's argument.
+let withFunction (f: 'request -> 'r when 'request :> IVR.IRequest<'r>) =
+    let service _ (req: Flux.Request) : Flux.Response option =
+        match req with
+        | :? 'request as req
+            -> Some (box (f req))
+        | _ -> None
+
+    withService service
 
 let create builder = 
 
