@@ -5,7 +5,8 @@ obj/
 *.ncrunchsolution.user
 *.ncrunchproject
 /_NCrunch_*/
-/packages/
 /.paket/paket.exe
+/packages/
+/paket-files/
 /*.user
 
