@@ -15,21 +15,24 @@ module IVR.Sideshow
 
 open IVR.GlobalExports
 
-/// This is the control for the side show.
+/// This is the control interface for the side show.
 
 type Control<'state>(doBegin: 'state * unit ivr -> unit ivr, getState: unit -> 'state option ivr) =
     /// Cancel and replace the side show ivr that is tagged with the given state. 
     /// This ivr returns after the
     /// currently running side show ivr is cancelled and the new one is started (gets into
     /// a waiting state or completed). Errors are propagated to the ivr of the caller.
-    member this.Begin(ivr: unit ivr) : unit ivr =
-        this.Begin(Unchecked.defaultof<'state>, ivr)
     member this.Begin(state, ivr) = doBegin(state, ivr)
+    /// Returns the state of the sideshow, or None if the sideshow is not active.
     member this.State with get() = getState()
 
-type State<'state> = 
-    | Active of 'state
-    | Idle
+type Control<'state> with
+    /// End the sideshow by cancelling the current ivr, which sets the state to None.
+    member this.End() = 
+        this.Begin(IVR.unit())
+    /// Begin the sideshow with the default state.
+    member this.Begin(ivr: unit ivr) : unit ivr =
+        this.Begin(Unchecked.defaultof<'state>, ivr)
 
 [<AutoOpen>]
 module private Private = 
