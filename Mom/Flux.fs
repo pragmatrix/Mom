@@ -2,10 +2,10 @@
 
 module Flux =
 
-    [<NoComparison>]
-    type 'result result =
-        | Value of 'result
-        | Error of exn
+    [<Struct;NoComparison>]
+    type 'value result =
+        | Value of v: 'value
+        | Error of e: exn
         | Cancelled
 
     [<RequireQualifiedAccess>]
@@ -76,7 +76,7 @@ module Flux =
     type Cancel = Cancel
 
     exception AsynchronousCancellationException with
-        override this.ToString() =
+        override __.ToString() =
             sprintf "an Mom got into a waiting state, even though it is being cancelled and expected to run only synchronously"
 
     /// Cancels the flux. This actually sends a Cancel event to the flux, and expects it to get
