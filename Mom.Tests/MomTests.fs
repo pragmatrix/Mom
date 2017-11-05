@@ -670,7 +670,10 @@ module CancellationAndFinally =
 
         Flux.isError res |> should be True
 
+#if DEBUG
+
 module Synchronous =
+
 
     [<Fact>]
     let ``asynchronous finally handler leads to an error``() =
@@ -687,6 +690,8 @@ module Synchronous =
             |> start
 
         Flux.error res |> should equal (Mom.AsynchronousException("finally"))
+
+#endif
 
 module UnresolvedIssues =
         
