@@ -33,7 +33,7 @@ module Flux =
     /// Dispatch an event to the flux that is currently waiting for one.
     let dispatch ev = function
         | Waiting cont -> cont ev
-        | flux -> failwithf "Mom.dispatch: can't dispatch an event to an mom that is not waiting for one: %A" flux
+        | flux -> failwithf "Flux.dispatch: can't dispatch an event to an flux that is not waiting for one: %A" flux
 
     //
     // Completed state queries
@@ -77,7 +77,7 @@ module Flux =
 
     exception AsynchronousCancellationException with
         override __.ToString() =
-            sprintf "an Mom got into a waiting state, even though it is being cancelled and expected to run only synchronously"
+            sprintf "an Flux got into a waiting state, even though it is being cancelled and expected to run only synchronously"
 
     /// Cancels the flux. This actually sends a Cancel event to the flux, and expects it to get
     /// either in the Error or Cancelled state.
