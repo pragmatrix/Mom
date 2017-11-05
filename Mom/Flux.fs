@@ -1,19 +1,20 @@
 ﻿namespace Mom
 
-[<NoComparison>]
-type 'result result =
-    | Value of 'result
-    | Error of exn
-    | Cancelled
-
-module Result =
-    let map f r =
-        match r with
-        | Value r -> Value (f r)
-        | Error e -> Error e
-        | Cancelled -> Cancelled
-
 module Flux =
+
+    [<NoComparison>]
+    type 'result result =
+        | Value of 'result
+        | Error of exn
+        | Cancelled
+
+    [<RequireQualifiedAccess>]
+    module Result =
+        let map f r =
+            match r with
+            | Value r -> Value (f r)
+            | Error e -> Error e
+            | Cancelled -> Cancelled
 
     type Request = obj
     type Response = obj

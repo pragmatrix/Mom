@@ -36,7 +36,7 @@ let dispatch = Flux.dispatch
 let stepH host mom =
     match mom with
     | Flux.Requesting (r, cont) -> 
-        host r |> unbox |> Mom.Value |> cont
+        host r |> unbox |> Flux.Value |> cont
     | _ -> failwithf "stepH: invalid state %A" mom
 
 
@@ -567,7 +567,7 @@ module Exceptions =
         test
         |> start
         |> Flux.result
-        |> should equal (Mom.Value 1)
+        |> should equal (Flux.Value 1)
 
     [<Fact>]
     let ``handles exception at runtime``() =
@@ -585,7 +585,7 @@ module Exceptions =
         |> start
         |> dispatch Event1
         |> Flux.result
-        |> should equal (Mom.Value 1)
+        |> should equal (Flux.Value 1)
 
     [<Fact>]
     let ``a waiter's exception is captured``() =
@@ -604,7 +604,7 @@ module Exceptions =
         |> start
         |> dispatch Event1
         |> Flux.result
-        |> should equal (Mom.Value 1)
+        |> should equal (Flux.Value 1)
 
     [<Fact>]
     let ``handle exception in exception handler after wait``() =
@@ -860,7 +860,7 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> Flux.result
-        |> should equal (Mom.Value 3) 
+        |> should equal (Flux.Value 3) 
 
     [<Fact>]
     let ``For``() = 
@@ -875,7 +875,7 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> Flux.result
-        |> should equal (Mom.Value ()) 
+        |> should equal (Flux.Value ()) 
 
 module AsyncRequest = 
 
@@ -899,9 +899,9 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (Mom.AsyncResponse(Id 10L, Mom.Value "Hello"))
+        |> dispatch (Mom.AsyncResponse(Id 10L, Flux.Value "Hello"))
         |> Flux.result
-        |> should equal (Mom.Value "Hello")
+        |> should equal (Flux.Value "Hello")
 
     [<Fact>]
     let ``AsyncRequest cancellation works``() = 
@@ -923,9 +923,9 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (Mom.AsyncResponse(Id 10L, Mom.Cancelled) : Mom.AsyncResponse<string>)
+        |> dispatch (Mom.AsyncResponse(Id 10L, Flux.Cancelled) : Mom.AsyncResponse<string>)
         |> Flux.result
-        |> should equal (Mom.Cancelled : string Mom.result)
+        |> should equal (Flux.Cancelled : string Flux.result)
 
         cancelled |> should be True
 
@@ -948,9 +948,9 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (Mom.AsyncResponse(Id 10L, Mom.Error (InvalidOperationException())) : Mom.AsyncResponse<string>)
+        |> dispatch (Mom.AsyncResponse(Id 10L, Flux.Error (InvalidOperationException())) : Mom.AsyncResponse<string>)
         |> Flux.result
-        |> should equal (Mom.Value "Catched")
+        |> should equal (Flux.Value "Catched")
      
 module Arbiter = 
     

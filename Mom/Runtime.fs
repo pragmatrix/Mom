@@ -49,16 +49,16 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
             match flux with
             | Flux.Completed c -> 
                 match c with 
-                | Mom.Value r -> Some r
-                | Mom.Error e -> raise e
-                | Mom.Cancelled -> None
+                | Flux.Value r -> Some r
+                | Flux.Error e -> raise e
+                | Flux.Cancelled -> None
             | Flux.Requesting (request, cont) -> 
                 let result = 
                     try
                         host request 
-                        |> Mom.Value
+                        |> Flux.Value
                     with e ->
-                        e |> Mom.Error
+                        e |> Flux.Error
                 result |> cont |> runLoop
             | Flux.Waiting cont ->
                 let event = eventQueue.Dequeue()

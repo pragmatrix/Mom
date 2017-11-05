@@ -76,8 +76,8 @@ module private ExecuteWrapper =
 
     // the generic function to create a typed AsyncResponse.
     let createResponse<'response> (id: Id, result: obj) : obj =
-        let unboxedResult : Mom.result<obj> = unbox result
-        let r : Mom.AsyncResponse<'response> = Mom.AsyncResponse(id, unboxedResult |> Mom.Result.map unbox)
+        let unboxedResult : obj Flux.result = unbox result
+        let r : Mom.AsyncResponse<'response> = Mom.AsyncResponse(id, unboxedResult |> Flux.Result.map unbox)
         box r
 
     // use Quotations to get out the MethodInfo of the wrap function.
@@ -149,8 +149,8 @@ module InlineAsyncRequestService =
                 
                 let result =
                     match reply with
-                    | Ok response -> Mom.Value response
-                    | Error e -> Mom.Error e.SourceException
+                    | Ok response -> Flux.Value response
+                    | Error e -> Flux.Error e.SourceException
 
                 createResponse(id, result)
                 |> service.ScheduleEvent

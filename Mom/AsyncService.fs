@@ -121,17 +121,17 @@ let add (f: 'e -> Async<'response> when 'e :> Mom.IAsyncRequest<'response>) (bui
         function
         | :? 'e as r -> 
             let id = Mom.generateAsyncRequestId()
-            let scheduleResponse (r: 'response Mom.result)  = 
+            let scheduleResponse (r: 'response Flux.result)  = 
                 Mom.AsyncResponse(id, r)
                 |> context.ScheduleEvent
                 
             Async.Start <| async {
                 try
                     let! response = f r
-                    Mom.Value response
+                    Flux.Value response
                     |> scheduleResponse
                 with e ->
-                    Mom.Error e
+                    Flux.Error e
                     |> scheduleResponse
             }
             Some <| box id

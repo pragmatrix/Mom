@@ -54,11 +54,11 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
         fun () ->
             let request = Replace(communicationId, (state, toReplace))
 
-            let processResponse (response: obj Mom.result) =
+            let processResponse (response: obj Flux.result) =
                 match response with
-                | Mom.Value _ -> Mom.Value ()
-                | Mom.Error e -> Mom.Error e
-                | Mom.Cancelled -> Mom.Cancelled
+                | Flux.Value _ -> Flux.Value ()
+                | Flux.Error e -> Flux.Error e
+                | Flux.Cancelled -> Flux.Cancelled
                 |> Flux.Completed
 
             Flux.Requesting (request, processResponse)
@@ -67,11 +67,11 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
         fun () ->
             let request : Request<'state> = GetState(communicationId)
 
-            let processResponse (response: obj Mom.result) =
+            let processResponse (response: obj Flux.result) =
                 match response with
-                | Mom.Value v -> Mom.Value (unbox v)
-                | Mom.Error e -> Mom.Error e
-                | Mom.Cancelled -> Mom.Cancelled
+                | Flux.Value v -> Flux.Value (unbox v)
+                | Flux.Error e -> Flux.Error e
+                | Flux.Cancelled -> Flux.Cancelled
                 |> Flux.Completed
 
             Flux.Requesting(request, processResponse)            
@@ -84,7 +84,7 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
             -> true
         | _ -> false
 
-    let idleSideshow = Flux.Completed (Mom.Value ())
+    let idleSideshow = Flux.Completed (Flux.Value ())
 
     // tbd: Flux module candidate!
     let cancelAndContinueWith continuation flux =
@@ -120,7 +120,7 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
                 | Replace(_, newSideshow) ->
                     beginSideshow sideshow newSideshow cont
                 | GetState(_) ->
-                    cont (Mom.Value (box state)) 
+                    cont (Flux.Value (box state)) 
                     |> next sideshow
                     
             | Flux.Requesting(r, cont) ->
@@ -130,8 +130,8 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
                     Flux.Completed <| 
                         // be sure errors of the control mom have precendence!
                         match cResult, sResult with
-                        | Mom.Error c, _ -> Mom.Error c
-                        | _, Mom.Error s -> Mom.Error s
+                        | Flux.Error c, _ -> Flux.Error c
+                        | _, Flux.Error s -> Flux.Error s
                         | _ -> cResult
                     )
             | Flux.Waiting cont ->
@@ -151,22 +151,22 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
                 | Flux.Requesting(r, cont) ->
                     Flux.Requesting(r, cont >> (fun flux -> startNew(state, flux)))
                 | Flux.Waiting _ ->
-                    contControl (Mom.Value (box ()))
+                    contControl (Flux.Value (box ()))
                     |> next (state, sideshow)
                 | Flux.Completed result ->
                     result 
-                    |> Mom.Result.map box
+                    |> Flux.Result.map box
                     |> contControl
                     |> next (None, idleSideshow)
 
             snd sideshow
             |> cancelAndContinueWith
                 (function
-                | Mom.Error err ->
+                | Flux.Error err ->
                     // sideshow was in error before or after the cancellation, 
                     // we propagate this to the Replace invoker and ignore the
                     // new sideshow
-                    Mom.Error err
+                    Flux.Error err
                     |> contControl
                     |> next (None, idleSideshow)
 

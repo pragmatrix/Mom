@@ -18,7 +18,7 @@ type ConvertIntToStr =
 // tbd: Mom API candidate!
 let respond r =
     function 
-    | Flux.Requesting (_, cont) -> cont (r |> box |> Mom.Value)
+    | Flux.Requesting (_, cont) -> cont (r |> box |> Flux.Value)
     | _ -> failwith "internal error"
 
 /// Mom under test.

@@ -12,8 +12,8 @@ open Mom.GlobalExports
 // Mom Tracing support.
 //
 
-type result<'r> = Mom.result<'r>
-type flux<'r> = Flux.flux<'r>
+type internal result<'r> = Flux.result<'r>
+type internal flux<'r> = Flux.flux<'r>
 
 /// A step trace represents a trace for a single step of an Mom. 
 [<NoComparison>]
@@ -51,7 +51,7 @@ let trace (p: 'param) (f : 'param -> 'r mom) : Trace<'param, 'r> mom =
 
             | Flux.Completed r ->
                 Trace((startTime, p), traces |> List.rev, r)
-                |> Mom.Value
+                |> Flux.Value
                 |> Flux.Completed
         
         f p |> Mom.start |> next []
