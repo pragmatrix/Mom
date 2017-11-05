@@ -16,6 +16,8 @@ open Mom.Flux
 [<RequireQualifiedAccess>]
 module Mom = 
 
+    let internal (^) = (<|)
+
     [<NoComparison;NoEquality>]
     type 'result mom = unit -> 'result flux
 
@@ -24,11 +26,11 @@ module Mom =
 
     /// Lifts a result.
     let ofResult (r: 'r result) : 'r mom = 
-        fun () -> r |> Completed
+        fun () -> Completed r
 
     /// Lifts a value. Creates an Mom that returns the value.
     let unit (v: 'v) : 'v mom =
-        v |> Value |> ofResult
+        ofResult ^ Value v
 
     /// Another way to lift a value.
     let ofValue (v: 'v) : 'v mom = 
@@ -36,28 +38,25 @@ module Mom =
     
     /// Lifts an error.
     let ofError e : 'v mom =
-        e |> Error |> ofResult
+        ofResult ^ Error e
 
     /// Continues the mom with a followup mom (Monad bind).
     let continueWith (followup : 'a result -> 'b mom) (mom: 'a mom) : 'b mom =
 
         let rec next = function
-            | Requesting (req, cont) ->
-                Requesting (req, cont >> next)
-            | Waiting cont ->
-                Waiting (cont >> next)
+            | Requesting (req, cont) 
+                -> Requesting (req, cont >> next)
+            | Waiting cont 
+                -> Waiting (cont >> next)
             | Completed r -> 
-                try followup r |> start
-                with e -> e |> Error |> Completed
+                try start ^ followup r
+                with e -> Completed ^ Error e
 
         fun () ->
-            mom |> start |> next
+            start mom |> next
 
-    let bind body mom = 
-        mom |> continueWith (function 
-            | Value r -> body r
-            | Error err -> err |> ofError
-            | Cancelled -> Cancelled |> ofResult)
+    let bind body = 
+        continueWith (Result.convert body ofError ofResult)
     
     /// Maps the mom's result. In other words: lifts a function that converts a value from a to b
     /// into the Mom category.
@@ -74,7 +73,7 @@ module Mom =
             
     /// Invokes a function when the mom is completed.
     let whenCompleted f =
-        continueWith (fun r -> f(); r |> ofResult)
+        continueWith (fun r -> f(); ofResult r)
 
     exception AsynchronousException of Why: string with
         override this.ToString() =
@@ -84,17 +83,16 @@ module Mom =
     /// function is only active for DEBUG builds.
     let synchronous (why: string) (mom: 'a mom) : 'a mom = 
 #if DEBUG
-        let rec next flux =
-            match flux with
-            | Requesting(req, cont) ->
-                Requesting(req, cont >> next)
-            | Waiting _ ->
-                raise (AsynchronousException why)
-            | Completed _ ->
-                flux
+        let rec next = function
+            | Requesting(req, cont) 
+                -> Requesting(req, cont >> next)
+            | Waiting _ 
+                -> raise (AsynchronousException why)
+            | Completed _ as flux 
+                -> flux
 
         fun () ->
-            mom |> start |> next
+            start mom |> next
 #else
         mom
 #endif
@@ -105,12 +103,10 @@ module Mom =
 
     /// Maps a list of Mom's by applying the function f to each result.
     let internal lmap (f: 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
-        let lf = map f
-        moms |> List.map lf
+        moms |> List.map (map f)
 
     let internal lmapi (f: int -> 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
-        moms 
-        |> List.mapi (f >> map)
+        moms |> List.mapi (f >> map)
 
     //
     // field
@@ -162,29 +158,30 @@ module Mom =
             try
                 arbiter state r
             with e ->
-                CancelField (e |> Error)
+                CancelField ^ Error e
 
         /// As long new Moms need to be added to the field we try to bring them into a state when they
         /// want to receive events only.
         let rec enter (field: Field<'state, 'r>) pending =
             match pending with
-            | [] -> proceed field
-            | mom :: pending ->
-            enter2 field (start mom) pending
+            | [] 
+                -> proceed field
+            | mom :: pending 
+                -> enter2 field (start mom) pending
         
         and enter2 (field: Field<'state, 'r>) flux pending =
             match flux with
-            | Requesting (request, cont) -> 
-                Requesting (request, cont >> fun flux -> enter2 field flux pending)
-            | Waiting _ -> 
+            | Requesting (request, cont) 
+                -> Requesting (request, cont >> fun flux -> enter2 field flux pending)
+            | Waiting _ 
                 // as long new moms are added to the field, event processing is delayed.
-                enter { field with Processed = flux::field.Processed } pending
+                -> enter { field with Processed = flux::field.Processed } pending
             | Completed result ->
             match arbiter field.State result with
-            | ContinueField (newState, moreMoms) ->
-                enter { field with State = newState } (moreMoms @ pending)
-            | CancelField result ->
-                cancel result [] ((rev field.Pending) @ field.Processed)
+            | ContinueField (newState, moreMoms) 
+                -> enter { field with State = newState } (moreMoms @ pending)
+            | CancelField result 
+                -> cancel result [] ((rev field.Pending) @ field.Processed)
         
         // Move the field forward.
         and proceed (field: Field<'state, 'r>) =
@@ -202,23 +199,26 @@ module Mom =
                 | flux::pending ->
                 match flux with
                 | Completed _
-                | Requesting _ -> failwithf "internal error: %A in field pending" flux
-                | Waiting cont ->
-                // deliver the event and be sure that the mom is removed from pending
-                cont ev |> postProcess { field with Pending = pending }
+                | Requesting _ 
+                    -> failwithf "internal error: %A in field pending" flux
+                | Waiting cont 
+                    // deliver the event and be sure that the mom is removed from pending
+                    ->
+                    cont ev |> postProcess { field with Pending = pending }
 
         // Continue processing the field or ask the arbiter what to do if the mom is completed.
         and postProcess (field: Field<'state, 'r>) flux =
             match flux with
-            | Requesting (request, cont) -> 
-                Requesting (request, cont >> fun flux -> postProcess field flux)
-            | Waiting _ -> proceed { field with Processed = flux::field.Processed }
+            | Requesting (request, cont) 
+                -> Requesting (request, cont >> fun flux -> postProcess field flux)
+            | Waiting _ 
+                -> proceed { field with Processed = flux::field.Processed }
             | Completed result ->
             match arbiter field.State result with
-            | ContinueField (newState, newMoms) ->
-                enter { field with State = newState } newMoms
-            | CancelField result ->
-                cancel result [] ((rev field.Pending) @ field.Processed)
+            | ContinueField (newState, newMoms) 
+                -> enter { field with State = newState } newMoms
+            | CancelField result 
+                -> cancel result [] ((rev field.Pending) @ field.Processed)
 
         // Cancellation:
         // send Cancel as soon they are in waiting state, if not, process host requests until they are.
@@ -227,12 +227,12 @@ module Mom =
             | [] -> finalize result cancelled
             | flux::pending ->
             match flux with
-            | Requesting (request, cont) ->
-                Requesting(request, cont >> fun flux -> cancel result cancelled (flux::pending))
-            | Waiting _ ->
-                cancel result ((Flux.cancel flux)::cancelled) pending
-            | Completed _ ->
-                cancel result cancelled pending
+            | Requesting (request, cont) 
+                -> Requesting(request, cont >> fun flux -> cancel result cancelled (flux::pending))
+            | Waiting _ 
+                -> cancel result ((Flux.cancel flux)::cancelled) pending
+            | Completed _ 
+                -> cancel result cancelled pending
 
         // Finalization: run them until they are all completed.
         and finalize result pending =
@@ -240,37 +240,30 @@ module Mom =
             | [] -> exit result
             | flux::pending ->
             match flux with
-            | Requesting (request, cont) ->
-                Requesting (request, cont >> fun flux -> finalize result (flux::pending))
-            | Waiting _ ->
+            | Requesting (request, cont) 
+                -> Requesting (request, cont >> fun flux -> finalize result (flux::pending))
+            | Waiting _ 
                 // See issue #4 why Waiting can not be supported.
-                raise AsynchronousCancellationException
+                -> raise AsynchronousCancellationException
                 // Waiting (cont >> fun flux -> finalize result (flux::pending))
-            | Completed _ ->
-                finalize result pending
+            | Completed _ 
+                -> finalize result pending
 
         and exit result =
-            result |> Completed
+            Completed result
 
         fun () ->
             enter { State = initial; Event = None; Pending = []; Processed = [] } moms
 
     /// field is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the field so that the arbiter does not need to handle them.
-
-    let field arbiter (initial: 'state) (moms: 'r mom list) : 'state mom = 
-        let arbiter state (r: 'r result) = 
-            match r with
-            | Value v -> arbiter state v
-            | Error e -> cancelField (Error e)
-            | Cancelled -> cancelField Cancelled
-
-        field' arbiter initial moms
+    let field arbiter = 
+        let arbiter state = Result.convert (arbiter state) (Error >> cancelField) cancelField
+        field' arbiter
 
     /// Combine a list of moms so that they run in parallel. The resulting mom ends when 
     /// all moms ended. When an error occurs in one of the moms, the resulting mom ends with
     /// that error and all other moms are cancelled.
-
     let all (moms: 'r mom list) : 'r list mom = 
 
         // all can be implemented in terms of the field algorithm:
@@ -389,11 +382,11 @@ module Mom =
     let onCancel (compensation: unit mom) = 
         continueWith <| function
         | Cancelled -> compensation |> continueWith (function
-            | Value _ -> Cancelled |> ofResult
-            | Error e -> e |> ofError
+            | Value _ -> ofResult Cancelled
+            | Error e -> ofError e
             // the compensation mom got cancelled! This is an error for now!
             // tbd: An cancellation mom must be protected from further cancellation.
-            | Cancelled -> NestedCancellationException |> ofError)
+            | Cancelled -> ofError NestedCancellationException)
         | r -> r |> ofResult
 
     /// Attach an compensating mom for the mom body that is called when a cancellation or an error
@@ -403,16 +396,16 @@ module Mom =
     let onCancelOrError (compensation: exn option -> unit mom) body = 
         let compensate rBody =
             let afterCancel = function
-            | Value _ -> rBody |> ofResult
-            | Error e -> e |> ofError
+            | Value _ -> ofResult rBody
+            | Error e -> ofError e
             // the compensation mom got cancelled! This is an error for now!
             // tbd: An cancellation mom must be protected from further cancellation.
-            | Cancelled -> NestedCancellationException |> ofError
+            | Cancelled -> ofError NestedCancellationException
 
             match rBody with
             | Error e -> compensation (Some e) |> continueWith afterCancel
             | Cancelled -> compensation None |> continueWith afterCancel
-            | r -> r |> ofResult
+            | r -> ofResult r
 
         body |> continueWith compensate
 
@@ -440,8 +433,7 @@ module Mom =
     /// returns true.
     let wait' predicate = 
         let f e = 
-            let r = predicate e
-            match r with
+            match predicate e with
             | true -> Some ()
             | false -> None
 
@@ -523,10 +515,9 @@ module Mom =
         member this.Using(disposable : 't, body : 't -> 'r mom when 't :> IDisposable) : 'r mom =
             let body = body disposable
             match box disposable with
-            | :? IDisposableFlow as dp -> 
-                this.TryFinally(body, fun () -> dp.DisposableFlow)
-            | _ -> 
-                this.TryFinally(body, disposable.Dispose)
+            | :? IDisposableFlow as dp 
+                -> this.TryFinally(body, fun () -> dp.DisposableFlow)
+            | _ -> this.TryFinally(body, disposable.Dispose)
 
         member __.TryFinally(mom: 'r mom, f: unit -> unit mom) : 'r mom =
             let finallyBlock tryResult =
@@ -535,11 +526,11 @@ module Mom =
                 // this _is_ our result, otherwise return the result.
                 let afterFinally finallyResult =
                     match finallyResult with
-                    | Value _ -> tryResult |> ofResult
-                    | Error e -> e |> ofError
+                    | Value _ -> ofResult tryResult
+                    | Error e -> ofError e
                     // if the finally {} got cancelled, our whole
                     // block's result is Cancelled
-                    | Cancelled -> Cancelled |> ofResult
+                    | Cancelled -> ofResult Cancelled
 
                 // note: f is already delayed
                 f() |> continueWith afterFinally
@@ -553,7 +544,7 @@ module Mom =
         member __.TryWith(mom: 'r mom, eh: exn -> 'r mom) : 'r mom =
             mom |> continueWith (function
                 | Error e -> eh e
-                | r -> r |> ofResult)
+                | r -> ofResult r)
                 
         member this.Combine(mom1: unit mom, mom2: 'r mom) : 'r mom =
             this.Bind(mom1, fun () -> mom2)
@@ -561,11 +552,9 @@ module Mom =
         // http://fsharpforfunandprofit.com/posts/computation-expressions-builder-part6/
         // While can be implemented in terms of Zero() and Bind()
         member this.While(guard: unit -> bool, body: unit mom) : unit mom =
-            if not (guard()) then
-                this.Zero()
-            else
-                this.Bind(body, fun () ->
-                    this.While(guard, body))
+            if not ^ guard()
+            then this.Zero()
+            else this.Bind(body, fun () -> this.While(guard, body))
 
         // For with Using(), While(), and Delay().
         member this.For(sequence: seq<'a>, body: 'a -> unit mom) : unit mom =
@@ -615,7 +604,7 @@ module Mom =
             try
                 do! waitFor' (fun (DelayCompleted id') -> id' = id)
             finally
-                CancelDelay id |> send
+                send ^ CancelDelay id
     }
 
     /// Deliver an event to the currently active processes.
@@ -626,7 +615,7 @@ module Mom =
         interface IRequest<unit>
     
     let schedule (e: Event) = 
-        e |> Schedule |> send
+        send ^ Schedule e
 
     //
     // Mom System combinators
@@ -659,9 +648,9 @@ module Mom =
                 async {
                     try
                         let! r = computation
-                        r |> box |> Value |> receiver
+                        Value ^ box r |> receiver
                     with e ->
-                        e |> Error |> receiver
+                        Error e |> receiver
                 } |> Async.Start
 
         interface IRequest<Id>

@@ -10,8 +10,12 @@ module Flux =
 
     [<RequireQualifiedAccess>]
     module Result =
-        let map f r =
-            match r with
+        let inline convert fv fe fc = function
+            | Value r -> fv r
+            | Error e -> fe e
+            | Cancelled -> fc Cancelled
+
+        let inline map f = function
             | Value r -> Value (f r)
             | Error e -> Error e
             | Cancelled -> Cancelled
@@ -27,8 +31,7 @@ module Flux =
         | Completed of 'result result
 
     /// Dispatch an event to the flux that is currently waiting for one.
-    let dispatch ev flux =
-        match flux with
+    let dispatch ev = function
         | Waiting cont -> cont ev
         | flux -> failwithf "Mom.dispatch: can't dispatch an event to an mom that is not waiting for one: %A" flux
 
@@ -46,33 +49,28 @@ module Flux =
         | _ -> false
 
     /// Returns the error of a completed flux.
-    let error flux = 
-        match flux with
+    let error = function
         | Completed (Error e) -> e
-        | _ -> failwithf "Flux.error: flux is not in error: %A" flux
+        | flux -> failwithf "Flux.error: flux is not in error: %A" flux
 
     /// The result of a completed flux.
-    let result flux = 
-        match flux with
+    let result = function
         | Completed r -> r
-        | _ -> failwithf "Flux.result: flux is not completed: %A" flux
+        | flux -> failwithf "Flux.result: flux is not completed: %A" flux
 
     /// Returns the resulting value of a completed flux.
-    let value flux = 
-        match flux with
+    let value = function
         | Completed (Value r) -> r
-        | Completed _ -> failwithf "Flux.value: flux has not been completed with a resulting value: %A" flux
-        | _ -> failwithf "Flux.value: flux is not completed: %A" flux
+        | Completed _ as flux -> failwithf "Flux.value: flux has not been completed with a resulting value: %A" flux
+        | flux -> failwithf "Flux.value: flux is not completed: %A" flux
 
     //
     // Cancellation
     //
 
-    let isCancelled flux = 
-        match flux with
+    let isCancelled = function
         | Completed Cancelled -> true
         | _ -> false
-
 
     /// The event that is sent to a flux when it gets cancelled.
     type Cancel = Cancel
@@ -88,20 +86,23 @@ module Flux =
     /// If a flux is completed, the result is overwritten (freed indirectly) with a Cancelled error,
     /// but an error is not, to avoid shadowing the error.
     /// A flux that is delayed (not started yet) or waiting for a synchronous response, can not be cancelled.
-    let cancel flux = 
-        let rec next flux = 
-            match flux with
-            | Requesting (req, cont) -> 
-                Requesting(req, cont >> next)
-            | Waiting _ ->
-                raise AsynchronousCancellationException
-            | Completed (Error _) -> flux
-            | Completed _ -> Cancelled |> Completed
+    let cancel = 
+        let rec next = function
+            | Requesting(req, cont) 
+                -> Requesting(req, cont >> next)
+            | Waiting _ 
+                -> raise AsynchronousCancellationException
+            | Completed(Error _) as flux
+                -> flux
+            | Completed _ 
+                -> Completed Cancelled
 
-        match flux with
-        | Requesting _ ->
-            failwith "failed to cancel a flux that is requesting a synchronous response"
-        | Waiting cont -> 
-            cont Cancel |> next
-        | Completed (Error _) -> flux
-        | Completed _ -> Cancelled |> Completed
+        function
+        | Requesting _ 
+            -> failwith "failed to cancel a flux that is requesting a synchronous response"
+        | Waiting cont 
+            -> cont Cancel |> next
+        | Completed(Error _) as flux
+            -> flux
+        | Completed _ 
+            -> Completed Cancelled
