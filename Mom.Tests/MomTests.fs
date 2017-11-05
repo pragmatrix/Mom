@@ -1,10 +1,10 @@
-﻿module IVR.Tests.IVRTests
+﻿module Mom.Tests.MomTests
 
 open System
 open System.Collections.Generic
 open FsUnit
 open Xunit
-open IVR
+open Mom
 
 //
 // Basic Combinator and semantic tests.
@@ -25,28 +25,28 @@ type Event3 = Event3
 
 type Request = 
     | Request of int
-    interface IVR.IRequest<string>
+    interface Mom.IRequest<string>
 
 type RequestU = 
     | RequestU of int
-    interface IVR.IRequest<unit>
+    interface Mom.IRequest<unit>
 
-let start = IVR.start
+let start = Mom.start
 let dispatch = Flux.dispatch
-let stepH host ivr =
-    match ivr with
+let stepH host mom =
+    match mom with
     | Flux.Requesting (r, cont) -> 
-        host r |> unbox |> IVR.Value |> cont
-    | _ -> failwithf "stepH: invalid state %A" ivr
+        host r |> unbox |> Mom.Value |> cont
+    | _ -> failwithf "stepH: invalid state %A" mom
 
 
 module Cancellation = 
 
     [<Fact>]
-    let disposeIsCalledInASequentialIVR() = 
+    let disposeIsCalledInASequentialMom() = 
         let ct = new CancellationTracker()
 
-        let a = ivr {
+        let a = mom {
             use __ = ct
             return 0
         }
@@ -62,13 +62,13 @@ module Cancellation =
             trace <- x::trace
 
         let x() = 
-            ivr {
+            mom {
                 t 0
                 return
-                    ivr { t 1 } |> IVR.asDisposable
+                    mom { t 1 } |> Mom.asDisposable
             }
 
-        let p = ivr {
+        let p = mom {
             use! __ = x()
             t 2
             return ()
@@ -88,14 +88,14 @@ module Cancellation =
             trace <- x::trace
 
         let x() = 
-            ivr {
+            mom {
                 t 0
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 return
-                    ivr { t 1 } |> IVR.asDisposable
+                    mom { t 1 } |> Mom.asDisposable
             }
 
-        let p = ivr {
+        let p = mom {
             use! __ = x()
             t 2
             return ()
@@ -109,12 +109,12 @@ module Cancellation =
         trace |> should equal [1;2;0]
 
     [<Fact>]
-    let ivrIsCancelledInASequentialIVRSurroundingAWait() = 
+    let momIsCancelledInASequentialMomSurroundingAWait() = 
         let ct = new CancellationTracker()
 
-        let a = ivr {
+        let a = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             return 0
         }
 
@@ -124,20 +124,20 @@ module Cancellation =
         ct.Disposed |> should equal true
 
     [<Fact>]
-    let ``join: right ivr is cancelled when left throws an exception``() = 
+    let ``join: right mom is cancelled when left throws an exception``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let left = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             failwith "HellNo!"
         }
 
-        let right = ivr {
+        let right = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event2) -> true)
+            do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        IVR.join left right
+        Mom.join left right
         |> start
         |> dispatch Event1 
         |> Flux.isError
@@ -146,20 +146,20 @@ module Cancellation =
         ct.Disposed |> should equal true
 
     [<Fact>]
-    let ``par: left ivr is cancelled when right throws an exception``() = 
+    let ``par: left mom is cancelled when right throws an exception``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
+        let left = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
-            do! IVR.waitFor' (fun (_:Event2) -> true)
+        let right = mom {
+            do! Mom.waitFor' (fun (_:Event2) -> true)
             failwith "HellNo!"
         }
 
-        IVR.join left right
+        Mom.join left right
         |> start
         |> dispatch Event2
         |> Flux.isError
@@ -168,39 +168,39 @@ module Cancellation =
         ct.Disposed |> should equal true
 
     [<Fact>]
-    let ``par': right ivr is cancelled after left completes``() = 
+    let ``par': right mom is cancelled after left completes``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let left = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
+        let right = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event2) -> true)
+            do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        let test = IVR.first left right
+        let test = Mom.first left right
         let started = start test
         dispatch Event1 started |> ignore
         ct.Disposed |> should equal true
 
     [<Fact>]
-    let ``par': right ivr is cancelled after left completes and its finally handler is called``() = 
+    let ``par': right mom is cancelled after left completes and its finally handler is called``() = 
         let mutable finallyCalled = false
 
-        let left = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let left = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
+        let right = mom {
             try
-                do! IVR.waitFor' (fun (_:Event2) -> true)
+                do! Mom.waitFor' (fun (_:Event2) -> true)
             finally
                 finallyCalled <- true
         }
 
-        let test = IVR.first left right
+        let test = Mom.first left right
         let started = start test
         dispatch Event1 started |> ignore
         finallyCalled |> should equal true
@@ -210,29 +210,29 @@ module Cancellation =
     // This test is currently not possible, because of #13. 
 
     [<Fact>]
-    let ``par': right ivr is cancelled after left completes and its finally ivr is run``() = 
+    let ``par': right mom is cancelled after left completes and its finally mom is run``() = 
         let mutable finallyCalled = false
 
         let leftResult = 1
         let rightResult = 2
 
-        let left = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let left = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             return leftResult
         }
 
-        let right = ivr {
+        let right = mom {
             try
-                do! IVR.waitFor' (fun (_:Event2) -> true)
+                do! Mom.waitFor' (fun (_:Event2) -> true)
                 return rightResult
             finally
-                ivr {
-                    do! IVR.waitFor' (fun (_:Event3) -> true)
+                mom {
+                    do! Mom.waitFor' (fun (_:Event3) -> true)
                     finallyCalled <- true
                 }
         }
 
-        let test = IVR.first left right
+        let test = Mom.first left right
         let result = 
             test
             |> start 
@@ -247,74 +247,74 @@ module Cancellation =
 #endif
 
     [<Fact>]
-    let ``par': left ivr is cancelled after right completes``() = 
+    let ``par': left mom is cancelled after right completes``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
+        let left = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
-            do! IVR.waitFor' (fun (_:Event2) -> true)
+        let right = mom {
+            do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        let test = IVR.first left right
+        let test = Mom.first left right
         let started = start test
         dispatch Event2 started |> ignore
         ct.Disposed |> should equal true
 
 
     [<Fact>]
-    let ``par': left ivr is cancelled when the right one is completed after startup``() = 
+    let ``par': left mom is cancelled when the right one is completed after startup``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
+        let left = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
+        let right = mom {
             return 0
         }
 
-        let test = IVR.first left right
+        let test = Mom.first left right
         let started = start test
         Flux.isCompleted started |> should equal true
         ct.Disposed |> should equal true
 
     [<Fact>]
-    let ``any: first ivr is cancelled when the second one finishes first``() = 
+    let ``any: first mom is cancelled when the second one finishes first``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
+        let left = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
-            do! IVR.waitFor' (fun (_:Event2) -> true)
+        let right = mom {
+            do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        let r = IVR.any [left; right]
+        let r = Mom.any [left; right]
         let started = start r
         dispatch Event2 started |> ignore
         ct.Disposed |> should equal true
 
     [<Fact>]
-    let ``any: second ivr is cancelled when the first one finishes first``() = 
+    let ``any: second mom is cancelled when the first one finishes first``() = 
         let ct = new CancellationTracker()
 
-        let left = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let left = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
-        let right = ivr {
+        let right = mom {
             use __ = ct
-            do! IVR.waitFor' (fun (_:Event2) -> true)
+            do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        let r = IVR.any [left; right]
+        let r = Mom.any [left; right]
         let started = start r
         dispatch Event1 started |> ignore
         ct.Disposed |> should equal true
@@ -324,42 +324,42 @@ module Cancellation =
 
         let mutable finallyTracker = []
 
-        let a = ivr {
+        let a = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['a']
             }
 
-        let b = ivr {
+        let b = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['b']
             }
 
-        let c = ivr {
+        let c = mom {
             try
-                do! IVR.waitFor' (fun (_:Event2) -> true)
+                do! Mom.waitFor' (fun (_:Event2) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['c']
             }
 
-        let d = ivr {
+        let d = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['d']
             }
 
-        let e = ivr {
+        let e = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 finallyTracker <- finallyTracker @ ['e']
             }
 
-        let r = IVR.any [a;b;c;d;e]
+        let r = Mom.any [a;b;c;d;e]
         start r 
         |> dispatch Event2
         |> ignore
@@ -370,35 +370,35 @@ module Cancellation =
         |> should equal ['c';'e';'d';'b';'a']
 
     [<Fact>]
-    let ``when an ivr gets cancelled, it ends cancelled but does not throw any exception``() = 
+    let ``when an mom gets cancelled, it ends cancelled but does not throw any exception``() = 
 
-        let ivr = ivr {
+        let mom = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             with _ ->
                 failwith "fail"
         }
 
         let res = 
-            ivr
+            mom
             |> start
             |> dispatch Flux.Cancel
 
         Flux.isCancelled res |> should be True
 
     [<Fact>]
-    let ``when an ivr gets cancelled in a while loop, it does not continue outside of it``() = 
+    let ``when an mom gets cancelled in a while loop, it does not continue outside of it``() = 
 
         let mutable continued = false
 
-        let ivr = ivr {
+        let mom = mom {
             while true do
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             continued <- true
         }
 
         let res = 
-            ivr
+            mom
             |> start
             |> dispatch Flux.Cancel
     
@@ -410,9 +410,9 @@ module Finally =
     let ``computation expression: try finally handler is run on a regular completion``() =
         let mutable x = false
 
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 x <- true
         }
@@ -428,9 +428,9 @@ module Finally =
     let ``computation expression: try finally handler is run on an error completion``() =
         let mutable x = false
 
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
             finally
                 x <- true
@@ -447,7 +447,7 @@ module Finally =
     let ``computation expression: try finally handler is run on an error completion at startup time``() =
         let mutable x = false
 
-        let test = ivr {
+        let test = mom {
             try
                 failwith "Nooooo"
             finally
@@ -461,17 +461,17 @@ module Finally =
         x |> should equal true
 
     [<Fact>]
-    let ``computation expression: finally handler with ivr is called``() = 
+    let ``computation expression: finally handler with mom is called``() = 
         let mutable x = false
 
-        let finallyIVR = ivr { x <- true }
+        let finallyMom = mom { x <- true }
 
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 return 10
             finally
-                finallyIVR
+                finallyMom
             }
 
         test
@@ -482,18 +482,18 @@ module Finally =
         x |> should equal true
 
     [<Fact>]
-    let ``computation expression: finally handler with ivr is called when an exception happens``() = 
+    let ``computation expression: finally handler with mom is called when an exception happens``() = 
         let mutable x = false
 
-        let finallyIVR = ivr { x <- true }
+        let finallyMom = mom { x <- true }
 
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
                 return 10
             finally
-                finallyIVR
+                finallyMom
             }
 
         test
@@ -505,7 +505,7 @@ module Finally =
 
     [<Fact>]
     let ``computation expression: finally crashes``() = 
-        let test = ivr {
+        let test = mom {
             try
                 return 10
             finally
@@ -519,12 +519,12 @@ module Finally =
         |> should equal true
         
     [<Fact>]
-    let ``computation expression: finally ivr crashes``() = 
-        let test = ivr {
+    let ``computation expression: finally mom crashes``() = 
+        let test = mom {
             try
                 return 10
             finally
-                ivr { 
+                mom { 
                     failwith "Nooo"
                 }
             }
@@ -535,13 +535,13 @@ module Finally =
         |> should equal true
         
     [<Fact>]
-    let ``computation expression: finally ivr crashes outside the ivr``() = 
-        let test = ivr {
+    let ``computation expression: finally mom crashes outside the mom``() = 
+        let test = mom {
             try
                 return 10
             finally
                 failwith "Nooo"
-                ivr { 
+                mom { 
                     return ()
                 }
             }
@@ -556,7 +556,7 @@ module Exceptions =
     [<Fact>]
     let ``handle exception at startup time``() =
 
-        let test = ivr {
+        let test = mom {
             try
                 failwith "Nooooo"
                 return 0
@@ -567,14 +567,14 @@ module Exceptions =
         test
         |> start
         |> Flux.result
-        |> should equal (IVR.Value 1)
+        |> should equal (Mom.Value 1)
 
     [<Fact>]
     let ``handles exception at runtime``() =
 
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
                 return 0
             with _ ->
@@ -585,15 +585,15 @@ module Exceptions =
         |> start
         |> dispatch Event1
         |> Flux.result
-        |> should equal (IVR.Value 1)
+        |> should equal (Mom.Value 1)
 
     [<Fact>]
     let ``a waiter's exception is captured``() =
 
         let msg = "Waiter Crashed"
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> failwith msg)
+                do! Mom.waitFor' (fun (_:Event1) -> failwith msg)
                 return 0
             with e ->
                 e.Message |> should equal msg
@@ -604,14 +604,14 @@ module Exceptions =
         |> start
         |> dispatch Event1
         |> Flux.result
-        |> should equal (IVR.Value 1)
+        |> should equal (Mom.Value 1)
 
     [<Fact>]
     let ``handle exception in exception handler after wait``() =
 
-        let test = ivr {
+        let test = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 failwith "Nooooo"
                 return 0
             with _ ->
@@ -634,19 +634,19 @@ module Exceptions =
 module CancellationAndFinally =
 
     [<Fact>]
-    let ``when an ivr gets cancelled, it runs the finally handler``() = 
+    let ``when an mom gets cancelled, it runs the finally handler``() = 
 
         let mutable runFinally = false
 
-        let ivr = ivr {
+        let mom = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 runFinally <- true
         }
 
         let res = 
-            ivr
+            mom
             |> start
             |> dispatch Flux.Cancel
     
@@ -654,17 +654,17 @@ module CancellationAndFinally =
         Flux.isCancelled res |> should be True
 
     [<Fact>]
-    let ``cancelled ivrs may propagate errors``() =
+    let ``cancelled moms may propagate errors``() =
 
-        let ivr = ivr {
+        let mom = mom {
             try
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             finally
                 failwith "error" |> ignore
         }
 
         let res = 
-            ivr
+            mom
             |> start
             |> dispatch Flux.Cancel
 
@@ -675,39 +675,39 @@ module Synchronous =
     [<Fact>]
     let ``asynchronous finally handler leads to an error``() =
 
-        let ivr = ivr {
+        let mom = mom {
             try
                 ()
             finally
-                ivr { do! IVR.waitFor' (fun (_: Event1) -> true) }
+                mom { do! Mom.waitFor' (fun (_: Event1) -> true) }
         }
 
         let res = 
-            ivr
+            mom
             |> start
 
-        Flux.error res |> should equal (IVR.AsynchronousException("finally"))
+        Flux.error res |> should equal (Mom.AsynchronousException("finally"))
 
 module UnresolvedIssues =
         
     [<Fact(Skip="See issue #4")>]
-    let ``when one part of a parallel ivr gets cancelled, the followup ivr continues while the cancellation is run``() = 
+    let ``when one part of a parallel mom gets cancelled, the followup mom continues while the cancellation is run``() = 
 
-        let primaryIVR = ivr {
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+        let primaryMom = mom {
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             }
 
-        // cancellation of the secondary IVR takes forvever
-        let secondaryIVR = ivr {
+        // cancellation of the secondary Mom takes forvever
+        let secondaryMom = mom {
             try
-                do! IVR.waitFor' (fun (_:Event2) -> true)
+                do! Mom.waitFor' (fun (_:Event2) -> true)
             finally
-                IVR.idle
+                Mom.idle
         }
 
-        let test = ivr {
-                do! IVR.any [primaryIVR; secondaryIVR]
-                do! IVR.waitFor' (fun (_:Event3) -> true)
+        let test = mom {
+                do! Mom.any [primaryMom; secondaryMom]
+                do! Mom.waitFor' (fun (_:Event3) -> true)
             }
 
         let res = 
@@ -720,11 +720,11 @@ module UnresolvedIssues =
 
 module HostCommunication =
     [<Fact>]
-    let ``IVR.send sends a request to the host``() =
+    let ``Mom.send sends a request to the host``() =
         let queue = Queue()
         
-        let test = ivr {
-            do! IVR.send (RequestU 0)
+        let test = mom {
+            do! Mom.send (RequestU 0)
         } 
 
         test
@@ -736,12 +736,12 @@ module HostCommunication =
 
 
     [<Fact>]
-    let ``IVR.send sends requests to the host in the right order``() =
+    let ``Mom.send sends requests to the host in the right order``() =
         let queue = Queue()
         
-        let test = ivr {
-            do! IVR.send (RequestU 0)
-            do! IVR.send (RequestU 1)
+        let test = mom {
+            do! Mom.send (RequestU 0)
+            do! Mom.send (RequestU 1)
         } 
 
         test
@@ -753,13 +753,13 @@ module HostCommunication =
         queue |> Seq.toList |> should equal [box <| RequestU 0; box <| RequestU 1]
 
     [<Fact>]
-    let ``after a wait, IVR.send sends a request to the host``() =
+    let ``after a wait, Mom.send sends a request to the host``() =
         let queue = Queue()
         
-        let test = ivr {
-            do! IVR.send (RequestU 0)
-            do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! IVR.send (RequestU 1)
+        let test = mom {
+            do! Mom.send (RequestU 0)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
+            do! Mom.send (RequestU 1)
         } 
 
         test
@@ -774,29 +774,29 @@ module HostCommunication =
 module Delay =
 
     [<Fact>]
-    let ``IVR.delay (simulated)``() = 
+    let ``Mom.delay (simulated)``() = 
 
         let expectDelay (c: obj) = 
-            c |> should equal (IVR.Delay (TimeSpan(1, 0, 0)))
+            c |> should equal (Mom.Delay (TimeSpan(1, 0, 0)))
             Id 1L |> box // return the 64 bit id of the Delay
 
         let expectCancelDelay (c: obj) = 
-            c |> should equal (IVR.CancelDelay (Id 1L))
+            c |> should equal (Mom.CancelDelay (Id 1L))
             () |> box
 
-        let test = IVR.delay (TimeSpan(1, 0, 0))
+        let test = Mom.delay (TimeSpan(1, 0, 0))
 
         test
         |> start
         |> stepH expectDelay
-        |> dispatch (IVR.DelayCompleted (Id 1L))
+        |> dispatch (Mom.DelayCompleted (Id 1L))
         |> stepH expectCancelDelay
         |> Flux.isCompleted |> should equal true
 
     [<Fact>]
-    let ``IVR.delay completes immediately in case of a zero delay``() = 
+    let ``Mom.delay completes immediately in case of a zero delay``() = 
 
-        let test = IVR.delay TimeSpan.Zero
+        let test = Mom.delay TimeSpan.Zero
 
         let state = 
             test |> start
@@ -808,8 +808,8 @@ module CompuationExpressionSyntax =
 
     [<Fact>]
     let ``Request with response type``() = 
-        let test = ivr {
-            let! r = IVR.send (Request 10)
+        let test = mom {
+            let! r = Mom.send (Request 10)
             return r
         }
 
@@ -827,7 +827,7 @@ module CompuationExpressionSyntax =
 
     [<Fact>]
     let ``Command with return type (implicit send!)``() = 
-        let test = ivr {
+        let test = mom {
             let! r = Request 10
             return r
         }
@@ -846,10 +846,10 @@ module CompuationExpressionSyntax =
         
     [<Fact>]
     let ``while``() = 
-        let test = ivr {
+        let test = mom {
             let mutable f = 0
             while f<3 do
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 f <- f + 1
             return f
         }
@@ -860,13 +860,13 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> Flux.result
-        |> should equal (IVR.Value 3) 
+        |> should equal (Mom.Value 3) 
 
     [<Fact>]
     let ``For``() = 
-        let test = ivr {
+        let test = mom {
             for _ in [0..2] do
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
         test
@@ -875,17 +875,17 @@ module CompuationExpressionSyntax =
         |> dispatch Event1
         |> dispatch Event1
         |> Flux.result
-        |> should equal (IVR.Value ()) 
+        |> should equal (Mom.Value ()) 
 
 module AsyncRequest = 
 
     type AsyncRequest =
         | AsyncRequest
-        interface IVR.IAsyncRequest<string>
+        interface Mom.IAsyncRequest<string>
     
     [<Fact>]
     let ``AsyncRequest works``() = 
-        let test = ivr {
+        let test = mom {
             let! r = AsyncRequest
             return r
         }
@@ -899,14 +899,14 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Value "Hello"))
+        |> dispatch (Mom.AsyncResponse(Id 10L, Mom.Value "Hello"))
         |> Flux.result
-        |> should equal (IVR.Value "Hello")
+        |> should equal (Mom.Value "Hello")
 
     [<Fact>]
     let ``AsyncRequest cancellation works``() = 
         let mutable cancelled = false
-        let test = ivr {
+        let test = mom {
             try
                 let! _ = AsyncRequest
                 return ""
@@ -923,15 +923,15 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Cancelled) : IVR.AsyncResponse<string>)
+        |> dispatch (Mom.AsyncResponse(Id 10L, Mom.Cancelled) : Mom.AsyncResponse<string>)
         |> Flux.result
-        |> should equal (IVR.Cancelled : string IVR.result)
+        |> should equal (Mom.Cancelled : string Mom.result)
 
         cancelled |> should be True
 
     [<Fact>]
     let ``AsyncRequest exceptions can be catched``() = 
-        let test = ivr {
+        let test = mom {
             try
                 let! _ = AsyncRequest
                 return ""
@@ -948,29 +948,29 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (IVR.AsyncResponse(Id 10L, IVR.Error (InvalidOperationException())) : IVR.AsyncResponse<string>)
+        |> dispatch (Mom.AsyncResponse(Id 10L, Mom.Error (InvalidOperationException())) : Mom.AsyncResponse<string>)
         |> Flux.result
-        |> should equal (IVR.Value "Catched")
+        |> should equal (Mom.Value "Catched")
      
 module Arbiter = 
     
     [<Fact>]
-    let immediateContinuationIsRunOnBothPathsInAParallelIVR() = 
+    let immediateContinuationIsRunOnBothPathsInAParallelMom() = 
         let mutable r1 = false
     
-        let ivr1 = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let mom1 = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             r1 <- true
         }
 
         let mutable r2 = false
 
-        let ivr2 = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let mom2 = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             r2 <- true
         }
 
-        IVR.all [ivr1;ivr2]
+        Mom.all [mom1;mom2]
         |> start
         |> dispatch Event1
         |> Flux.value
@@ -980,21 +980,21 @@ module Arbiter =
         r2 |> should be True
 
     [<Fact>]
-    let hostContinuationIsRunOnBothPathsInAParallelIVR() = 
+    let hostContinuationIsRunOnBothPathsInAParallelMom() = 
 
         let queue = Queue()
     
-        let ivr1 = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! IVR.send (RequestU 0)
+        let mom1 = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
+            do! Mom.send (RequestU 0)
         }
 
-        let ivr2 = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
-            do! IVR.send (RequestU 1)
+        let mom2 = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
+            do! Mom.send (RequestU 1)
         }
 
-        IVR.all [ivr1;ivr2]
+        Mom.all [mom1;mom2]
         |> start
         |> dispatch Event1
         |> stepH queue.Enqueue
@@ -1015,22 +1015,22 @@ module Sideshow =
         let mutable nestedContinued = 0
         let mutable sideshowFinalized = 0
 
-        let sideshow = ivr {
+        let sideshow = mom {
             try
                 sideshowStarted <- sideshowStarted + 1
-                do! IVR.waitFor' (fun (_:Event2) -> true)
+                do! Mom.waitFor' (fun (_:Event2) -> true)
             finally
                 sideshowFinalized <- sideshowFinalized + 1
         }
 
-        let control (control: Sideshow.Control) = ivr {
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+        let control (control: Sideshow.Control) = mom {
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             do! control.Begin sideshow
             nestedContinued <- nestedContinued + 1
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
             do! control.Begin sideshow
             nestedContinued <- nestedContinued + 1
-            do! IVR.waitFor' (fun (_:Event1) -> true)
+            do! Mom.waitFor' (fun (_:Event1) -> true)
         }
 
         let state =
@@ -1055,15 +1055,15 @@ module Sideshow =
     module ErrorPropagation =
 
         [<Fact>]
-        let ``sideshow error while starting is propagated into the control ivr``() = 
+        let ``sideshow error while starting is propagated into the control mom``() = 
 
             // we start it, we control it!
         
-            let sideshow = ivr {
+            let sideshow = mom {
                 failwith "error"
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 try
                     do! control.Begin sideshow
                     return false
@@ -1079,14 +1079,14 @@ module Sideshow =
         [<Fact>]
         let ``sideshow error after an event is propagated to a subsequent replace``() = 
 
-            let sideshow = ivr {
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+            let sideshow = mom {
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 failwith "error" |> ignore
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin sideshow
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 try
                     do! control.Begin sideshow
                     return false
@@ -1104,14 +1104,14 @@ module Sideshow =
         [<Fact>]
         let ``sideshow error while cancelling is propagated in a subsequent replace``() = 
 
-            let sideshow = ivr {
+            let sideshow = mom {
                 try
-                    do! IVR.waitFor' (fun (_:Event2) -> true)
+                    do! Mom.waitFor' (fun (_:Event2) -> true)
                 finally
                     failwith "error" |> ignore
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin sideshow
                 try
                     do! control.Begin sideshow
@@ -1128,14 +1128,14 @@ module Sideshow =
         [<Fact>]
         let ``pending sideshow error overrides successful value``() = 
 
-            let sideshow = ivr {
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+            let sideshow = mom {
+                do! Mom.waitFor' (fun (_:Event1) -> true)
                 failwith "error" |> ignore
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin sideshow
-                do! IVR.waitFor' (fun (_:Event1) -> true)
+                do! Mom.waitFor' (fun (_:Event1) -> true)
             }
 
             let state =
@@ -1147,14 +1147,14 @@ module Sideshow =
         [<Fact>]
         let ``pending sideshow cancellation error overrides successful value``() = 
 
-            let sideshow = ivr {
+            let sideshow = mom {
                 try
-                    do! IVR.waitFor' (fun (_:Event1) -> true)
+                    do! Mom.waitFor' (fun (_:Event1) -> true)
                 finally
                     failwith "error" |> ignore
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin sideshow
             }
 
@@ -1166,17 +1166,17 @@ module Sideshow =
         [<Fact>]
         let ``if both sideshow and control are in error, the control error has precedence``() = 
             
-            // the nested error is the control ivr for the sideshow ivr, so if there happens
+            // the nested error is the control mom for the sideshow mom, so if there happens
             // and error there, it should be considered as more important.
             
-            let sideshow = ivr {
+            let sideshow = mom {
                 try
-                    do! IVR.waitFor' (fun (_:Event1) -> true)
+                    do! Mom.waitFor' (fun (_:Event1) -> true)
                 finally
                     failwith "error-sideshow" |> ignore
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin sideshow
                 failwith "error-control"
             }
@@ -1189,7 +1189,7 @@ module Sideshow =
     module State = 
         [<Fact>] 
         let ``state is initially set to None``() = 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 return! control.State
             }
 
@@ -1203,11 +1203,11 @@ module Sideshow =
         [<Fact>]
         let ``if sideshow terminates immediately, state stays at None``() = 
 
-            let sideshow = ivr {
+            let sideshow = mom {
                 return ()
             }
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin(sideshow)
                 return! control.State
             }
@@ -1222,9 +1222,9 @@ module Sideshow =
         [<Fact>]
         let ``if sideshow takes time , state is set ``() = 
 
-            let sideshow = IVR.idle
+            let sideshow = Mom.idle
 
-            let control (control: Sideshow.Control) = ivr {
+            let control (control: Sideshow.Control) = mom {
                 do! control.Begin(sideshow)
                 return! control.State
             }
@@ -1239,10 +1239,10 @@ module Sideshow =
         [<Fact>]
         let ``sideshow state changes``() = 
 
-            let sideshow = IVR.idle
-            let sideshowNone = IVR.unit()
+            let sideshow = Mom.idle
+            let sideshowNone = Mom.unit()
 
-            let control (control: Sideshow.Control<int>) = ivr {
+            let control (control: Sideshow.Control<int>) = mom {
                 do! control.Begin(1, sideshow)
                 let! state1 = control.State
                 do! control.Begin(2, sideshow)

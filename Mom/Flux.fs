@@ -1,4 +1,4 @@
-﻿namespace IVR
+﻿namespace Mom
 
 [<NoComparison>]
 type 'result result =
@@ -29,7 +29,7 @@ module Flux =
     let dispatch ev flux =
         match flux with
         | Waiting cont -> cont ev
-        | flux -> failwithf "IVR.dispatch: can't dispatch an event to an ivr that is not waiting for one: %A" flux
+        | flux -> failwithf "Mom.dispatch: can't dispatch an event to an mom that is not waiting for one: %A" flux
 
     //
     // Completed state queries
@@ -78,7 +78,7 @@ module Flux =
 
     exception AsynchronousCancellationException with
         override this.ToString() =
-            sprintf "an IVR got into a waiting state, even though it is being cancelled and expected to run only synchronously"
+            sprintf "an Mom got into a waiting state, even though it is being cancelled and expected to run only synchronously"
 
     /// Cancels the flux. This actually sends a Cancel event to the flux, and expects it to get
     /// either in the Error or Cancelled state.

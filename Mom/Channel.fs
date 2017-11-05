@@ -1,8 +1,8 @@
-﻿/// A channel offers a way to communicate events across IVRs. The channels are named so that
+﻿/// A channel offers a way to communicate events across Moms. The channels are named so that
 /// it is possible to create multiple channels of the same type.
-module IVR.Channel
+module Mom.Channel
 
-open IVR.GlobalExports
+open Mom.GlobalExports
 
 type 'message receiver = {
     Name: string
@@ -21,15 +21,15 @@ let create<'message>(name) : 'message sender * 'message receiver =
     { Name = name }, { Name = name }
 
 /// Post a message to a channel.
-let post (message: 'message) (channel: 'message sender) = ivr {
-    do! IVR.schedule (Message(channel.Name, message))
+let post (message: 'message) (channel: 'message sender) = mom {
+    do! Mom.schedule (Message(channel.Name, message))
 }
 
 /// Wait for a message on a channel by using selector. Continues waiting if the selector
 /// does not match. Note that messages are ignored if a message is sent while the receiver
 /// does not wait / selects for it.
-let wait' (selector: 'message -> 'r option) (channel: 'message receiver) : 'r ivr =
-    IVR.waitFor <|
+let wait' (selector: 'message -> 'r option) (channel: 'message receiver) : 'r mom =
+    Mom.waitFor <|
     fun (Message(name, message)) ->
         if name = channel.Name 
         then selector message

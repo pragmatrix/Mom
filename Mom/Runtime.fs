@@ -1,19 +1,19 @@
 ﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 [<RequireQualifiedAccess>]
-module IVR.Runtime
+module Mom.Runtime
 
 open System
 open System.Threading
-open IVR.Threading
+open Mom.Threading
 
 ///
-/// The IVR runtime.
+/// The Mom runtime.
 /// 
 
 // predefined runtime events
 
-/// This event can be sent to the Runtime to try to cancel the current IVR.
-type CancelIVR = CancelIVR
+/// This event can be sent to the Runtime to try to cancel the current Mom.
+type CancelMom = CancelMom
 
 /// The stuff a service can do.
 type IServiceContext = 
@@ -22,7 +22,7 @@ type IServiceContext =
 
 type Host = Flux.Request -> Flux.Response
 
-/// This is the runtime that drives the IVR.
+/// This is the runtime that drives the Mom.
 type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IServiceContext -> Host) as this = 
 
     // Partially apply the runtime to the host, so that hosts can initialize.
@@ -40,40 +40,40 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
         eventQueue.Enqueue event
 
     member private this.Cancel() = 
-        this.ScheduleEvent CancelIVR
+        this.ScheduleEvent CancelMom
 
-    /// Runs the ivr synchronously. Returns Some value or None if the ivr was cancelled.
-    member __.Run ivr = 
+    /// Runs the mom synchronously. Returns Some value or None if the mom was cancelled.
+    member __.Run mom = 
 
         let rec runLoop flux =
             match flux with
             | Flux.Completed c -> 
                 match c with 
-                | IVR.Value r -> Some r
-                | IVR.Error e -> raise e
-                | IVR.Cancelled -> None
+                | Mom.Value r -> Some r
+                | Mom.Error e -> raise e
+                | Mom.Cancelled -> None
             | Flux.Requesting (request, cont) -> 
                 let result = 
                     try
                         host request 
-                        |> IVR.Value
+                        |> Mom.Value
                     with e ->
-                        e |> IVR.Error
+                        e |> Mom.Error
                 result |> cont |> runLoop
             | Flux.Waiting cont ->
                 let event = eventQueue.Dequeue()
                 match event with
-                | :? CancelIVR -> Flux.cancel flux
+                | :? CancelMom -> Flux.cancel flux
                 | event -> cont event
                 |> runLoop 
 
-        ivr
-        |> IVR.start
+        mom
+        |> Mom.start
         |> runLoop
 
-    member this.Run (ivr, cancellationToken: CancellationToken) = 
+    member this.Run (mom, cancellationToken: CancellationToken) = 
         use __ = cancellationToken.Register(fun () -> this.Cancel())
-        this.Run ivr
+        this.Run mom
 
 /// Defines a service. 
 /// Note that a service's context is partially applied per Runtime. 
@@ -107,8 +107,8 @@ let withServices (services: Service list) builder =
     services |> List.fold (flip withService) builder
 
 /// Adds a function that gets run when the particular request was
-/// invoked inside the IVR with the type of the function's argument.
-let withFunction (f: 'request -> 'r when 'request :> IVR.IRequest<'r>) =
+/// invoked inside the Mom with the type of the function's argument.
+let withFunction (f: 'request -> 'r when 'request :> Mom.IRequest<'r>) =
     let service _ (req: Flux.Request) : Flux.Response option =
         match req with
         | :? 'request as req
@@ -139,7 +139,7 @@ module Service =
 
     let schedule (context: IServiceContext) (cmd: Flux.Request) = 
         match cmd with
-        | :? IVR.Schedule as s -> s.Event |> context.ScheduleEvent; () |> box |> Some
+        | :? Mom.Schedule as s -> s.Event |> context.ScheduleEvent; () |> box |> Some
         | _ -> None
 
     let delay (context: IServiceContext) =
@@ -147,15 +147,15 @@ module Service =
         let mutable activeTimers = Map.empty
         fun (cmd : Flux.Request) ->
             match cmd with
-            | :? IVR.Delay as d -> 
-                let (IVR.Delay timespan) = d
+            | :? Mom.Delay as d -> 
+                let (Mom.Delay timespan) = d
                 let id = delayIdGenerator.GenerateId()
-                let callback _ = context.ScheduleEvent (IVR.DelayCompleted id)
+                let callback _ = context.ScheduleEvent (Mom.DelayCompleted id)
                 let t = new Timer(callback, null, int64 timespan.TotalMilliseconds, -1L)
                 activeTimers <- Map.add id t activeTimers
                 id |> box |> Some
-            | :? IVR.CancelDelay as cd ->
-                let (IVR.CancelDelay id) = cd
+            | :? Mom.CancelDelay as cd ->
+                let (Mom.CancelDelay id) = cd
                 activeTimers <- Map.remove id activeTimers
                 () |> box |> Some
             | _ -> None
@@ -164,10 +164,10 @@ module Service =
         let asyncIdGenerator = Ids.newGenerator()
         fun (cmd: Flux.Request) ->
             match cmd with
-            | :? IVR.IAsyncComputation as ac -> 
+            | :? Mom.IAsyncComputation as ac -> 
                 let id = asyncIdGenerator.GenerateId()
                 ac.Run(fun r ->
-                    context.ScheduleEvent (IVR.AsyncComputationCompleted(id, r))
+                    context.ScheduleEvent (Mom.AsyncComputationCompleted(id, r))
                     )
                 id |> box |> Some
             | _ -> None

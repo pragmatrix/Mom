@@ -1,4 +1,4 @@
-﻿module IVR.Tracing
+﻿module Mom.Tracing
 
 open System
 open System.IO
@@ -6,16 +6,16 @@ open System.Globalization
 open System.Diagnostics
 open MBrace.FsPickler
 
-open IVR.GlobalExports
+open Mom.GlobalExports
 
 //
-// IVR Tracing support.
+// Mom Tracing support.
 //
 
-type result<'r> = IVR.result<'r>
+type result<'r> = Mom.result<'r>
 type flux<'r> = Flux.flux<'r>
 
-/// A step trace represents a trace for a single step of an IVR. 
+/// A step trace represents a trace for a single step of an Mom. 
 [<NoComparison>]
 type StepTrace = 
     | EventTrace of Flux.Event
@@ -25,8 +25,8 @@ type StepTrace =
 type Trace<'param, 'r> = 
     | Trace of (DateTimeOffset * 'param) * (TimeSpan * StepTrace) list * 'r result
 
-/// Wraps a parameter block and an IVR so that it generates a trace.
-let trace (p: 'param) (f : 'param -> 'r ivr) : Trace<'param, 'r> ivr = 
+/// Wraps a parameter block and an Mom so that it generates a trace.
+let trace (p: 'param) (f : 'param -> 'r mom) : Trace<'param, 'r> mom = 
 
     fun () ->
 
@@ -51,10 +51,10 @@ let trace (p: 'param) (f : 'param -> 'r ivr) : Trace<'param, 'r> ivr =
 
             | Flux.Completed r ->
                 Trace((startTime, p), traces |> List.rev, r)
-                |> IVR.Value
+                |> Mom.Value
                 |> Flux.Completed
         
-        f p |> IVR.start |> next []
+        f p |> Mom.start |> next []
 
 [<RequireQualifiedAccess; NoComparison; NoEquality>]
 type ReplayReport<'r> = 
@@ -63,8 +63,8 @@ type ReplayReport<'r> =
     | ResultDiffers of expected: 'r result * actual: 'r result
     | Completed
 
-/// Replay a trace to an IVR and return a report.
-let replay (f: 'param -> 'r ivr) (Trace((_, param), traces, expectedResult)) : ReplayReport<'r> = 
+/// Replay a trace to an Mom and return a report.
+let replay (f: 'param -> 'r mom) (Trace((_, param), traces, expectedResult)) : ReplayReport<'r> = 
     
     let rec next traces flux = 
         match flux with
@@ -88,7 +88,7 @@ let replay (f: 'param -> 'r ivr) (Trace((_, param), traces, expectedResult)) : R
                 ReplayReport.Diverged(traces, flux) 
 
     f param 
-    |> IVR.start 
+    |> Mom.start 
     |> next (traces |> List.map snd)
         
 /// Module to convert traces into a human comprehensible format.

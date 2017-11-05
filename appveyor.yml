@@ -1,6 +1,6 @@
 configuration: Release
 os: Visual Studio 2017
 build:
-    project: IVR.sln
+    project: Mom.sln
     verbosity: minimal
 

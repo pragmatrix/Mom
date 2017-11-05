@@ -1,14 +1,14 @@
-﻿module IVR.Tests.IVRGCTests
+﻿module Mom.Tests.MomGCTests
 
 open System
 open FsUnit
 open Xunit
-open IVR
+open Mom
 
 [<AutoOpen>]
 module Helper = 
-    let ivr<'r> = IVR.IVR.ivr<'r>
-    let step ev ivr = Flux.dispatch ev ivr
+    let mom<'r> = Mom.Mom.mom<'r>
+    let step ev mom = Flux.dispatch ev mom
 
 [<Fact(Skip="brittle")>]
 let longSequentialLoopDoesNotEatUpStackOrMemory() =
@@ -16,12 +16,12 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
     // interestingly, the "Generate Tail Calls" option does 
     // not have an effect
 
-    let rec endlessLoop() = ivr {
-        do! IVR.wait' (fun _ -> true)
+    let rec endlessLoop() = mom {
+        do! Mom.wait' (fun _ -> true)
         return! endlessLoop()
         }
 
-    let ivr = IVR.start (endlessLoop())
+    let mom = Mom.start (endlessLoop())
 
     let count = 10000000
     let memTraces = count / 10000
@@ -31,15 +31,15 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
 
     let array = Array.zeroCreate memTraces
 
-    let rec stepLoop ivr cnt = 
+    let rec stepLoop mom cnt = 
         if cnt = count then () else
         if (cnt % memTrace = 0) then
             GC.Collect()
             let totalMem = GC.GetTotalMemory(true)
             array.[cnt / memTrace] <- totalMem
-        stepLoop (step null ivr) (cnt+1)
+        stepLoop (step null mom) (cnt+1)
 
-    stepLoop ivr 0
+    stepLoop mom 0
 
     let memAtStart = array.[0]
     let memAtEnd = array.[memTraces-1]

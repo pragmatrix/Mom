@@ -1,4 +1,4 @@
-﻿module IVR.Tests.SystemTests
+﻿module Mom.Tests.SystemTests
 
 open FsUnit
 open Xunit

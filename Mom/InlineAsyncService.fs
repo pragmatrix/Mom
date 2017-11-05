@@ -5,7 +5,7 @@
 /// To implement that, it installs a mailbox processor for each type. 
 /// If the async functions need to run in parallel, use another type.
 
-namespace IVR
+namespace Mom
 
 open System
 open System.Collections.Generic
@@ -18,7 +18,7 @@ type IInlineAsyncRequest = interface end
 
 type IInlineAsyncRequest<'response> =
     inherit IInlineAsyncRequest
-    inherit IVR.IAsyncRequest<'response>
+    inherit Mom.IAsyncRequest<'response>
     
     /// Implement this member to specify the async function that
     /// should be run
@@ -76,8 +76,8 @@ module private ExecuteWrapper =
 
     // the generic function to create a typed AsyncResponse.
     let createResponse<'response> (id: Id, result: obj) : obj =
-        let unboxedResult : IVR.result<obj> = unbox result
-        let r : IVR.AsyncResponse<'response> = IVR.AsyncResponse(id, unboxedResult |> IVR.Result.map unbox)
+        let unboxedResult : Mom.result<obj> = unbox result
+        let r : Mom.AsyncResponse<'response> = Mom.AsyncResponse(id, unboxedResult |> Mom.Result.map unbox)
         box r
 
     // use Quotations to get out the MethodInfo of the wrap function.
@@ -140,7 +140,7 @@ module InlineAsyncRequestService =
             let execute, processor, createResponse = resolveHelper (r.GetType())
             let f = execute r
             
-            let id = IVR.generateAsyncRequestId()
+            let id = Mom.generateAsyncRequestId()
 
             Async.Start <| async {
                 let! reply = 
@@ -149,8 +149,8 @@ module InlineAsyncRequestService =
                 
                 let result =
                     match reply with
-                    | Ok response -> IVR.Value response
-                    | Error e -> IVR.Error e.SourceException
+                    | Ok response -> Mom.Value response
+                    | Error e -> Mom.Error e.SourceException
 
                 createResponse(id, result)
                 |> service.ScheduleEvent

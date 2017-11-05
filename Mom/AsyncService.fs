@@ -1,5 +1,5 @@
 ﻿/// A service that can be used to register async functions.
-module IVR.AsyncService
+module Mom.AsyncService
 
 open System
 open System.Threading
@@ -115,23 +115,23 @@ let private addDispatcher dispatcher (builder: AsyncServiceBuilder) =
     }
 
 /// Add an async service function to the builder.
-let add (f: 'e -> Async<'response> when 'e :> IVR.IAsyncRequest<'response>) (builder: AsyncServiceBuilder) =
+let add (f: 'e -> Async<'response> when 'e :> Mom.IAsyncRequest<'response>) (builder: AsyncServiceBuilder) =
         
     let dispatch (context: Runtime.IServiceContext) : (Flux.Request -> Flux.Response option) =
         function
         | :? 'e as r -> 
-            let id = IVR.generateAsyncRequestId()
-            let scheduleResponse (r: 'response IVR.result)  = 
-                IVR.AsyncResponse(id, r)
+            let id = Mom.generateAsyncRequestId()
+            let scheduleResponse (r: 'response Mom.result)  = 
+                Mom.AsyncResponse(id, r)
                 |> context.ScheduleEvent
                 
             Async.Start <| async {
                 try
                     let! response = f r
-                    IVR.Value response
+                    Mom.Value response
                     |> scheduleResponse
                 with e ->
-                    IVR.Error e
+                    Mom.Error e
                     |> scheduleResponse
             }
             Some <| box id
@@ -144,7 +144,7 @@ let add (f: 'e -> Async<'response> when 'e :> IVR.IAsyncRequest<'response>) (bui
 /// its result is ignored. This is useful for situations in which
 /// an async service function may be used in a finalizer (which can never
 /// wait for an event / result), _and_ it's failure is not considered fatal.
-let addUnsafe (f: 'e -> Async<unit> when 'e :> IVR.IRequest<unit>) builder =
+let addUnsafe (f: 'e -> Async<unit> when 'e :> Mom.IRequest<unit>) builder =
 
     let registry = builder.Registry
 

@@ -1,41 +1,41 @@
-﻿module IVR.Tests.TracingTests
+﻿module Mom.Tests.TracingTests
 
 open FsUnit
 open Xunit
-open IVR
+open Mom
 open Tracing
 
 type TraceEvent1 = TraceEvent1 of int
 
 type TraceRequest = 
     | TraceRequest
-    interface IVR.IRequest<unit>
+    interface Mom.IRequest<unit>
 
 type ConvertIntToStr = 
     | ConvertIntToStr of int
-    interface IVR.IRequest<string>
+    interface Mom.IRequest<string>
 
-// tbd: IVR API candidate!
+// tbd: Mom API candidate!
 let respond r =
     function 
-    | Flux.Requesting (_, cont) -> cont (r |> box |> IVR.Value)
+    | Flux.Requesting (_, cont) -> cont (r |> box |> Mom.Value)
     | _ -> failwith "internal error"
 
-/// IVR under test.
-let ivr p = ivr {
-    let! x = IVR.waitFor (fun (TraceEvent1 x) -> Some x)
-    do! IVR.send TraceRequest
+/// Mom under test.
+let mom p = mom {
+    let! x = Mom.waitFor (fun (TraceEvent1 x) -> Some x)
+    do! Mom.send TraceRequest
     return x * p
 }
 
 [<Fact>]
 let createTrace() =
 
-    let traced = ivr |> Tracing.trace 5
+    let traced = mom |> Tracing.trace 5
 
     let trace = 
         traced
-        |> IVR.start
+        |> Mom.start
         |> Flux.dispatch (TraceEvent1 10)
         |> respond ()
         |> Flux.value
@@ -52,7 +52,7 @@ let simpleTraceAndReplay() =
     |> Seq.iter (printfn "%s")
 
     trace
-    |> Tracing.replay ivr
+    |> Tracing.replay mom
     |> printfn "%A"
 
 [<Fact>]
@@ -80,8 +80,8 @@ let replayReplaysCommandResponses() =
             i.ToString() |> box
         | _ -> failwith "internal error"
 
-    let ivr = ivr {
-        return! IVR.send (ConvertIntToStr 10)
+    let mom = mom {
+        return! Mom.send (ConvertIntToStr 10)
     }
 
     // tbd: prettify tracing APIs for common cases and tests! This is ugly as ....!
@@ -90,11 +90,11 @@ let replayReplaysCommandResponses() =
     let mutable trace = None
     let tracer = Tracers.memoryTracer sessionInfo (fun t -> trace <- Some t)
         
-    let traced = ivr |> Tracing.trace tracer
+    let traced = mom |> Tracing.trace tracer
 
-    IVR.start host traced
-    |> IVR.result
-    |> should equal ("10" |> IVR.Value)
+    Mom.start host traced
+    |> Mom.result
+    |> should equal ("10" |> Mom.Value)
 
     trace.Value
     |> Format.trace
@@ -102,7 +102,7 @@ let replayReplaysCommandResponses() =
 
     let report = 
         trace.Value
-        |> Tracing.replay (fun _ -> ivr)
+        |> Tracing.replay (fun _ -> mom)
         
     report.Incidents |> Seq.iter (printfn "%A")
     report.IsEmpty |> should equal true
