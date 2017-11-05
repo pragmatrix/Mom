@@ -10,3 +10,4 @@ obj/
 /paket-files/
 /*.user
 /.paket/Paket.Restore.targets
+/tmp/

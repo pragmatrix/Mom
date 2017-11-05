@@ -62,6 +62,7 @@
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
     <Compile Include="InlineAsyncService.fs" />
+    <Compile Include="AssemblyInfo.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <ItemGroup>
