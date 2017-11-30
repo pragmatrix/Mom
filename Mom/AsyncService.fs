@@ -14,6 +14,7 @@ type internal UnsafeRegistry = {
     OnException: exn -> unit
 }
 
+[<RequireQualifiedAccess>]
 type JoinResult = 
     | Timeout
     | Completed
@@ -68,7 +69,7 @@ module private UnsafeRegistry =
         lock registry.SyncRoot <| 
         fun () ->
         let rec loop() =
-            if registry.Active = 0 then Completed else
+            if registry.Active = 0 then JoinResult.Completed else
             let now = Stopwatch.GetTimestamp()
             if timeoutAt <= now then JoinResult.Timeout else
             let maxWait = timeoutAt - now
