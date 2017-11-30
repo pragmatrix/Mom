@@ -52,5 +52,17 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
         
     array
     |> Array.iter (fun mem -> System.Console.WriteLine(sprintf "mem: %i" mem))
-     
-            
+
+[<Fact>]
+let ``for loop does not eat up stack space``() = 
+
+    let loop() = mom {
+        for i in 0..10000 do
+            printf "hello" 
+    }
+
+    let r = Mom.start(loop())
+    printfn "%A" r
+    Flux.isError
+    |> should equal false
+    
