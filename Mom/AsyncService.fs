@@ -44,21 +44,26 @@ module private UnsafeRegistry =
 
     /// Run an async job in the context of the registry. Note that the
     /// job itself must be deferred, so that the registration covers the
-    /// complete dispatching process of a message.
+    /// creation of the computation and the computation itself.
     let run (job: unit -> Async<unit>) registry = 
         register registry
 
-        let registeredJob = async {
-            try
-                try
-                    do! job()
-                finally
-                    unregister registry
-            with e ->
-                registry.OnException e
-        }
+        try
+            let computation = job()
 
-        Async.Start(registeredJob, registry.Cancellation.Token)
+            let registeredJob = async {
+                try
+                    try
+                        do! computation
+                    finally
+                        unregister registry
+                with e ->
+                    registry.OnException e
+            }
+
+            Async.Start(registeredJob, registry.Cancellation.Token)
+        with e ->
+            registry.OnException e
 
     let join (timeout: TimeSpan) registry =
         let ticksPerSecond = float Stopwatch.Frequency
@@ -125,10 +130,15 @@ let add (f: 'e -> Async<'response> when 'e :> Mom.IAsyncRequest<'response>) (bui
             let scheduleResponse (r: 'response Flux.result)  = 
                 Mom.AsyncResponse(id, r)
                 |> context.ScheduleEvent
-                
+
+            // Note that we instantiate the computation synchronously! This
+            // allows the function to
+            // - throw exceptions directly into the same mom calling context.
+            // - makes it possible for it synchronize with other asynchronous calls.
+            let computation = f r
             Async.Start <| async {
                 try
-                    let! response = f r
+                    let! response = computation
                     Flux.Value response
                     |> scheduleResponse
                 with e ->
@@ -136,6 +146,7 @@ let add (f: 'e -> Async<'response> when 'e :> Mom.IAsyncRequest<'response>) (bui
                     |> scheduleResponse
             }
             Some <| box id
+                
         | _ -> 
             None
 
