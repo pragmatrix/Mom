@@ -670,10 +670,10 @@ module CancellationAndFinally =
 
         Flux.isError res |> should be True
 
-#if DEBUG
+// testing for asynchronous finally handlers is currently done in DEBUG builds only
+#if DEBUG 
 
 module Synchronous =
-
 
     [<Fact>]
     let ``asynchronous finally handler leads to an error``() =
