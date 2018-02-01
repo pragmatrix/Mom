@@ -387,21 +387,21 @@ module Mom =
             | Error e -> ofError e
             // the compensation mom got cancelled! This is an error for now!
             // tbd: An cancellation mom must be protected from further cancellation.
-            | Cancelled -> ofError NestedCancellationException)
-        | r -> r |> ofResult
+            | Cancelled -> ofError (ExceptionDispatchInfo.Capture(NestedCancellationException)))
+        | r -> ofResult r
 
     /// Attach an compensating mom for the mom body that is called when a cancellation or an error
     /// happened.
     /// The compensating mom receives (Some Exception) in case of an error, and None in case
     /// of a cancelation.
-    let onCancelOrError (compensation: exn option -> unit mom) body = 
+    let onCancelOrError (compensation: ExceptionDispatchInfo option -> unit mom) body = 
         let compensate rBody =
             let afterCancel = function
             | Value _ -> ofResult rBody
             | Error e -> ofError e
             // the compensation mom got cancelled! This is an error for now!
             // tbd: An cancellation mom must be protected from further cancellation.
-            | Cancelled -> ofError NestedCancellationException
+            | Cancelled -> ofError (ExceptionDispatchInfo.Capture(NestedCancellationException))
 
             match rBody with
             | Error e -> compensation (Some e) |> continueWith afterCancel
@@ -544,10 +544,8 @@ module Mom =
 
         member __.TryWith(mom: 'r mom, eh: exn -> 'r mom) : 'r mom =
             mom |> continueWith (function
-                | Error (:? CapturedException as ci)
-                    -> eh (ci.DispatchInfo.SourceException)
                 | Error e 
-                    -> eh e
+                    -> eh e.SourceException
                 | r -> ofResult r)
                 
         member this.Combine(mom1: unit mom, mom2: 'r mom) : 'r mom =

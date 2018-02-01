@@ -51,10 +51,8 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
                 match c with 
                 | Flux.Value r 
                     -> Some r
-                | Flux.Error (:? Flux.CapturedException as ci)
-                    -> ci.DispatchInfo.Throw(); None
                 | Flux.Error e 
-                    -> raise e
+                    -> e.Throw(); None
                 | Flux.Cancelled -> None
             | Flux.Requesting (request, cont) -> 
                 let result = 

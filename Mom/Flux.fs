@@ -5,15 +5,10 @@ open System.Runtime.ExceptionServices
 
 module Flux =
 
-    type CapturedException(e: Exception) =
-        inherit Exception(e.Message)
-        let info = ExceptionDispatchInfo.Capture(e)
-        member __.DispatchInfo = info
-
     [<Struct; NoComparison>]
     type 'value result =
         | Value of v: 'value
-        | Error of e: exn
+        | Error of e: ExceptionDispatchInfo
         | Cancelled
 
     [<RequireQualifiedAccess>]
@@ -56,7 +51,7 @@ module Flux =
         | Completed (Error _) -> true
         | _ -> false
 
-    /// Returns the error of a completed flux.
+    /// Returns the ExceptionDispatchInfo of a completed flux.
     let error = function
         | Completed (Error e) -> e
         | flux -> failwithf "Flux.error: flux is not in error: %A" flux
@@ -73,8 +68,7 @@ module Flux =
         | flux -> failwithf "Flux.value: flux is not completed: %A" flux
 
     let inline captureException e = 
-        CapturedException(e)
-        :> exn
+        ExceptionDispatchInfo.Capture(e)
         |> Error
 
     //

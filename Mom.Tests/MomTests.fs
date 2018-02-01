@@ -627,7 +627,8 @@ module Exceptions =
         res |> Flux.isError |> should be True
 
         res 
-        |> Flux.result
+        |> Flux.error
+        |> fun info -> info.SourceException
         |> sprintf "%A"
         |> should haveSubstring "AGAIN"
 
@@ -712,8 +713,8 @@ module Synchronous =
             mom
             |> start
 
-        let captured = Flux.error res :?> Flux.CapturedException
-        captured.DispatchInfo.SourceException |> should equal (Mom.AsynchronousException("finally"))
+        let captured = Flux.error res
+        captured.SourceException |> should equal (Mom.AsynchronousException("finally"))
 
 #endif
 
@@ -979,7 +980,7 @@ module AsyncRequest =
         |> stepH host
         |> dispatch (
             Mom.AsyncResponse(Id 10L, 
-                Flux.Error (InvalidOperationException())) 
+                Flux.captureException (InvalidOperationException())) 
                 : Mom.AsyncResponse<string>)
         |> Flux.result
         |> should equal (Flux.Value "Catched")
@@ -1216,7 +1217,7 @@ module Sideshow =
             let state =
                 Sideshow.attachTo control |> start
 
-            (Flux.error state).Message |> should equal "error-control"
+            (Flux.error state).SourceException.Message |> should equal "error-control"
 
     module State = 
         [<Fact>] 

@@ -150,7 +150,7 @@ module InlineAsyncRequestService =
                 let result =
                     match reply with
                     | Ok response -> Flux.Value response
-                    | Error e -> Flux.Error e.SourceException
+                    | Error e -> Flux.Error e
 
                 createResponse(id, result)
                 |> service.ScheduleEvent
