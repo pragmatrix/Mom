@@ -1,7 +1,5 @@
 ﻿/// The idea:
 /// We want to control another mom independently of the current mom we are running now.
-/// The coordination should not be processed via channels, because it does not have to
-/// pollute the trace and should not require a host.
 ///
 /// There are two moms, The sideshow mom and the control mom. The control mom can start and
 /// replace the sideshow mom. The control mom receives the propagated errors from the side
