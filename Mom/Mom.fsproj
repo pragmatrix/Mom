@@ -56,7 +56,6 @@
     <Compile Include="Ids.fs" />
     <Compile Include="Flux.fs" />
     <Compile Include="Mom.fs" />
-    <Compile Include="Channel.fs" />
     <Compile Include="Sideshow.fs" />
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />

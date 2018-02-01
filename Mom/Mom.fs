@@ -607,16 +607,6 @@ module Mom =
                 send ^ CancelDelay id
     }
 
-    /// Deliver an event to the currently active processes.
-    [<NoComparison>]
-    type Schedule = 
-        | Schedule of Event
-        member this.Event = let (Schedule e) = this in e
-        interface IRequest<unit>
-    
-    let schedule (e: Event) = 
-        send ^ Schedule e
-
     //
     // Mom System combinators
     //

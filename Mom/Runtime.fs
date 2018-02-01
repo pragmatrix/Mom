@@ -137,11 +137,6 @@ let create builder =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Service = 
 
-    let schedule (context: IServiceContext) (cmd: Flux.Request) = 
-        match cmd with
-        | :? Mom.Schedule as s -> s.Event |> context.ScheduleEvent; () |> box |> Some
-        | _ -> None
-
     let delay (context: IServiceContext) =
         let delayIdGenerator = Ids.newGenerator()
         let mutable activeTimers = Map.empty
@@ -223,7 +218,6 @@ module Service =
 /// Creates a default builder, that includes the services schedule, delay, and async.
 let defaultBuilder = 
     builder
-    |> withService Service.schedule
     |> withService Service.delay
     |> withService Service.async
 
