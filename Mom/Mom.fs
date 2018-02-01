@@ -387,7 +387,7 @@ module Mom =
             | Error e -> ofError e
             // the compensation mom got cancelled! This is an error for now!
             // tbd: An cancellation mom must be protected from further cancellation.
-            | Cancelled -> ofError (ExceptionDispatchInfo.Capture(NestedCancellationException)))
+            | Cancelled -> ofResult ^ captureException NestedCancellationException)
         | r -> ofResult r
 
     /// Attach an compensating mom for the mom body that is called when a cancellation or an error
@@ -401,7 +401,7 @@ module Mom =
             | Error e -> ofError e
             // the compensation mom got cancelled! This is an error for now!
             // tbd: An cancellation mom must be protected from further cancellation.
-            | Cancelled -> ofError (ExceptionDispatchInfo.Capture(NestedCancellationException))
+            | Cancelled -> ofResult ^ captureException(NestedCancellationException)
 
             match rBody with
             | Error e -> compensation (Some e) |> continueWith afterCancel
