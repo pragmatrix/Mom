@@ -631,6 +631,29 @@ module Exceptions =
         |> sprintf "%A"
         |> should haveSubstring "AGAIN"
 
+    exception TestException
+
+    [<Fact>]
+    let ``can properly match on exceptions``() =
+
+        let test = mom {
+            try
+                raise TestException
+                return 0
+            with 
+            | TestException as e ->
+                return 1
+            | e -> 
+                return 0
+        }
+
+        let res = 
+            test
+            |> start
+        
+        let r = res |> Flux.value
+        r |> should equal 1
+
 module CancellationAndFinally =
 
     [<Fact>]
@@ -676,7 +699,7 @@ module CancellationAndFinally =
 module Synchronous =
 
     [<Fact>]
-    let ``asynchronous finally handler leads to an error``() =
+    let ``blocking finally handler leads to an error``() =
 
         let mom = mom {
             try
@@ -689,7 +712,8 @@ module Synchronous =
             mom
             |> start
 
-        Flux.error res |> should equal (Mom.AsynchronousException("finally"))
+        let captured = Flux.error res :?> Flux.CapturedException
+        captured.DispatchInfo.SourceException |> should equal (Mom.AsynchronousException("finally"))
 
 #endif
 
@@ -953,7 +977,10 @@ module AsyncRequest =
         test
         |> start
         |> stepH host
-        |> dispatch (Mom.AsyncResponse(Id 10L, Flux.Error (InvalidOperationException())) : Mom.AsyncResponse<string>)
+        |> dispatch (
+            Mom.AsyncResponse(Id 10L, 
+                Flux.Error (InvalidOperationException())) 
+                : Mom.AsyncResponse<string>)
         |> Flux.result
         |> should equal (Flux.Value "Catched")
      

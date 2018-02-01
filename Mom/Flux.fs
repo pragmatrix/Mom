@@ -1,8 +1,16 @@
 ﻿namespace Mom
 
+open System
+open System.Runtime.ExceptionServices
+
 module Flux =
 
-    [<Struct;NoComparison>]
+    type CapturedException(e: Exception) =
+        inherit Exception(e.Message)
+        let info = ExceptionDispatchInfo.Capture(e)
+        member __.DispatchInfo = info
+
+    [<Struct; NoComparison>]
     type 'value result =
         | Value of v: 'value
         | Error of e: exn
@@ -63,6 +71,11 @@ module Flux =
         | Completed (Value r) -> r
         | Completed _ as flux -> failwithf "Flux.value: flux has not been completed with a resulting value: %A" flux
         | flux -> failwithf "Flux.value: flux is not completed: %A" flux
+
+    let inline captureException e = 
+        CapturedException(e)
+        :> exn
+        |> Error
 
     //
     // Cancellation

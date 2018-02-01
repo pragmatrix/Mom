@@ -49,8 +49,12 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
             match flux with
             | Flux.Completed c -> 
                 match c with 
-                | Flux.Value r -> Some r
-                | Flux.Error e -> raise e
+                | Flux.Value r 
+                    -> Some r
+                | Flux.Error (:? Flux.CapturedException as ci)
+                    -> ci.DispatchInfo.Throw(); None
+                | Flux.Error e 
+                    -> raise e
                 | Flux.Cancelled -> None
             | Flux.Requesting (request, cont) -> 
                 let result = 
@@ -58,7 +62,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
                         host request 
                         |> Flux.Value
                     with e ->
-                        e |> Flux.Error
+                        Flux.captureException e
                 result |> cont |> runLoop
             | Flux.Waiting cont ->
                 let event = eventQueue.Dequeue()

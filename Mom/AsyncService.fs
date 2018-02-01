@@ -142,7 +142,7 @@ let add (f: 'e -> Async<'response> when 'e :> Mom.IAsyncRequest<'response>) (bui
                     Flux.Value response
                     |> scheduleResponse
                 with e ->
-                    Flux.Error e
+                    Flux.captureException e
                     |> scheduleResponse
             }
             Some <| box id

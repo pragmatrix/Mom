@@ -117,4 +117,24 @@ let ``async exceptions can be catched inside an Mom``() =
 
     let runtime = Mom.Runtime.newRuntime(host)
     runtime.Run test |> should equal (Some 11)
+
+let private momThatThrows() = mom {
+    failwith "error"
+}
         
+[<Fact>]
+let ``stack traces of exceptions are preserved``() = 
+
+    let host _ _ = 
+        failwith "Error"
+
+    let mom = momThatThrows()
+
+    let runtime = Runtime.newRuntime host
+    try
+        runtime.Run mom |> ignore
+        failwith "unexpected"
+    with e ->
+        let ex = string e
+        printfn "%s" ex
+        ex |> should haveSubstring "momThatThrows"

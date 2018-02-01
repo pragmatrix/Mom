@@ -1,6 +1,7 @@
 ﻿namespace Mom
 
 open System
+open System.Runtime.ExceptionServices
 open Mom.Flux
 
 (*
@@ -50,7 +51,7 @@ module Mom =
                 -> Waiting (cont >> next)
             | Completed r -> 
                 try start ^ followup r
-                with e -> Completed ^ Error e
+                with e -> Completed ^ captureException e
 
         fun () ->
             start mom |> next
@@ -158,7 +159,7 @@ module Mom =
             try
                 arbiter state r
             with e ->
-                CancelField ^ Error e
+                CancelField ^ captureException e
 
         /// As long new Moms need to be added to the field we try to bring them into a state when they
         /// want to receive events only.
@@ -424,7 +425,7 @@ module Mom =
                 | Some r -> r |> Value |> Completed
                 | None -> Waiting waiter
             with e ->
-                e |> Error |> Completed
+                e |> captureException |> Completed
 
         fun () -> Waiting waiter
 
@@ -543,7 +544,10 @@ module Mom =
 
         member __.TryWith(mom: 'r mom, eh: exn -> 'r mom) : 'r mom =
             mom |> continueWith (function
-                | Error e -> eh e
+                | Error (:? CapturedException as ci)
+                    -> eh (ci.DispatchInfo.SourceException)
+                | Error e 
+                    -> eh e
                 | r -> ofResult r)
                 
         member this.Combine(mom1: unit mom, mom2: 'r mom) : 'r mom =
@@ -640,7 +644,7 @@ module Mom =
                         let! r = computation
                         Value ^ box r |> receiver
                     with e ->
-                        Error e |> receiver
+                        captureException e |> receiver
                 } |> Async.Start
 
         interface IRequest<Id>

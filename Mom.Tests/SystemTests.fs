@@ -3,6 +3,7 @@
 open FsUnit
 open Xunit
 open Microsoft.FSharp.Quotations
+open System.Runtime.ExceptionServices
 
 [<Fact>]
 let boxedValueOfUnitIsNull() = 
@@ -48,3 +49,25 @@ let canGetMethodInfoFromGenericModuleFunctionWithParameterViaQuotations() =
     mi.IsGenericMethod |> should equal true
     mi.IsGenericMethodDefinition |> should equal false
     mi.GetGenericMethodDefinition().IsGenericMethodDefinition |> should equal true
+
+let private functionThatThrows() = 
+    failwith "error here"
+
+[<Fact>]
+let ``ExceptionDispatchInfo properly preserves stack traces``() = 
+    
+    let dispatchInfo =
+        try
+            functionThatThrows()
+        with e ->
+            ExceptionDispatchInfo.Capture(e)
+
+    try
+        dispatchInfo.Throw()
+        failwith "unexpected"
+    with e ->
+        let str = string e
+        printfn "%s" str
+        str |> should haveSubstring "functionThatThrows"
+
+    
