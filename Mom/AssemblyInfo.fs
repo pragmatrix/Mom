@@ -16,8 +16,8 @@ open System.Runtime.CompilerServices
 [<assembly: ComVisible(false)>]
 [<assembly: Guid("7acec947-9a6a-4c15-aaeb-b56f3242c59e")>]
 
-[<assembly: AssemblyVersion("0.2.0.0")>]
-[<assembly: AssemblyFileVersion("0.2.0.0")>]
+[<assembly: AssemblyVersion("0.3.0.0")>]
+[<assembly: AssemblyFileVersion("0.3.0.0")>]
 
 [<assembly: InternalsVisibleTo("Mom.Tests")>]
 
