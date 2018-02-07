@@ -17,28 +17,28 @@ open Mom.Flux
 [<RequireQualifiedAccess>]
 module Mom = 
 
-    let internal (^) = (<|)
+    let inline (^) a b = (<|) a b
 
     [<NoComparison;NoEquality>]
     type 'result mom = unit -> 'result flux
 
     /// Start up an mom.
-    let start (mom : _ mom) = mom ()
+    let inline start (mom : _ mom) = mom ()
 
     /// Lifts a result.
-    let ofResult (r: 'r result) : 'r mom = 
+    let inline ofResult (r: 'r result) : 'r mom = 
         fun () -> Completed r
 
     /// Lifts a value. Creates an Mom that returns the value.
-    let unit (v: 'v) : 'v mom =
+    let inline unit (v: 'v) : 'v mom =
         ofResult ^ Value v
 
     /// Another way to lift a value.
-    let ofValue (v: 'v) : 'v mom = 
+    let inline ofValue (v: 'v) : 'v mom = 
         unit v
     
     /// Lifts an error.
-    let ofError e : 'v mom =
+    let inline ofError e : 'v mom =
         ofResult ^ Error e
 
     /// Continues the mom with a followup mom (Monad bind).
@@ -56,7 +56,7 @@ module Mom =
         fun () ->
             start mom |> next
 
-    let bind body = 
+    let inline bind body = 
         continueWith (Result.convert body ofError ofResult)
     
     /// Maps the mom's result. In other words: lifts a function that converts a value from a to b
@@ -67,13 +67,13 @@ module Mom =
         continueWith f mom
 
     /// Ignores the mom's result.
-    let ignore mom = mom |> map ignore
+    let inline ignore mom = mom |> map ignore
 
     /// Runs the mom, ignores its result, and then changes the mom's return value to the value given. 
-    let force value mom = mom |> map (fun _ -> value)
+    let inline force value mom = mom |> map (fun _ -> value)
             
     /// Invokes a function when the mom is completed.
-    let whenCompleted f =
+    let inline whenCompleted f =
         continueWith (fun r -> f(); ofResult r)
 
     exception AsynchronousException of Why: string with
@@ -119,12 +119,12 @@ module Mom =
         | ContinueField of 'state * 'r mom list
 
     /// Cancel all remaining Moms and set the result of the field mom
-    let cancelField r = CancelField r
+    let inline cancelField r = CancelField r
 
     /// Continue the field with a new state and optionally add some new players / Moms to it.
     /// Note: when the field does not contain any more active moms, the 'state is returned
     /// as a final result of the field mom.
-    let continueField state moms = ContinueField(state, moms)
+    let inline continueField state moms = ContinueField(state, moms)
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
@@ -496,21 +496,21 @@ module Mom =
 
     type MomBuilder<'result>() = 
 
-        member __.Source(mom: _ mom) : _ mom = mom
-        member __.Source(r: IRequest<_>) = r |> send
-        member __.Source(r: IAsyncRequest<_>) = r |> sendAsync
-        member __.Source(s: _ seq) = s
+        member inline __.Source(mom: _ mom) : _ mom = mom
+        member inline __.Source(r: IRequest<_>) = r |> send
+        member inline __.Source(r: IAsyncRequest<_>) = r |> sendAsync
+        member inline __.Source(s: _ seq) = s
 
-        member __.Bind(mom: 'r mom, body: 'r -> 'r2 mom) : 'r2 mom = 
+        member inline __.Bind(mom: 'r mom, body: 'r -> 'r2 mom) : 'r2 mom = 
             mom |> bind body
 
-        member __.Return(v: 'r) : 'r mom = 
+        member inline __.Return(v: 'r) : 'r mom = 
             ofValue v
-        member __.ReturnFrom(mom : 'r mom) = 
+        member inline __.ReturnFrom(mom : 'r mom) = 
             mom
-        member this.Delay(f : unit -> 'r mom) : 'r mom = 
+        member inline this.Delay(f : unit -> 'r mom) : 'r mom = 
             this.Bind(this.Return(), f)
-        member this.Zero () : unit mom = 
+        member inline this.Zero () : unit mom = 
             this.Return()
 
         member this.Using(disposable : 't, body : 't -> 'r mom when 't :> IDisposable) : 'r mom =
@@ -548,7 +548,7 @@ module Mom =
                     -> eh e.SourceException
                 | r -> ofResult r)
                 
-        member this.Combine(mom1: unit mom, mom2: 'r mom) : 'r mom =
+        member inline this.Combine(mom1: unit mom, mom2: 'r mom) : 'r mom =
             this.Bind(mom1, fun () -> mom2)
 
         // http://fsharpforfunandprofit.com/posts/computation-expressions-builder-part6/
@@ -568,7 +568,7 @@ module Mom =
 
     /// Construct an IDisposableProc from a unit mom, so that this mom can be used
     /// with F# 'use' keyword inside a computation expression.
-    let asDisposable (mom: unit mom) = { 
+    let inline asDisposable (mom: unit mom) = { 
         new IDisposableFlow with
             member __.Dispose() = ()
             member __.DisposableFlow = mom
