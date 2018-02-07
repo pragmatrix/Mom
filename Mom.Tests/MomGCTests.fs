@@ -57,7 +57,9 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
 let ``for loop does not eat up stack space``() = 
 
     let loop() = mom {
-        for i in 0..10000 do
+        let mutable x = 10000
+        while x > 0 do
+            x <- x - 1
             printf "hello" 
     }
 
