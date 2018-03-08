@@ -1,5 +1,3 @@
 type project
 authors Armin Sander
 
-dependencies
-  FsPickler >= 4.5

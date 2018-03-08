@@ -55,6 +55,8 @@ let simpleTraceAndReplay() =
     |> Tracing.replay mom
     |> printfn "%A"
 
+#if false
+
 [<Fact>]
 let simpleTraceBinarySerializationTest() = 
 
@@ -66,6 +68,8 @@ let simpleTraceBinarySerializationTest() =
         |> Trace.deserialize
 
     t2 |> should equal trace
+
+#endif
 
 #if false
 

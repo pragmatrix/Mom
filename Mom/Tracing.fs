@@ -1,10 +1,9 @@
 ﻿module Mom.Tracing
 
 open System
-open System.IO
 open System.Globalization
 open System.Diagnostics
-open MBrace.FsPickler
+// open MBrace.FsPickler
 
 open Mom.GlobalExports
 
@@ -157,6 +156,8 @@ module Format =
             yield Format.result result
         }
 
+#if false
+
 module Trace =
 
     [<AutoOpen>]
@@ -181,3 +182,5 @@ module Trace =
     let deserialize (data: byte[]) : Trace<'param, 'r> =
         use stream = new MemoryStream(data)
         serializer.Deserialize(stream)
+
+#endif
