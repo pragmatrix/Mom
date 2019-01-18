@@ -128,13 +128,18 @@ module Mom =
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
+    // a waiting mom
+    type private 'result waiting = Event -> 'result flux
+
     [<NoEquality; NoComparison>]
     type private Field<'state, 'r> = {
         State: 'state
         Event: Response option
-        Pending: 'r flux list
+        /// Waiting moms that need to receive the current event.
+        Pending: 'r waiting list
         /// All moms that got the event already or new moms, all in reversed order.
-        Processed: 'r flux list
+        /// Note that new moms that were added in response to an event don't receive that same event.
+        Processed: 'r waiting list
     }
 
     /// A generic algorithm for running Moms in parallel.
@@ -152,32 +157,41 @@ module Mom =
     
     let field' (arbiter: Arbiter<'state, 'r>) (initial: 'state) (moms: 'r mom list) : 'state mom = 
 
-        let rev = List.rev
+        let inline rev l = List.rev l
 
-        // if the arbiter crashes, the field will be cancelled.
-        let arbiter state r = 
-            try
-                arbiter state r
-            with e ->
-                CancelField ^ captureException e
-
-        /// As long new Moms need to be added to the field we try to bring them into a state when they
-        /// want to receive events only.
-        let rec enter (field: Field<'state, 'r>) pending =
-            match pending with
+        // As long new Moms need to be added to the field we try to bring them into a state when they
+        // want to receive events only.
+        let rec enter (field: Field<'state, 'r>) = function
             | [] 
+                // Finished adding new moms to the field, and all are in a waiting state now.
                 -> proceed field
             | mom :: pending 
-                -> enter2 field (start mom) pending
-        
-        and enter2 (field: Field<'state, 'r>) flux pending =
-            match flux with
+                // Start mom and continue pushing the remaining moms into the field.
+                -> enterMom field pending (start mom)
+    
+        // A new mom has entered the field and needs initial processing with the goal to
+        // get it into the Waiting state.
+        and enterMom (field: Field<'state, 'r>) newMoms = function
             | Requesting (request, cont) 
-                -> Requesting (request, cont >> fun flux -> enter2 field flux pending)
-            | Waiting _ 
-                // as long new moms are added to the field, event processing is delayed.
-                -> enter { field with Processed = flux::field.Processed } pending
-            | Completed result ->
+                -> Requesting (request, cont >> enterMom field newMoms)
+            | Waiting waiting
+                // good, the current mom is waiting, 
+                // so continue entering the remaining ones, and mark the 
+                // current processed (which means that it does not receive the current event
+                // if there is any).
+                -> enter { field with Processed = waiting::field.Processed } newMoms
+            | Completed result
+                -> askArbiter field result newMoms
+
+        and askArbiter (field: Field<'state, 'r>) (result: 'r result) (pending: 'r mom list) =
+
+            // if the arbiter crashes, the field will be cancelled.
+            let inline arbiter state r = 
+                try
+                    arbiter state r
+                with e ->
+                    CancelField ^ captureException e
+
             match arbiter field.State result with
             | ContinueField (newState, moreMoms) 
                 -> enter { field with State = newState } (moreMoms @ pending)
@@ -190,65 +204,47 @@ module Mom =
             | None ->
                 assert(field.Pending.IsEmpty)
                 match field.Processed with
-                | [] -> 
-                    exit (field.State |> Value)
-                | processed -> 
-                    Waiting (fun ev -> proceed { field with Event = Some ev; Pending = rev processed; Processed = [] })
+                | [] 
+                    -> exit ^ Value field.State
+                | processed 
+                    -> Waiting (fun ev -> proceed { field with Event = Some ev; Pending = rev processed; Processed = [] })
             | Some ev ->
                 match field.Pending with
                 | [] -> proceed { field with Event = None }
-                | flux::pending ->
-                match flux with
-                | Completed _
-                | Requesting _ 
-                    -> failwithf "internal error: %A in field pending" flux
-                | Waiting cont 
+                | waiting::pending
                     // deliver the event and be sure that the mom is removed from pending
-                    ->
-                    cont ev |> postProcess { field with Pending = pending }
+                    -> waiting ev |> proceedMom { field with Pending = pending }
 
         // Continue processing the field or ask the arbiter what to do if the mom is completed.
-        and postProcess (field: Field<'state, 'r>) flux =
-            match flux with
+        and proceedMom (field: Field<'state, 'r>) = function
             | Requesting (request, cont) 
-                -> Requesting (request, cont >> fun flux -> postProcess field flux)
-            | Waiting _ 
-                -> proceed { field with Processed = flux::field.Processed }
-            | Completed result ->
-            match arbiter field.State result with
-            | ContinueField (newState, newMoms) 
-                -> enter { field with State = newState } newMoms
-            | CancelField result 
-                -> cancel result [] ((rev field.Pending) @ field.Processed)
+                -> Requesting (request, cont >> proceedMom field)
+            | Waiting waiting
+                -> proceed { field with Processed = waiting::field.Processed }
+            | Completed result
+                -> askArbiter field result []
 
-        // Cancellation:
-        // send Cancel as soon they are in waiting state, if not, process host requests until they are.
-        and cancel result cancelled pending =
-            match pending with
-            | [] -> finalize result cancelled
-            | flux::pending ->
-            match flux with
-            | Requesting (request, cont) 
-                -> Requesting(request, cont >> fun flux -> cancel result cancelled (flux::pending))
-            | Waiting _ 
-                -> cancel result ((Flux.cancel flux)::cancelled) pending
-            | Completed _ 
-                -> cancel result cancelled pending
+        and cancel result cancelled = function
+            | [] 
+                -> finalizeCancel result cancelled
+            | waiting::pending
+                -> cancel result ((Flux.cancel (Waiting waiting))::cancelled) pending
 
-        // Finalization: run them until they are all completed.
-        and finalize result pending =
+        // Finalize the cancellation by processing all moms until they are completed, 
+        // ... and then ignore their result.
+        and finalizeCancel result pending =
             match pending with
             | [] -> exit result
             | flux::pending ->
             match flux with
             | Requesting (request, cont) 
-                -> Requesting (request, cont >> fun flux -> finalize result (flux::pending))
+                -> Requesting (request, cont >> fun flux -> finalizeCancel result (flux::pending))
             | Waiting _ 
-                // See issue #4 why Waiting can not be supported.
+                // See issue #4 why a mom that flips back to Waiting after a cancellation can not be supported.
                 -> raise AsynchronousCancellationException
                 // Waiting (cont >> fun flux -> finalize result (flux::pending))
             | Completed _ 
-                -> finalize result pending
+                -> finalizeCancel result pending
 
         and exit result =
             Completed result
