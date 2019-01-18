@@ -134,27 +134,37 @@ module Mom =
     [<NoEquality; NoComparison>]
     type private Field<'state, 'r> = {
         State: 'state
-        Event: Response option
-        /// Waiting moms that need to receive the current event.
-        Pending: 'r waiting list
+        /// The current event and waiting moms that need to receive it.
+        Pending: (Response * 'r waiting list) option
         /// All moms that got the event already or new moms, all in reversed order.
         /// Note that new moms that were added in response to an event don't receive that same event.
         Processed: 'r waiting list
     }
 
     /// A generic algorithm for running Moms in parallel.
+    ///
     /// The field:
+    ///
     /// All moms are processed in parallel, and as soon an mom completes, the arbiter is asked what to do.
     /// The arbiter can either decide to cancel the field and set a final result or
-    /// continue the field with a 
+    /// continue the field with
     ///   an intermediate state/result
-    ///   and a number of new moms to add to the field.
+    ///   and a number of new moms that are added to the field.
+    ///
     /// Notes:
-    ///   The arbiter does not get to be asked again, after it cancels the field.
-    ///   When the arbiter throws an exception, it's equivalent to cancelling the field with 
-    ///   that exception as an error result.
-    ///   Cancellation is processed in reversed field insertion order.
-    
+    ///   - The arbiter does not get to be asked again, after it cancels the field.
+    ///   - When the arbiter throws an exception, it's equivalent to cancelling the field with 
+    ///     that exception as an error result.
+    ///   - Cancellation is processed in reversed field insertion order.
+    ///
+    /// The arbiter implementation consists of three nested loops (from outer to inner):
+    ///   - Event Loop
+    ///     Delivers a number of event to all the moms that are currently running in parallel.
+    ///   - Processing Loop
+    ///     Delivers one event to a list of currently active moms.
+    ///   - Mom Loop
+    ///     Runs one mom as long it can receive an event.
+
     let field' (arbiter: Arbiter<'state, 'r>) (initial: 'state) (moms: 'r mom list) : 'state mom = 
 
         let inline rev l = List.rev l
@@ -167,13 +177,12 @@ module Mom =
                 -> proceed field
             | mom :: pending 
                 // Start mom and continue pushing the remaining moms into the field.
-                -> enterMom field pending (start mom)
+                -> proceedMom field pending (start mom)
     
-        // A new mom has entered the field and needs initial processing with the goal to
-        // get it into the Waiting state.
-        and enterMom (field: Field<'state, 'r>) newMoms = function
+        // Proceed a mom until it lands in the waiting state, and add additional moms after that, if needed.
+        and proceedMom (field: Field<'state, 'r>) newMoms = function
             | Requesting (request, cont) 
-                -> Requesting (request, cont >> enterMom field newMoms)
+                -> Requesting (request, cont >> proceedMom field newMoms)
             | Waiting waiting
                 // good, the current mom is waiting, 
                 // so continue entering the remaining ones, and mark the 
@@ -195,34 +204,33 @@ module Mom =
             match arbiter field.State result with
             | ContinueField (newState, moreMoms) 
                 -> enter { field with State = newState } (moreMoms @ pending)
-            | CancelField result 
-                -> cancel result [] ((rev field.Pending) @ field.Processed)
+            | CancelField result ->
+                let processed = 
+                    match field.Pending with
+                    | Some(_, pending)
+                        -> (rev pending) @ field.Processed
+                    | None
+                        -> field.Processed
+                cancel result [] processed
         
         // Move the field forward.
         and proceed (field: Field<'state, 'r>) =
-            match field.Event with
+            match field.Pending with
+            | Some (ev, pending) ->
+                match pending with
+                | [] -> proceed { field with Pending = None }
+                | waiting::pending
+                    // deliver the event and be sure that the mom is removed from pending
+                    // interesting detail: Every mom that returns Requesting or Completed
+                    // could add new moms without breaking the algorithm.
+                    -> waiting ev |> proceedMom { field with Pending = Some (ev, pending) } [(* no new moms entering*)]
             | None ->
-                assert(field.Pending.IsEmpty)
+                // no event to process, start next waiting round.
                 match field.Processed with
                 | [] 
                     -> exit ^ Value field.State
                 | processed 
-                    -> Waiting (fun ev -> proceed { field with Event = Some ev; Pending = rev processed; Processed = [] })
-            | Some ev ->
-                match field.Pending with
-                | [] -> proceed { field with Event = None }
-                | waiting::pending
-                    // deliver the event and be sure that the mom is removed from pending
-                    -> waiting ev |> proceedMom { field with Pending = pending }
-
-        // Continue processing the field or ask the arbiter what to do if the mom is completed.
-        and proceedMom (field: Field<'state, 'r>) = function
-            | Requesting (request, cont) 
-                -> Requesting (request, cont >> proceedMom field)
-            | Waiting waiting
-                -> proceed { field with Processed = waiting::field.Processed }
-            | Completed result
-                -> askArbiter field result []
+                    -> Waiting (fun ev -> proceed { field with Pending = Some (ev, rev processed); Processed = [] })
 
         and cancel result cancelled = function
             | [] 
@@ -250,7 +258,7 @@ module Mom =
             Completed result
 
         fun () ->
-            enter { State = initial; Event = None; Pending = []; Processed = [] } moms
+            enter { State = initial; Pending = None; Processed = [] } moms
 
     /// field is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the field so that the arbiter does not need to handle them.
