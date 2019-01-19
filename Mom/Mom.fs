@@ -116,15 +116,30 @@ module Mom =
     [<NoComparison;NoEquality>]
     type ArbiterDecision<'state, 'r> = 
         | CancelField of 'state result
-        | ContinueField of 'state * 'r mom list
+        | ContinueField of 'state * 'r mom list * Event list
+
+    module Field = 
+        /// Cancel all remaining Moms and set the result of the field's mom.
+        let inline cancel r = CancelField r
+
+        /// Continue the field with a new state and optionally add some new players / Moms to it and
+        /// also schedule events to the field if needed.
+        /// Note: when the field does not contain any more active moms, the 'state is returned
+        /// as a final result of the field mom.
+        let inline proceed' state newMoms scheduled = ContinueField(state, newMoms, scheduled)
+
+        /// Continue the field with a new state and optionally add some new players / Moms to it.
+        let inline proceed state newMoms = proceed' state newMoms []
 
     /// Cancel all remaining Moms and set the result of the field mom
+    [<Obsolete("use Field.cancel")>]
     let inline cancelField r = CancelField r
 
     /// Continue the field with a new state and optionally add some new players / Moms to it.
     /// Note: when the field does not contain any more active moms, the 'state is returned
     /// as a final result of the field mom.
-    let inline continueField state moms = ContinueField(state, moms)
+    [<Obsolete("use Field.proceed")>]
+    let inline continueField state moms = ContinueField(state, moms, [])
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
@@ -139,6 +154,8 @@ module Mom =
         /// All moms that got the event already or new moms, all in reversed order.
         /// Note that new moms that were added in response to an event don't receive that same event.
         Processed: 'r waiting list
+        /// Scheduled Events.
+        Scheduled: Event list
     }
 
     /// A generic algorithm for running Moms in parallel.
@@ -202,8 +219,8 @@ module Mom =
                     CancelField ^ captureException e
 
             match arbiter field.State result with
-            | ContinueField (newState, moreMoms) 
-                -> enter { field with State = newState } (moreMoms @ pending)
+            | ContinueField (newState, moreMoms, scheduledEvents) 
+                -> enter { field with State = newState; Scheduled = field.Scheduled @ scheduledEvents } (moreMoms @ pending)
             | CancelField result ->
                 let processed = 
                     match field.Pending with
@@ -225,12 +242,21 @@ module Mom =
                     // could add new moms without breaking the algorithm.
                     -> waiting ev |> proceedMom { field with Pending = Some (ev, pending) } [(* no new moms entering*)]
             | None ->
-                // no event to process, start next waiting round.
-                match field.Processed with
-                | [] 
-                    -> exit ^ Value field.State
-                | processed 
-                    -> Waiting (fun ev -> proceed { field with Pending = Some (ev, rev processed); Processed = [] })
+                // no event to process, start next round.
+                match field.Processed, field.Scheduled with
+                | [], _ ->
+                    // no mom waiting? ready, exit.
+                    exit ^ Value field.State
+                | processed, nextScheduled::moreEvents ->
+                    // a scheduled event? process it.
+                    { field with 
+                        Pending = Some(nextScheduled, rev processed)
+                        Processed = []
+                        Scheduled = moreEvents }
+                    |> proceed
+                | _ ->
+                    // can't proceed? Flip to the waiting state and proceed with the received event.
+                    Waiting ^ fun ev -> proceed { field with Scheduled = [ev] }
 
         and cancel result cancelled = function
             | [] 
@@ -258,12 +284,17 @@ module Mom =
             Completed result
 
         fun () ->
-            enter { State = initial; Pending = None; Processed = [] } moms
+            moms 
+            |> enter { 
+                State = initial
+                Pending = None
+                Processed = [] 
+                Scheduled = [] }
 
     /// field is a simpler version of the field, in which errors automatically lead to
     /// the cancellation of the field so that the arbiter does not need to handle them.
     let field arbiter = 
-        let arbiter state = Result.convert (arbiter state) (Error >> cancelField) cancelField
+        let arbiter state = Result.convert (arbiter state) (Error >> Field.cancel) Field.cancel
         field' arbiter
 
     /// Combine a list of moms so that they run in parallel. The resulting mom ends when 
@@ -279,7 +310,7 @@ module Mom =
         // arbiter collects the results in a map
         let arbiter state (i, r) = 
             let state = state |> Map.add i r
-            continueField state []
+            Field.proceed state []
 
         // and at last, convert the map to a list.
         let mapToList m = 
@@ -301,7 +332,7 @@ module Mom =
         // order they were originally specified in the list 
         // (independent of how many of them already received the current event)!
 
-        let arbiter _ = cancelField
+        let arbiter _ = Field.cancel
         field' arbiter Unchecked.defaultof<'r> moms
 
     /// Runs two moms in parallel, the resulting mom completes, when both moms are completed.
