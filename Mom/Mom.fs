@@ -135,7 +135,7 @@ module Mom =
     type private Field<'state, 'r> = {
         State: 'state
         /// The current event and waiting moms that need to receive it.
-        Pending: (Response * 'r waiting list) option
+        Pending: (Event * 'r waiting list) option
         /// All moms that got the event already or new moms, all in reversed order.
         /// Note that new moms that were added in response to an event don't receive that same event.
         Processed: 'r waiting list
