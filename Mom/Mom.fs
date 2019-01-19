@@ -247,12 +247,12 @@ module Mom =
                 | [], _ ->
                     // no mom waiting? ready, exit.
                     exit ^ Value field.State
-                | processed, nextScheduled::moreEvents ->
+                | processed, nextScheduled::moreScheduled ->
                     // a scheduled event? process it.
                     { field with 
                         Pending = Some(nextScheduled, rev processed)
                         Processed = []
-                        Scheduled = moreEvents }
+                        Scheduled = moreScheduled }
                     |> proceed
                 | _ ->
                     // can't proceed? Flip to the waiting state and proceed with the received event.
