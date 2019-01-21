@@ -664,7 +664,7 @@ module Mom =
     let eventCancelable (event: 'e) (mom: 'r mom) : Result<'r, 'e> mom =
         any [
             waitFor' ((=) event) |> force (Result.Error event)
-            mom |> map ^ Ok
+            mom |> map Ok
         ]
 
     /// Make a mom hard-cancellable by returning an event 
