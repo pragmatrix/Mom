@@ -648,6 +648,46 @@ module Mom =
     }
 
     //
+    // Event driven Hard & Soft cancellation of moms.
+    //
+
+    module private Cancellation = 
+        let hardGenerator, softGenerator = 
+            Ids.newGenerator().GenerateId, Ids.newGenerator().GenerateId
+        type HardCancelEvent = HardCancelEvent of Id
+        type SoftCancelEvent = SoftCancelEvent of Id
+        let generateHard() = HardCancelEvent ^ hardGenerator()
+        let generateSoft() = SoftCancelEvent ^ softGenerator()
+
+    /// Make a mom (soft) cancelable in response to a specific event 
+    /// that is passed in and returned as an Result.Error case.
+    let eventCancelable (event: 'e) (mom: 'r mom) : Result<'r, 'e> mom =
+        any [
+            waitFor' ((=) event) |> force (Result.Error event)
+            mom |> map ^ Ok
+        ]
+
+    /// Make a mom hard-cancellable by returning an event 
+    /// that when sent to the returning mom cancels it and
+    /// puts the mom into a cancelled state.
+    let cancelable (mom: 'r mom) : Event * 'r mom = 
+        let event = Cancellation.generateHard()
+        box event, (
+            eventCancelable event mom 
+            |> bind ^ function 
+                | Ok r -> ofValue r 
+                | Result.Error _ -> ofResult Cancelled)
+
+    /// Make a mom soft-cancellable by returning an event 
+    /// that when sent to the returning mom cancels it 
+    /// and returns None.
+    let softCancelable (mom: 'r mom) : Event * 'r option mom = 
+        let event = Cancellation.generateSoft()
+        box event, (
+            eventCancelable event mom 
+            |> map ^ function Ok r -> Some r | Result.Error _ -> None)
+
+    //
     // Mom System combinators
     //
 
