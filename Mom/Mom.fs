@@ -103,10 +103,10 @@ module Mom =
     //
 
     /// Maps a list of Mom's by applying the function f to each result.
-    let internal lmap (f: 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
+    let inline internal lmap (f: 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
         moms |> List.map (map f)
 
-    let internal lmapi (f: int -> 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
+    let inline internal lmapi (f: int -> 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
         moms |> List.mapi (f >> map)
 
     //
@@ -146,7 +146,7 @@ module Mom =
     // a waiting mom
     type private 'result waiting = Event -> 'result flux
 
-    [<NoEquality; NoComparison>]
+    [<Struct; NoEquality; NoComparison>]
     type private Field<'state, 'r> = {
         State: 'state
         /// The current event and waiting moms that need to receive it.
@@ -622,14 +622,17 @@ module Mom =
     // Mom System Requests & Events
     //
 
+    [<Struct>]
     type Delay = 
         | Delay of TimeSpan
         interface IRequest<Id>
-    
+
+    [<Struct>]    
     type CancelDelay = 
         | CancelDelay of Id
         interface IRequest<unit>
 
+    [<Struct>]
     type DelayCompleted = DelayCompleted of Id
 
     /// Wait for the given time span and continue then.
@@ -682,7 +685,7 @@ module Mom =
 
         interface IRequest<Id>
 
-    [<NoComparison>]
+    [<Struct; NoComparison>]
     type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: obj result
 
     /// Waits for an F# asynchronous computation.
