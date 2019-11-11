@@ -217,14 +217,14 @@ module Service =
                 | ContinueService -> ()
                 None
 
-/// Creates a default builder, that includes the services schedule, delay, and async.
+/// Creates a default builder, that includes the services delay, and async.
 let defaultBuilder = 
     builder
     |> withService Service.delay
     |> withService Service.async
 
 /// Builds a default runtime that forwards all requests to the host service. The runtime includes the
-/// services schedule, delay, and async.
+/// services delay, and async.
 let newRuntime hostService = 
     defaultBuilder
     |> withService hostService
