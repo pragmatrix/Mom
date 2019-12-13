@@ -159,7 +159,7 @@ module Mom =
     ///
     /// The arbiter implementation consists of three nested loops (from outer to inner):
     ///   - Event Loop
-    ///     Delivers a number of event to all the moms that are currently running in parallel.
+    ///     Delivers a number of events to _all_ the moms that are currently running in parallel.
     ///   - Processing Loop
     ///     Delivers one event to a list of currently active moms.
     ///   - Mom Loop
