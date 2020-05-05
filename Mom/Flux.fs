@@ -86,12 +86,15 @@ module Flux =
         override __.ToString() =
             sprintf "an Flux got into a waiting state, even though it is being cancelled and expected to run only synchronously"
 
-    /// Cancels the flux. This actually sends a Cancel event to the flux, and expects it to get
-    /// either in the Error or Cancelled state.
+    /// Cancels the flux. 
+    ///
+    /// This sends a Cancel event to the flux, and expects it to get either in the Error or Cancelled state.
+    ///
     /// The flux is required to react on Cancel events (for example every wait function does that)
     /// immediately and synchronously.
-    /// If a flux is completed, the result is overwritten (freed indirectly) with a Cancelled error,
-    /// but an error is not, to avoid shadowing the error.
+    ///
+    /// If a flux is completed, the result will be "Completed Cancelled",
+    /// but an error is not to avoid shadowing it.
     /// A flux that is delayed (not started yet) or waiting for a synchronous response, can not be cancelled.
     let cancel = 
         let rec next = function

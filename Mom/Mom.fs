@@ -152,7 +152,7 @@ module Mom =
     ///   and a number of new moms that are added to the field.
     ///
     /// Notes:
-    ///   - The arbiter does not get to be asked again, after it cancels the field.
+    ///   - The arbiter does not get to be invoked again after it cancels the field.
     ///   - When the arbiter throws an exception, it's equivalent to cancelling the field with 
     ///     that exception as an error result.
     ///   - Cancellation is processed in reversed field insertion order.
