@@ -9,15 +9,15 @@ open System.Runtime.CompilerServices
 [<assembly: AssemblyConfiguration("")>]
 [<assembly: AssemblyCompany("")>]
 [<assembly: AssemblyProduct("Mom")>]
-[<assembly: AssemblyCopyright("Copyright © 2017 Armin Sander")>]
+[<assembly: AssemblyCopyright("Copyright © 2020 Armin Sander")>]
 [<assembly: AssemblyTrademark("")>]
 [<assembly: AssemblyCulture("")>]
 
 [<assembly: ComVisible(false)>]
 [<assembly: Guid("7acec947-9a6a-4c15-aaeb-b56f3242c59e")>]
 
-[<assembly: AssemblyVersion("0.4.0.0")>]
-[<assembly: AssemblyFileVersion("0.4.0.0")>]
+[<assembly: AssemblyVersion("0.5.0.0")>]
+[<assembly: AssemblyFileVersion("0.5.0.0")>]
 
 [<assembly: InternalsVisibleTo("Mom.Tests")>]
 

@@ -53,7 +53,7 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
     array
     |> Array.iter (fun mem -> System.Console.WriteLine(sprintf "mem: %i" mem))
 
-[<Fact>]
+[<Fact(Skip="todo, see issue #29")>]
 let ``for loop does not eat up stack space``() = 
 
     let loop() = mom {

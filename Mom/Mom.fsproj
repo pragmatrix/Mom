@@ -60,7 +60,7 @@
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
-    <Compile Include="InlineAsyncService.fs" />
+    <Compile Include="InlineRequestService.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
