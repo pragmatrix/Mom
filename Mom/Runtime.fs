@@ -13,6 +13,7 @@ open Mom.Threading
 // predefined runtime events
 
 /// This event can be sent to the Runtime to try to cancel the current Mom.
+[<Struct>]
 type CancelMom = CancelMom
 
 /// The stuff a service can do.
