@@ -113,18 +113,31 @@ module Mom =
     // field
     //
 
+    /// The priority with which new players should enter the field.
+    ///
+    /// Experimental.
+    [<RequireQualifiedAccess; Struct>]
+    type EnteringPriority = 
+        /// Default: New players are immediately entering the field to replace the player that has exited before.
+        | Now
+        /// New players are added to field as soon all current players are in the waiting state.
+        | Lazy
+
     [<NoComparison;NoEquality>]
     type ArbiterDecision<'state, 'r> = 
         | CancelField of 'state result
-        | ContinueField of 'state * 'r mom list
+        | ContinueField of 'state * EnteringPriority * 'r mom list
 
     /// Cancel all remaining Moms and set the result of the field mom
     let inline cancelField r = CancelField r
 
     /// Continue the field with a new state and optionally add some new players / Moms to it.
-    /// Note: when the field does not contain any more active moms, the 'state is returned
+    ///
+    /// When the field does not contain any more active moms, the 'state is returned
     /// as a final result of the field mom.
-    let inline continueField state moms = ContinueField(state, moms)
+    let inline continueField state moms = ContinueField(state, EnteringPriority.Now, moms)
+
+    let inline continueFieldLazy state moms = ContinueField(state, EnteringPriority.Lazy, moms)
 
     type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
 
@@ -202,8 +215,12 @@ module Mom =
                     CancelField ^ captureException e
 
             match arbiter field.State result with
-            | ContinueField (newState, moreMoms) 
-                -> enter { field with State = newState } (moreMoms @ pending)
+            | ContinueField (newState, priority, newPlayers) ->
+                let players =
+                    match priority with
+                    | EnteringPriority.Now -> newPlayers @ pending
+                    | EnteringPriority.Lazy -> pending @ newPlayers
+                enter { field with State = newState } players
             | CancelField result ->
                 let processed = 
                     match field.Pending with
