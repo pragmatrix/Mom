@@ -1,6 +1,6 @@
 source https://www.nuget.org/api/v2/
 
-framework: net452
+framework: netstandard2.0,netcoreapp3.1
 
-nuget FSharp.Core redirects: on
-nuget FsUnit.xUnit
+nuget FSharp.Core ~> 4.7.2
+nuget FsUnit.xUnit ~> 4.0.2

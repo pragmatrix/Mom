@@ -2,8 +2,9 @@
 bin/
 obj/
 *.ncrunchsolution
-*.ncrunchsolution.user
 *.ncrunchproject
+*.ncrunchsolution.user
+*.ncrunchproject.user
 /_NCrunch_*/
 /.paket/paket.exe
 /packages/
