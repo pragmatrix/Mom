@@ -130,7 +130,7 @@ let create builder =
             services
             |> List.tryPick (fun s -> s cmd)
             |> function 
-            | None -> failwithf "%A: request unhandled" cmd
+            | None -> failwithf "Request of type `%O` unhandled, is the service registered?" (cmd.GetType())
             | Some response -> response
 
     new Runtime (builder.EventQueue, serviceHost)
