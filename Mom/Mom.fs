@@ -310,9 +310,12 @@ module Mom =
         |> map mapToList
     
     /// Runs a list of moms in parallel and finish with the first one that completes.
-    /// If one mom completes, it may take an arbitrary amount of time (steps) until the result is finally 
-    /// returned, because the remaining moms may refuse to get cancelled.
-    let any (moms: 'r mom list) : 'r mom =
+    ///
+    /// If one mom completes, it may take an arbitrary amount of time (steps) until the result is
+    /// finally returned, because the remaining moms may refuse to get cancelled.
+    let race (moms: 'r mom list) : 'r mom =
+        if List.isEmpty moms then
+            failwith "internal error: Mom.race with no nested moms is unsound."
 
         // Note: when an mom finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
@@ -320,6 +323,9 @@ module Mom =
 
         let arbiter _ = cancelField
         field' arbiter Unchecked.defaultof<'r> moms
+
+    [<Obsolete("Use race")>]
+    let inline any (moms: 'r mom list) : 'r mom = race moms
 
     /// Runs two moms in parallel, the resulting mom completes, when both moms are completed.
     /// Events are delivered first to mom1, then to mom2. When one of the moms terminates without a result 
