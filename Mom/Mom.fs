@@ -315,7 +315,7 @@ module Mom =
     /// finally returned, because the remaining moms may refuse to get cancelled.
     let race (moms: 'r mom list) : 'r mom =
         if List.isEmpty moms then
-            failwith "internal error: Mom.race with no nested moms is unsound."
+            failwith "internal error: Mom.race with zero nested moms would be unsound."
 
         // Note: when an mom finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
