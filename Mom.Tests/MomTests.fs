@@ -296,7 +296,7 @@ module Cancellation =
             do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        let r = Mom.any [left; right]
+        let r = Mom.race [left; right]
         let started = start r
         dispatch Event2 started |> ignore
         ct.Disposed |> should equal true
@@ -314,7 +314,7 @@ module Cancellation =
             do! Mom.waitFor' (fun (_:Event2) -> true)
         }
 
-        let r = Mom.any [left; right]
+        let r = Mom.race [left; right]
         let started = start r
         dispatch Event1 started |> ignore
         ct.Disposed |> should equal true
@@ -359,7 +359,7 @@ module Cancellation =
                 finallyTracker <- finallyTracker @ ['e']
             }
 
-        let r = Mom.any [a;b;c;d;e]
+        let r = Mom.race [a;b;c;d;e]
         start r 
         |> dispatch Event2
         |> ignore
@@ -736,7 +736,7 @@ module UnresolvedIssues =
         }
 
         let test = mom {
-                do! Mom.any [primaryMom; secondaryMom]
+                do! Mom.race [primaryMom; secondaryMom]
                 do! Mom.waitFor' (fun (_:Event3) -> true)
             }
 

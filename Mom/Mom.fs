@@ -310,9 +310,12 @@ module Mom =
         |> map mapToList
     
     /// Runs a list of moms in parallel and finish with the first one that completes.
-    /// If one mom completes, it may take an arbitrary amount of time (steps) until the result is finally 
-    /// returned, because the remaining moms may refuse to get cancelled.
-    let any (moms: 'r mom list) : 'r mom =
+    ///
+    /// If one mom completes, it may take an arbitrary amount of time (steps) until the result is
+    /// finally returned, because the remaining moms may refuse to get cancelled.
+    let race (moms: 'r mom list) : 'r mom =
+        if List.isEmpty moms then
+            failwith "internal error: Mom.race with zero nested moms would be unsound."
 
         // Note: when an mom finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
@@ -320,6 +323,9 @@ module Mom =
 
         let arbiter _ = cancelField
         field' arbiter Unchecked.defaultof<'r> moms
+
+    [<Obsolete("Use race")>]
+    let inline any (moms: 'r mom list) : 'r mom = race moms
 
     /// Runs two moms in parallel, the resulting mom completes, when both moms are completed.
     /// Events are delivered first to mom1, then to mom2. When one of the moms terminates without a result 
@@ -350,7 +356,7 @@ module Mom =
 
         let mom1 = mom1 |> map Choice<_,_>.Choice1Of2
         let mom2 = mom2 |> map Choice<_,_>.Choice2Of2
-        any [mom1; mom2]
+        race [mom1; mom2]
 
     /// Runs three moms in parallel, the resulting mom completes with the result of the one that finishes first.
     /// tbd: this does not belong into the core module.
@@ -359,7 +365,7 @@ module Mom =
         let mom1 = mom1 |> map Choice<_,_,_>.Choice1Of3
         let mom2 = mom2 |> map Choice<_,_,_>.Choice2Of3
         let mom3 = mom3 |> map Choice<_,_,_>.Choice3Of3
-        any [mom1; mom2; mom3]
+        race [mom1; mom2; mom3]
 
     //
     // Sending requests to the host.
@@ -637,7 +643,7 @@ module Mom =
     /// Process the mom given and return it's value as an option or
     /// timeout after the given timespan and return None.
     let timeoutAfter (ts: TimeSpan) mom = 
-        any [
+        race [
             // The delay gets started first, to ensure that
             // startup times of mom are included in the measurement.
             delay ts |> map (fun () -> None)
