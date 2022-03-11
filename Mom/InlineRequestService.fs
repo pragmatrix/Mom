@@ -14,26 +14,26 @@ open System.Collections.Generic
 open System.Runtime.ExceptionServices
 open Microsoft.FSharp.Quotations
 
-/// This is the non-generic marker interface, so that the service can 
+/// This is the non-generic marker interface in terms of the response type, so that the service can
 /// unambiguously detect if it's called for.
-type IInlineAsyncRequest = interface end
+type IInlineAsyncRequest<'context> = interface end
 
-type IInlineRequest = interface end
+type IInlineRequest<'context> = interface end
 
-type IInlineAsyncRequest<'response> =
-    inherit IInlineAsyncRequest
+type IInlineAsyncRequest<'context, 'response> =
+    inherit IInlineAsyncRequest<'context>
     inherit Mom.IAsyncRequest<'response>
     
     /// Implement this member to specify the async function that
     /// should be run
-    abstract member Execute : unit -> Async<'response>
+    abstract member Execute : 'context -> Async<'response>
 
-type IInlineRequest<'response> =
-    inherit IInlineRequest
+type IInlineRequest<'context, 'response> =
+    inherit IInlineRequest<'context>
     inherit Mom.IRequest<'response>
 
     /// Implement this member to specify the function that should be run
-    abstract member Execute : unit -> 'response
+    abstract member Execute : 'context -> 'response
 
 [<AutoOpen>]
 module private Processor =
@@ -69,29 +69,28 @@ module private Processor =
 module private ExecuteWrapperAsync =
 
     let inlineAsyncRequestGenericTypeDefinition = 
-        typeof<IInlineAsyncRequest<obj>>.GetGenericTypeDefinition()
+        typeof<IInlineAsyncRequest<obj, obj>>.GetGenericTypeDefinition()
 
-    // the generic function to resolve the async function.
-
-    let wrap<'response> (request: IInlineAsyncRequest) : unit -> Async<obj> =
+    // The generic function to resolve the async function.
+    let wrap<'context, 'response> (request: IInlineAsyncRequest<'context>) : 'context -> Async<obj> =
         // can't return this as a fun / lambda, somehow these screws up the method
         // extractor below.
-        let f() =
+        let f (context: 'context) =
             async {
-                let request = request :?> IInlineAsyncRequest<'response>
-                let! r = request.Execute()
+                let request = request :?> IInlineAsyncRequest<'context, 'response>
+                let! r = request.Execute(context)
                 return box r
             }
         f
 
-    // use Quotations to get out the MethodInfo of the wrap function.
-    let wrapMethodInfo = 
-        let exp = <@@ wrap<obj>((box null) :?> IInlineAsyncRequest) @@>
+    // Use Quotations to get out the `MethodInfo` of the `wrap` function.
+    let wrapMethodInfo : Reflection.MethodInfo = 
+        let exp = <@@ wrap<obj, obj>((box null) :?> IInlineAsyncRequest<obj>) @@>
         match exp with
         | Patterns.Call(_, mi, _) -> mi.GetGenericMethodDefinition()
-        | _ -> failwith "internal error"
+        | _ -> failwith "Internal error"
 
-    // the generic function to create a typed AsyncResponse.
+    // The generic function to create a typed `AsyncResponse`.
     let createResponse<'response> (id: Id, result: obj) : obj =
         let unboxedResult : obj Flux.result = unbox result
         let r : Mom.AsyncResponse<'response> = Mom.AsyncResponse(id, unboxedResult |> Flux.Result.map unbox)
@@ -101,7 +100,7 @@ module private ExecuteWrapperAsync =
         let exp = <@@ createResponse<obj>(Id 0L, null) @@>
         match exp with
         | Patterns.Call(_, mi, _) -> mi.GetGenericMethodDefinition()
-        | _ -> failwith "internal error"
+        | _ -> failwith "Internal error"
 
     let resolveResponseType (t: Type) = 
         let genericInterface = 
@@ -110,13 +109,13 @@ module private ExecuteWrapperAsync =
 
         genericInterface.GetGenericArguments().[0]
 
-    type ExecuteF = IInlineAsyncRequest -> unit -> Async<obj>
+    type ExecuteF<'context> = IInlineAsyncRequest<'context> -> 'context -> Async<obj>
 
-    let createBoxedExecute (responseType: Type) : ExecuteF =
-        let m = wrapMethodInfo.MakeGenericMethod responseType
+    let createBoxedExecute (responseType: Type) : ExecuteF<'context> =
+        let m = wrapMethodInfo.MakeGenericMethod(typeof<'context>, responseType)
         let f = 
-            Delegate.CreateDelegate(typeof<Func<IInlineAsyncRequest, unit -> Async<obj>>>, m)
-            :?> Func<IInlineAsyncRequest, unit -> Async<obj>>
+            Delegate.CreateDelegate(typeof<Func<IInlineAsyncRequest<'context>, 'context -> Async<obj>>>, m)
+            :?> Func<IInlineAsyncRequest<'context>, 'context -> Async<obj>>
         f.Invoke
 
     type ResponseF = Id * obj -> obj
@@ -131,47 +130,47 @@ module private ExecuteWrapperAsync =
 module private ExecuteWrapper =
 
     let inlineRequestGenericTypeDefinition = 
-        typeof<IInlineRequest<obj>>.GetGenericTypeDefinition()
+        typeof<IInlineRequest<obj, obj>>.GetGenericTypeDefinition()
 
-    let wrap<'response> (request: IInlineRequest) : unit -> obj =
+    let wrap<'context, 'response> (request: IInlineRequest<'context>) : 'context -> obj =
         // can't return this as a fun / lambda, somehow these screws up the method
         // extractor below.
-        let f() =
-            let request = request :?> IInlineRequest<'response>
-            request.Execute()
+        let f (context: 'context) =
+            let request = request :?> IInlineRequest<'context, 'response>
+            request.Execute(context)
             |> box
         f
 
     // use Quotations to get out the MethodInfo of the wrap function.
-    let wrapMethodInfo = 
-        let exp = <@@ wrap<obj>((box null) :?> IInlineRequest) @@>
+    let wrapMethodInfo<'context> = 
+        let exp = <@@ wrap<'context, obj>((box null) :?> IInlineRequest<'context>) @@>
         match exp with
         | Patterns.Call(_, mi, _) -> mi.GetGenericMethodDefinition()
         | _ -> failwith "internal error"
 
-    let resolveResponseType (t: Type) = 
+    let resolveResponseType (t: Type) : Type = 
         let genericInterface = 
             t.GetInterfaces()
             |> Seq.find(fun i -> i.IsGenericType && i.GetGenericTypeDefinition() = inlineRequestGenericTypeDefinition)
-        genericInterface.GetGenericArguments().[0]
+        genericInterface.GetGenericArguments().[1]
 
-    type ExecuteF = IInlineRequest -> unit -> obj
+    type ExecuteF<'context> = IInlineRequest<'context> -> 'context -> obj
 
-    let createBoxedExecute (responseType: Type) : ExecuteF =
-        let m = wrapMethodInfo.MakeGenericMethod responseType
+    let createBoxedExecute (responseType: Type) : ExecuteF<'context> =
+        let m = wrapMethodInfo.MakeGenericMethod(typeof<'context>, responseType)
         let f = 
-            Delegate.CreateDelegate(typeof<Func<IInlineRequest, unit -> obj>>, m)
-            :?> Func<IInlineRequest, unit -> obj>
+            Delegate.CreateDelegate(typeof<Func<IInlineRequest<'context>, 'context -> obj>>, m)
+            :?> Func<IInlineRequest<'context>, 'context -> obj>
         f.Invoke
 
 module InlineRequestService =
 
-    /// Create a service that is able to support IInlineRequest<'response> and IInlineAsyncService<'response>
-    let create() : Runtime.IServiceContext -> Flux.Request -> Flux.Response option = 
+    /// Create a service that is able to support IInlineRequest<'context, 'response> and IInlineAsyncService<'context, 'response>
+    let create (context: 'context) : Runtime.IServiceContext -> Flux.Request -> Flux.Response option = 
 
         fun (service : Runtime.IServiceContext) ->
 
-        let helperTableAsync = Dictionary<Type, ExecuteWrapperAsync.ExecuteF * Processor * ExecuteWrapperAsync.ResponseF>()
+        let helperTableAsync = Dictionary<Type, ExecuteWrapperAsync.ExecuteF<'context> * Processor * ExecuteWrapperAsync.ResponseF>()
         let resolveHelperAsync interfaceType =
             match helperTableAsync.TryGetValue interfaceType with
             | true, helper -> helper
@@ -181,7 +180,7 @@ module InlineRequestService =
             helperTableAsync.Add(interfaceType, helper)
             helper
 
-        let executeTable = Dictionary<Type, ExecuteWrapper.ExecuteF>()
+        let executeTable = Dictionary<Type, ExecuteWrapper.ExecuteF<'context>>()
         let resolveExecute interfaceType =
             match executeTable.TryGetValue interfaceType with
             | true, helper -> helper
@@ -192,16 +191,16 @@ module InlineRequestService =
             executeF
 
         function
-        | :? IInlineAsyncRequest as r ->
+        | :? IInlineAsyncRequest<'context> as r ->
             let execute, processor, createResponse = resolveHelperAsync (r.GetType())
-            let f = execute r
+            let f : 'context -> Async<obj> = execute r
             
             let id = Mom.generateAsyncRequestId()
 
             Async.Start <| async {
                 let! reply = 
                     processor.PostAndAsyncReply 
-                    <| fun replyChannel -> RunAsync(f, replyChannel)
+                    <| fun replyChannel -> RunAsync((fun () -> f context), replyChannel)
                 
                 let result =
                     match reply with
@@ -214,8 +213,8 @@ module InlineRequestService =
 
             Some (box id)
 
-        | :? IInlineRequest as r ->
+        | :? IInlineRequest<'context> as r ->
             let execute = resolveExecute (r.GetType())
-            Some(execute r ())
+            Some(execute r context)
 
         | _ -> None
