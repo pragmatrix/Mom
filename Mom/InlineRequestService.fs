@@ -170,16 +170,6 @@ module InlineRequestService =
 
         fun (service : Runtime.IServiceContext) ->
 
-        let helperTableAsync = Dictionary<Type, ExecuteWrapperAsync.ExecuteF<'context> * Processor * ExecuteWrapperAsync.ResponseF>()
-        let resolveHelperAsync interfaceType =
-            match helperTableAsync.TryGetValue interfaceType with
-            | true, helper -> helper
-            | _ ->
-            let responseType = ExecuteWrapperAsync.resolveResponseType interfaceType
-            let helper = ExecuteWrapperAsync.createBoxedExecute responseType, createProcessor(), ExecuteWrapperAsync.createBoxedResponse responseType
-            helperTableAsync.Add(interfaceType, helper)
-            helper
-
         let executeTable = Dictionary<Type, ExecuteWrapper.ExecuteF<'context>>()
         let resolveExecute interfaceType =
             match executeTable.TryGetValue interfaceType with
@@ -190,7 +180,21 @@ module InlineRequestService =
             executeTable.Add(interfaceType, executeF)
             executeF
 
+        let asyncExecuteTable = Dictionary<Type, ExecuteWrapperAsync.ExecuteF<'context> * Processor * ExecuteWrapperAsync.ResponseF>()
+        let resolveHelperAsync interfaceType =
+            match asyncExecuteTable.TryGetValue interfaceType with
+            | true, helper -> helper
+            | _ ->
+            let responseType = ExecuteWrapperAsync.resolveResponseType interfaceType
+            let helper = ExecuteWrapperAsync.createBoxedExecute responseType, createProcessor(), ExecuteWrapperAsync.createBoxedResponse responseType
+            asyncExecuteTable.Add(interfaceType, helper)
+            helper
+
         function
+        | :? IInlineRequest<'context> as r ->
+            let execute = resolveExecute (r.GetType())
+            Some(execute r context)
+
         | :? IInlineAsyncRequest<'context> as r ->
             let execute, processor, createResponse = resolveHelperAsync (r.GetType())
             let f : 'context -> Async<obj> = execute r
@@ -212,9 +216,5 @@ module InlineRequestService =
             }
 
             Some (box id)
-
-        | :? IInlineRequest<'context> as r ->
-            let execute = resolveExecute (r.GetType())
-            Some(execute r context)
 
         | _ -> None
