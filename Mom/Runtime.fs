@@ -119,7 +119,7 @@ let withFunction (f: 'request -> 'r when 'request :> Mom.IRequest<'r>) =
 
     withService service
 
-let create builder = 
+let build (builder: Builder) = 
 
     let services = builder.Services |> List.rev
 
@@ -134,6 +134,9 @@ let create builder =
             | Some response -> response
 
     new Runtime (builder.EventQueue, serviceHost)
+
+[<Obsolete("Use Runtime.build")>]
+let create builder = build builder
 
 /// Some predefined services that should be supported by every runtime.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -226,5 +229,5 @@ let defaultBuilder =
 let newRuntime hostService = 
     defaultBuilder
     |> withService hostService
-    |> create
+    |> build
     
