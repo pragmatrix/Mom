@@ -9,6 +9,7 @@
     <Compile Include="MomGCTests.fs" />
     <Compile Include="TracingTests.fs" />
     <Compile Include="RuntimeTests.fs" />
+    <Compile Include="InlineRequests.fs" />
     <Compile Include="SystemTests.fs" />
     <Content Include="paket.references" />
     <Content Include="app.config" />
