@@ -107,7 +107,7 @@ module private ExecuteWrapperAsync =
             t.GetInterfaces()
             |> Seq.find(fun i -> i.IsGenericType && i.GetGenericTypeDefinition() = inlineAsyncRequestGenericTypeDefinition)
 
-        genericInterface.GetGenericArguments().[0]
+        genericInterface.GetGenericArguments().[1]
 
     type ExecuteF<'context> = IInlineAsyncRequest<'context> -> 'context -> Async<obj>
 
