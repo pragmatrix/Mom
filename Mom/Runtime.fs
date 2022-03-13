@@ -42,7 +42,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
     member private this.Cancel() = 
         this.ScheduleEvent CancelMom
 
-    /// Runs the mom synchronously. Returns Some value or None if the mom was cancelled.
+    /// Runs the mom synchronously. Returns `Some(value)` or `None` if the mom was cancelled.
     member __.Run mom = 
 
         let rec runLoop flux =
@@ -163,9 +163,7 @@ module Service =
             match cmd with
             | :? Mom.IAsyncComputation as ac -> 
                 let id = asyncIdGenerator.GenerateId()
-                ac.Run(fun r ->
-                    context.ScheduleEvent (Mom.AsyncComputationCompleted(id, r))
-                    )
+                ac.Run(fun r -> Mom.AsyncComputationCompleted(id, r) |> context.ScheduleEvent)
                 id |> box |> Some
             | _ -> None
 
