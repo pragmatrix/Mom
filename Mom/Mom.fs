@@ -315,7 +315,7 @@ module Mom =
     /// finally returned, because the remaining moms may refuse to get cancelled.
     let race (moms: 'r mom list) : 'r mom =
         if List.isEmpty moms then
-            failwith "internal error: Mom.race with zero nested moms would be unsound."
+            failwith "Internal error: Mom.race with zero nested moms would be unsound."
 
         // Note: when an mom finishes, all the running ones are canceled in the reversed 
         // order they were originally specified in the list 
@@ -345,7 +345,7 @@ module Mom =
         |> all
         |> map (function 
             | [l;r] -> unbox l, unbox r 
-            | _ -> failwith "internal error")
+            | _ -> failwith "Internal error")
 
     /// Runs two moms in parallel, the resulting mom completes with the result of the one that finishes first.
     /// events are delivered to mom1 and then to mom2, so mom1 has an advantage when both complete in response to

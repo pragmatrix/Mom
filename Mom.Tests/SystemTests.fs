@@ -20,7 +20,7 @@ let canGetMethodInfoFromGenericModuleFunctionViaQuotations() =
     let mi = 
         match exp with
         | Patterns.Call(_, mi, _) -> mi
-        | _ -> failwith "internal error"
+        | _ -> failwith "Internal error"
 
     mi.Name |> should equal "someGenericFunction"
     mi.IsGenericMethod |> should equal true
@@ -43,7 +43,7 @@ let canGetMethodInfoFromGenericModuleFunctionWithParameterViaQuotations() =
     let mi = 
         match exp with
         | Patterns.Call(_, mi, _) -> mi
-        | _ -> failwith "internal error"
+        | _ -> failwith "Internal error"
 
     mi.Name |> should equal "someGenericFunction2"
     mi.IsGenericMethod |> should equal true

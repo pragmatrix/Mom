@@ -146,7 +146,7 @@ module private ExecuteWrapper =
         let exp = <@@ wrap<'context, obj>((box null) :?> IInlineRequest<'context>) @@>
         match exp with
         | Patterns.Call(_, mi, _) -> mi.GetGenericMethodDefinition()
-        | _ -> failwith "internal error"
+        | _ -> failwith "Internal error"
 
     let resolveResponseType (t: Type) : Type = 
         let genericInterface = 
