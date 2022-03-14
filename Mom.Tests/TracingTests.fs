@@ -19,7 +19,7 @@ type ConvertIntToStr =
 let respond r =
     function 
     | Flux.Requesting (_, cont) -> cont (r |> box |> Flux.Value)
-    | _ -> failwith "internal error"
+    | _ -> failwith "Internal error"
 
 /// Mom under test.
 let mom p = mom {
@@ -82,7 +82,7 @@ let replayReplaysCommandResponses() =
         | :? ConvertIntToStr as ci ->
             let (ConvertIntToStr i) = ci
             i.ToString() |> box
-        | _ -> failwith "internal error"
+        | _ -> failwith "Internal error"
 
     let mom = mom {
         return! Mom.send (ConvertIntToStr 10)

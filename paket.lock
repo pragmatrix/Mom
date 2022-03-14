@@ -1,9 +1,9 @@
-RESTRICTION: || (== netcoreapp3.1) (== netstandard2.0)
+RESTRICTION: || (== net6.0) (== netstandard2.0)
 NUGET
   remote: https://www.nuget.org/api/v2
-    FSharp.Core (4.7.2)
-    FsUnit.xUnit (4.0.2)
-      FSharp.Core (>= 4.3.4)
+    FSharp.Core (6.0.3)
+    FsUnit.xUnit (4.0.7)
+      FSharp.Core (>= 4.7.2)
       NETStandard.Library (>= 2.0.3)
       NHamcrest (>= 2.0.1 < 2.1)
       xunit (>= 2.4.1 < 2.5)

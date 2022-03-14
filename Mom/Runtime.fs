@@ -42,7 +42,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
     member private this.Cancel() = 
         this.ScheduleEvent CancelMom
 
-    /// Runs the mom synchronously. Returns Some value or None if the mom was cancelled.
+    /// Runs the mom synchronously. Returns `Some(value)` or `None` if the mom was cancelled.
     member __.Run mom = 
 
         let rec runLoop flux =
@@ -119,7 +119,7 @@ let withFunction (f: 'request -> 'r when 'request :> Mom.IRequest<'r>) =
 
     withService service
 
-let create builder = 
+let build (builder: Builder) = 
 
     let services = builder.Services |> List.rev
 
@@ -134,6 +134,9 @@ let create builder =
             | Some response -> response
 
     new Runtime (builder.EventQueue, serviceHost)
+
+[<Obsolete("Use Runtime.build")>]
+let create builder = build builder
 
 /// Some predefined services that should be supported by every runtime.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -163,9 +166,7 @@ module Service =
             match cmd with
             | :? Mom.IAsyncComputation as ac -> 
                 let id = asyncIdGenerator.GenerateId()
-                ac.Run(fun r ->
-                    context.ScheduleEvent (Mom.AsyncComputationCompleted(id, r))
-                    )
+                ac.Run(fun r -> Mom.AsyncComputationCompleted(id, r) |> context.ScheduleEvent)
                 id |> box |> Some
             | _ -> None
 
@@ -228,5 +229,5 @@ let defaultBuilder =
 let newRuntime hostService = 
     defaultBuilder
     |> withService hostService
-    |> create
+    |> build
     
