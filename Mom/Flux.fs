@@ -27,7 +27,7 @@ module Flux =
     type Response = obj
     type Event = obj
 
-    [<NoComparison;NoEquality>] 
+    [<NoComparison; NoEquality>] 
     type 'result flux =
         | Requesting of Request * (Response result -> 'result flux)
         | Waiting of (Event -> 'result flux)

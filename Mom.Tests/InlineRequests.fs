@@ -22,7 +22,7 @@ let ``simple inline request with context``() =
 
     let context = "100"
     let runtime = 
-        Runtime.defaultBuilder
+        Runtime.newDefaultBuilder()
         |> Runtime.withService (InlineRequestService.create context)
         |> Runtime.build
 
