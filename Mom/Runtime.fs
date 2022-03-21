@@ -13,7 +13,9 @@ open Mom.Threading
 // predefined runtime events
 
 /// This event can be sent to the Runtime to try to cancel the current Mom.
-type CancelMom = CancelMom
+[<Struct>]
+type CancelMom = 
+    | CancelMom
 
 /// The stuff a service can do.
 type IServiceContext = 
@@ -86,14 +88,19 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
 type Service = IServiceContext -> Flux.Request -> Flux.Response option
         
 /// A builder that supports the creation of runtimes and adding services to it.
-[<NoComparison;NoEquality>]
+[<NoComparison; NoEquality; Struct>]
 type Builder = {
     EventQueue: SynchronizedQueue<Flux.Event>
     Services: Service list
-    Closed: bool
 }
 
-let builder = { EventQueue = SynchronizedQueue<Flux.Event>(); Services = []; Closed = false }
+/// Create a new builder instance.
+///
+/// The `EventQueue` inside the builder mutates, therefore we can not share builder instances
+/// between runtimes. Meaning that new builders need to be created for each.
+///
+/// TODO: Make sure that we can't share Event Queues between different runtimes.
+let newBuilder() = { EventQueue = SynchronizedQueue<Flux.Event>(); Services = [] }
 
 let withEventQueue queue builder = 
     { builder with EventQueue = queue }
@@ -193,7 +200,7 @@ module Service =
 
     let disabled _ _ = None
 
-    [<NoComparison;NoEquality>]
+    [<NoComparison; NoEquality; Struct>]
     type ServiceCrashResponse =
         /// Return the response and continue the service that crashed
         | ContinueService
@@ -219,15 +226,15 @@ module Service =
                 None
 
 /// Creates a default builder, that includes the services delay, and async.
-let defaultBuilder = 
-    builder
+let newDefaultBuilder() = 
+    newBuilder()
     |> withService Service.delay
     |> withService Service.async
 
 /// Builds a default runtime that forwards all requests to the host service. The runtime includes the
 /// services delay, and async.
 let newRuntime hostService = 
-    defaultBuilder
+    newDefaultBuilder()
     |> withService hostService
     |> build
     
