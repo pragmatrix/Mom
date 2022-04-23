@@ -23,6 +23,7 @@
     <Compile Include="Flux.fs" />
     <Compile Include="Mom.fs" />
     <Compile Include="Sideshow.fs" />
+    <Compile Include="Reflector.fs" />
     <Compile Include="Tracing.fs" />
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
