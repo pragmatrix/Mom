@@ -2,6 +2,7 @@
 
 open System.Threading
 
+[<Struct>]
 type Id = 
     | Id of int64
     member this.Value = let (Id v) = this in v
@@ -10,6 +11,7 @@ type Id =
 [<RequireQualifiedAccess>]
 module Ids =
     
+    [<Struct>]
     type Generator = {
         Id: int64 ref
     } with 

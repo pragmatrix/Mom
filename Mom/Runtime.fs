@@ -88,7 +88,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
 type Service = IServiceContext -> Flux.Request -> Flux.Response option
         
 /// A builder that supports the creation of runtimes and adding services to it.
-[<NoComparison; NoEquality; Struct>]
+[<Struct; NoComparison; NoEquality>]
 type Builder = {
     EventQueue: SynchronizedQueue<Flux.Event>
     Services: Service list
@@ -200,7 +200,7 @@ module Service =
 
     let disabled _ _ = None
 
-    [<NoComparison; NoEquality; Struct>]
+    [<Struct; NoComparison; NoEquality>]
     type ServiceCrashResponse =
         /// Return the response and continue the service that crashed
         | ContinueService

@@ -14,7 +14,7 @@ type internal UnsafeRegistry = {
     OnException: exn -> unit
 }
 
-[<RequireQualifiedAccess>]
+[<Struct; RequireQualifiedAccess>]
 type JoinResult = 
     | Timeout
     | Completed
