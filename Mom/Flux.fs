@@ -1,6 +1,5 @@
 ﻿namespace Mom
 
-open System
 open System.Runtime.ExceptionServices
 
 module Flux =
@@ -27,11 +26,11 @@ module Flux =
     type Response = obj
     type Event = obj
 
-    [<NoComparison; NoEquality>] 
+    [<Struct; NoComparison; NoEquality>] 
     type 'result flux =
-        | Requesting of Request * (Response result -> 'result flux)
-        | Waiting of (Event -> 'result flux)
-        | Completed of 'result result
+        | Requesting of _request: Request * (Response result -> 'result flux)
+        | Waiting of _waiting: (Event -> 'result flux)
+        | Completed of _result: 'result result
 
     /// Dispatch an event to the flux that is currently waiting for one.
     let dispatch ev = function
@@ -80,6 +79,7 @@ module Flux =
         | _ -> false
 
     /// The event that is sent to a flux when it gets cancelled.
+    [<Struct>]
     type Cancel = Cancel
 
     exception AsynchronousCancellationException with

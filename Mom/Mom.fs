@@ -116,17 +116,17 @@ module Mom =
     /// The priority with which new players should enter the field.
     ///
     /// Experimental.
-    [<RequireQualifiedAccess; Struct>]
+    [<Struct; RequireQualifiedAccess>]
     type EnteringPriority = 
         /// Default: New players are immediately entering the field to replace the player that has exited before.
         | Now
         /// New players are added to field as soon all current players are in the waiting state.
         | Lazy
 
-    [<NoComparison;NoEquality>]
+    [<Struct; NoComparison; NoEquality>]
     type ArbiterDecision<'state, 'r> = 
-        | CancelField of 'state result
-        | ContinueField of 'state * EnteringPriority * 'r mom list
+        | CancelField of cancel: 'state result
+        | ContinueField of cont: 'state * EnteringPriority * 'r mom list
 
     /// Cancel all remaining Moms and set the result of the field mom
     let inline cancelField r = CancelField r
@@ -144,7 +144,7 @@ module Mom =
     // a waiting mom
     type private 'result waiting = Event -> 'result flux
 
-    [<NoEquality; NoComparison>]
+    [<Struct; NoEquality; NoComparison>]
     type private Field<'state, 'r> = {
         State: 'state
         /// The current event and waiting moms that need to receive it.
@@ -503,7 +503,7 @@ module Mom =
     type IAsyncRequest<'response> = 
         interface end
 
-    [<NoComparison>]
+    [<Struct; NoComparison>]
     type AsyncResponse<'response> = 
         | AsyncResponse of Id * 'response result
 
@@ -614,14 +614,17 @@ module Mom =
     // Mom System Requests & Events
     //
 
+    [<Struct>]
     type Delay = 
         | Delay of TimeSpan
         interface IRequest<Id>
-    
+
+    [<Struct>]    
     type CancelDelay = 
         | CancelDelay of Id
         interface IRequest<unit>
 
+    [<Struct>]
     type DelayCompleted = DelayCompleted of Id
 
     /// Wait for the given time span and continue then.
@@ -674,8 +677,9 @@ module Mom =
 
         interface IRequest<Id>
 
-    [<NoComparison>]
-    type AsyncComputationCompleted = AsyncComputationCompleted of id: Id * result: obj result
+    [<Struct; NoComparison>]
+    type AsyncComputationCompleted = 
+        | AsyncComputationCompleted of id: Id * result: obj result
 
     /// Waits for an F# asynchronous computation.
     let await (computation: Async<'r>) : 'r mom = mom {

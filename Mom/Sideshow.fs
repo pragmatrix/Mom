@@ -15,14 +15,15 @@ open Mom.GlobalExports
 
 /// This is the control interface for the side show.
 
+[<Struct>]
 type Control<'state>(doBegin: 'state * unit mom -> unit mom, getState: unit -> 'state option mom) =
     /// Cancel and replace the side show mom that is tagged with the given state. 
     /// This mom returns after the
     /// currently running side show mom is cancelled and the new one is started (gets into
     /// a waiting state or completed). Errors are propagated to the mom of the caller.
-    member this.Begin(state, mom) = doBegin(state, mom)
+    member _.Begin(state, mom) = doBegin(state, mom)
     /// Returns the state of the sideshow, or None if the sideshow is not active.
-    member this.State with get() = getState()
+    member _.State with get() = getState()
 
 type Control<'state> with
     /// End the sideshow by cancelling the current mom, which sets the state to None.
@@ -36,10 +37,10 @@ type Control<'state> with
 module private Private = 
     let generateId = Ids.newGenerator().GenerateId
 
-    [<NoEquality;NoComparison>]
+    [<Struct; NoEquality; NoComparison>]
     type Request<'state> = 
-        | Replace of Id * ('state * unit mom)
-        | GetState of Id
+        | Replace of _replace: Id * ('state * unit mom)
+        | GetState of _getState: Id
 
     type 'r flux = 'r Flux.flux
 
