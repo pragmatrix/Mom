@@ -1,0 +1,21 @@
+root = true
+
+[*.fs]
+indent_style = space
+indent_size = 4
+# Use the VS 2019/2022 Editor Guidelines extension to show these and the Rewrap
+# extension to wrap comments. 
+guidelines = 100 1px solid 10000000, 120 1px solid 10000000
+
+[*.toml]
+indent_style = space
+indent_size = 4
+
+[*.fsproj]
+indent_style = space
+indent_size = 2
+
+[*.json]
+indent_style = space
+indent_size = 2
+
