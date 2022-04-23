@@ -2,7 +2,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="MomTests.fs" />
@@ -12,7 +11,6 @@
     <Compile Include="InlineRequests.fs" />
     <Compile Include="SystemTests.fs" />
     <Content Include="paket.references" />
-    <Content Include="app.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Mom\Mom.fsproj" />
