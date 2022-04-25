@@ -22,6 +22,7 @@ open System.Collections.Generic
 
 type Sender<'e> = 'e -> unit mom
 type Receiver<'e> = unit -> 'e mom
+type Channel<'e> = (Sender<'e> * Receiver<'e>)
 
 [<AutoOpen>]
 module private Private =
@@ -31,7 +32,9 @@ module private Private =
     type ReflectedEvent<'e> = 
         | ReflectedEvent of Id * 'e
 
-let reflector (nested: (Sender<'e> * Receiver<'e>) -> 'a mom) : 'a mom = 
+/// Wraps a mom so that it can use a direct channel for communication. This is implemented by
+/// installing an event reflector at the current node in the execution hierarchy.
+let wrap (mkNested: Channel<'e> -> 'a mom) : 'a mom = 
     // We need an unique id to be sure that this reflector's receiver only process the events send
     // by this reflector's sender.
     let id = idGen.GenerateId()
@@ -58,4 +61,4 @@ let reflector (nested: (Sender<'e> * Receiver<'e>) -> 'a mom) : 'a mom =
         | Completed(_) as flux -> flux 
         
     fun () ->
-        nested (send, receive) () |> next
+        mkNested (send, receive) () |> next
