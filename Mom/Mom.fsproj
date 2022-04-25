@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Version>0.12.0</Version>
+    <Version>0.13.0</Version>
     <Description>F# computation expressions and combinators for deterministic coordination, simulation, and testing of concurrent processes.</Description>
     <PackageProjectUrl>https://github.com/pragmatrix/mom</PackageProjectUrl>
     <RepositoryUrl>https://github.com/pragmatrix/mom</RepositoryUrl>
@@ -18,6 +18,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="C:\Users\armin\.nuget\packages\fsharp.core\6.0.3\contentFiles\any\netstandard2.0\FSharp.Core.xml" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Threading.fs" />
     <Compile Include="Ids.fs" />
     <Compile Include="Flux.fs" />
@@ -28,7 +31,6 @@
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
     <Compile Include="InlineRequestService.fs" />
-    <Compile Include="AssemblyInfo.fs" />
     <Content Include="paket.references" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
