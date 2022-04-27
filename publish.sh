@@ -1,4 +1,4 @@
-set -e
+set -ex
 dotnet tool restore
 dotnet clean -c Release
 rm -f Mom/bin/Release/*.nupkg
