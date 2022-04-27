@@ -53,10 +53,10 @@ let wrap (mkNested: Channel<'e> -> 'a mom) : 'a mom =
 
     let rec next = function
         | Requesting(req, cont) -> Requesting(req, cont >> next)
-        | Waiting(f) as flux ->
+        | Waiting(f) ->
             if queue.Count <> 0 
             then ReflectedEvent(id, queue.Dequeue) |> f |> next
-            else flux
+            else Waiting(f >> next)
         // TODO: might log if not all events are consumed
         | Completed(_) as flux -> flux 
         
