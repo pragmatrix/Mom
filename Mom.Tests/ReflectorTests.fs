@@ -16,15 +16,8 @@ let ``Reflector sends and receive a message``() =
         do! receiver()
     }
 
-    // Expected to be run in one go.
+    // Expected to complete in one go.
     wrapped
     |> Mom.start
     |> Flux.isCompleted
     |> should be True
-
-
-
-
-    
-
-
