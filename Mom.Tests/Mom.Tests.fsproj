@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="MomTests.fs" />
     <Compile Include="MomGCTests.fs" />
+    <Compile Include="ReflectorTests.fs" />
     <Compile Include="TracingTests.fs" />
     <Compile Include="RuntimeTests.fs" />
     <Compile Include="InlineRequests.fs" />
