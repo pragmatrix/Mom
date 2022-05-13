@@ -4,8 +4,12 @@
     <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="C:\Users\armin\.nuget\packages\fsharp.core\6.0.3\contentFiles\any\netstandard2.1\FSharp.Core.xml" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="MomTests.fs" />
     <Compile Include="MomGCTests.fs" />
+    <Compile Include="ReflectorTests.fs" />
     <Compile Include="TracingTests.fs" />
     <Compile Include="RuntimeTests.fs" />
     <Compile Include="InlineRequests.fs" />
