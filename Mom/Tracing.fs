@@ -41,7 +41,7 @@ let trace (p: 'param) (f : 'param -> 'r mom) : Trace<'param, 'r> mom =
                         |> cont
                         |> next ((stopwatch.Elapsed, RequestTrace (request, response)) :: traces))
 
-            | Flux.Waiting (cont) ->
+            | Flux.Waiting cont ->
                 Flux.Waiting (
                     fun event ->
                     event 
@@ -72,7 +72,7 @@ let replay (f: 'param -> 'r mom) (Trace((_, param), traces, expectedResult)) : R
             | RequestTrace (r, response) :: traces when r = request ->
                 response |> cont |> next traces
             | traces -> ReplayReport.Diverged(traces, flux)
-        | Flux.Waiting (cont) ->
+        | Flux.Waiting cont ->
             match traces with
             | EventTrace e :: traces ->
                 e |> cont |> next traces
@@ -99,7 +99,7 @@ module Format =
         // Inspired by ISO 8601, 
         // but changed T->_, removed date und time separators, and 3 fractional seconds for presenting milliseconds.
         let localTime = dt.ToLocalTime()
-        localTime.ToString("yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
+        localTime.ToString(@"yyyyMMdd_HHmmss.fff", CultureInfo.InvariantCulture)
 
     let private timeSpan (ts: TimeSpan) = 
         let ms = ts.TotalSeconds
@@ -137,7 +137,7 @@ module Format =
 
         /// Formats a TraceStep to a human comprehensible format. Note that this format might change.
         let step (offset, trace) = 
-            { offset = timeSpan offset; trace = sprintf "%A" trace }
+            { offset = timeSpan offset; trace = $"%A{trace}" }
             |> sprintf "%A" |> postProcess
 
         [<NoComparison>]

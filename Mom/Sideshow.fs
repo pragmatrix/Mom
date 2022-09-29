@@ -7,7 +7,6 @@
 /// return until either the sideshow is in a waiting state or completed. This guarantees that
 /// the control mom can be sure that all teardown of the old sideshow mom and startup of the
 /// new one is processed when the control is returned to it.
-
 [<RequireQualifiedAccess>]
 module Mom.Sideshow
 
@@ -118,7 +117,7 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
                 match request with
                 | Replace(_, newSideshow) ->
                     beginSideshow sideshow newSideshow cont
-                | GetState(_) ->
+                | GetState _ ->
                     cont (Flux.Value (box state)) 
                     |> next sideshow
                     
@@ -127,7 +126,7 @@ let attachTo (control: Control<'state> -> 'r mom) : 'r mom =
             | Flux.Completed cResult ->
                 flux |> cancelAndContinueWith (fun sResult ->
                     Flux.Completed <| 
-                        // be sure errors of the control mom have precendence!
+                        // be sure errors of the control mom have precedence!
                         match cResult, sResult with
                         | Flux.Error c, _ -> Flux.Error c
                         | _, Flux.Error s -> Flux.Error s

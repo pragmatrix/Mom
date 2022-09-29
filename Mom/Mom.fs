@@ -78,7 +78,7 @@ module Mom =
 
     exception AsynchronousException of Why: string with
         override this.ToString() =
-            sprintf "an Mom got into a waiting state, even though it is expected to run only synchronously(%s)" this.Why
+            $"A Mom got into a waiting state, even though it is expected to run only synchronously({this.Why})"
 
     /// Test if the Mom runs only synchronously (never gets into a waiting state). This
     /// function is only active for DEBUG builds.
@@ -103,10 +103,10 @@ module Mom =
     //
 
     /// Maps a list of Mom's by applying the function f to each result.
-    let internal lmap (f: 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
+    let internal lmap (f: 'a -> 'b) (moms: 'a mom list) : 'b mom list = 
         moms |> List.map (map f)
 
-    let internal lmapi (f: int -> 'a -> 'b) (moms: 'a mom list) : ('b mom list) = 
+    let internal lmapi (f: int -> 'a -> 'b) (moms: 'a mom list) : 'b mom list = 
         moms |> List.mapi (f >> map)
 
     //
@@ -139,7 +139,7 @@ module Mom =
 
     let inline continueFieldLazy state moms = ContinueField(state, EnteringPriority.Lazy, moms)
 
-    type Arbiter<'state, 'r> = 'state -> 'r result -> (ArbiterDecision<'state, 'r>)
+    type Arbiter<'state, 'r> = 'state -> 'r result -> ArbiterDecision<'state, 'r>
 
     // a waiting mom
     type private 'result waiting = Event -> 'result flux
@@ -420,7 +420,7 @@ module Mom =
     /// Attach an compensating mom for the mom body that is called when a cancellation or an error
     /// happened.
     /// The compensating mom receives (Some Exception) in case of an error, and None in case
-    /// of a cancelation.
+    /// of a cancellation.
     let onCancelOrError (compensation: ExceptionDispatchInfo option -> unit mom) body = 
         let compensate rBody =
             let afterCancel = function
@@ -523,17 +523,17 @@ module Mom =
 
     type MomBuilder<'result>() = 
 
-        member inline __.Source(mom: _ mom) : _ mom = mom
-        member inline __.Source(r: IRequest<_>) = r |> send
-        member inline __.Source(r: IAsyncRequest<_>) = r |> sendAsync
-        member inline __.Source(s: _ seq) = s
+        member inline _.Source(mom: _ mom) : _ mom = mom
+        member inline _.Source(r: IRequest<_>) = r |> send
+        member inline _.Source(r: IAsyncRequest<_>) = r |> sendAsync
+        member inline _.Source(s: _ seq) = s
 
-        member inline __.Bind(mom: 'r mom, body: 'r -> 'r2 mom) : 'r2 mom = 
+        member inline _.Bind(mom: 'r mom, body: 'r -> 'r2 mom) : 'r2 mom = 
             mom |> bind body
 
-        member inline __.Return(v: 'r) : 'r mom = 
+        member inline _.Return(v: 'r) : 'r mom = 
             ofValue v
-        member inline __.ReturnFrom(mom : 'r mom) = 
+        member inline _.ReturnFrom(mom : 'r mom) = 
             mom
         member inline this.Delay(f : unit -> 'r mom) : 'r mom = 
             this.Bind(this.Return(), f)
@@ -547,7 +547,7 @@ module Mom =
                 -> this.TryFinally(body, fun () -> dp.DisposableFlow)
             | _ -> this.TryFinally(body, disposable.Dispose)
 
-        member __.TryFinally(mom: 'r mom, f: unit -> unit mom) : 'r mom =
+        member _.TryFinally(mom: 'r mom, f: unit -> unit mom) : 'r mom =
             let finallyBlock tryResult =
 
                 // if the finally mom results in an error or cancellation, 
@@ -566,10 +566,10 @@ module Mom =
             mom 
             |> continueWith (finallyBlock >> synchronous "finally")
 
-        member __.TryFinally(mom: 'r mom, f: unit -> unit) : 'r mom =
+        member _.TryFinally(mom: 'r mom, f: unit -> unit) : 'r mom =
             mom |> whenCompleted f
 
-        member __.TryWith(mom: 'r mom, eh: exn -> 'r mom) : 'r mom =
+        member _.TryWith(mom: 'r mom, eh: exn -> 'r mom) : 'r mom =
             mom |> continueWith (function
                 | Error e 
                     -> eh e.SourceException
@@ -597,8 +597,8 @@ module Mom =
     /// with F# 'use' keyword inside a computation expression.
     let inline asDisposable (mom: unit mom) = { 
         new IDisposableFlow with
-            member __.Dispose() = ()
-            member __.DisposableFlow = mom
+            member _.Dispose() = ()
+            member _.DisposableFlow = mom
     }
             
     /// Combine a number of unit moms so that they are run in sequence, one after another.
@@ -630,7 +630,7 @@ module Mom =
     /// Wait for the given time span and continue then.
     let delay (ts: TimeSpan) = mom {
         if ts < TimeSpan.Zero then
-            failwithf "Mom.delay: unsupported negative time span: %s" (ts |> string)
+            failwith $"Mom.delay: Unsupported negative time span: {ts |> string}"
         if ts <> TimeSpan.Zero then
             let! id = Delay ts
             try
@@ -657,16 +657,16 @@ module Mom =
     // Async interoperability
     //
 
-    // async computations are scheduled on the threadpool by default.
+    // async computations are scheduled on the thread pool by default.
 
     type IAsyncComputation = 
         abstract member Run : (obj result -> unit) -> unit
 
     type AsyncComputation<'r>(computation: Async<'r>) = 
         interface IAsyncComputation with
-            /// Run the asynchronous computation on a threadpool thread and post 
+            /// Run the asynchronous computation on a thread pool thread and post 
             /// its result to the receiver.
-            member __.Run(receiver : obj result -> unit) : unit = 
+            member _.Run(receiver : obj result -> unit) : unit = 
                 async {
                     try
                         let! r = computation

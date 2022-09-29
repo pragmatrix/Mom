@@ -1,14 +1,11 @@
-﻿[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+﻿// The Mom runtime.
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 [<RequireQualifiedAccess>]
 module Mom.Runtime
 
 open System
 open System.Threading
 open Mom.Threading
-
-///
-/// The Mom runtime.
-/// 
 
 // predefined runtime events
 
@@ -35,17 +32,17 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
 
     interface IServiceContext with
         member this.ScheduleEvent event = this.ScheduleEvent event
-        member __.PostRequest request = host request |> ignore
+        member _.PostRequest request = host request |> ignore
 
     /// Asynchronously schedules an event to the runtime.
-    member __.ScheduleEvent (event : Flux.Event) = 
+    member _.ScheduleEvent (event : Flux.Event) = 
         eventQueue.Enqueue event
 
     member private this.Cancel() = 
         this.ScheduleEvent CancelMom
 
     /// Runs the mom synchronously. Returns `Some(value)` or `None` if the mom was cancelled.
-    member __.Run mom = 
+    member _.Run mom = 
 
         let rec runLoop flux =
             match flux with
@@ -84,7 +81,7 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
 /// This way the service can associate its own instance variables with the Runtime.
 /// Note that the return value indicates not only the response itself, it also notifies the
 /// runtime if a request is handled, so if the request is asynchronous and can not actually
-/// return a reponse, () should be returned when the request is considered to be processed.
+/// return a response, `()` should be returned when the request is considered to be processed.
 type Service = IServiceContext -> Flux.Request -> Flux.Response option
         
 /// A builder that supports the creation of runtimes and adding services to it.
@@ -137,7 +134,7 @@ let build (builder: Builder) =
             services
             |> List.tryPick (fun s -> s cmd)
             |> function 
-            | None -> failwithf "Request of type `%O` unhandled, is the service registered?" (cmd.GetType())
+            | None -> failwith $"Request of type `{cmd.GetType()}` unhandled, is the service registered?"
             | Some response -> response
 
     new Runtime (builder.EventQueue, serviceHost)
@@ -190,7 +187,7 @@ module Service =
                     |> List.map (fun service -> 
                         match service message with
                         | Some v when v = box () -> true
-                        | Some v -> failwithf "a service that is in a forwarding group, returned an unexpected value: %A" v
+                        | Some v -> failwith $"A service that is in a forwarding group, returned an unexpected value: %A{v}"
                         | None -> false
                         ) 
                     |> List.contains true

@@ -1,12 +1,11 @@
-﻿/// A service that runs synchronous and asynchronous functions that are directly 
-/// attached to the request by providing a Execute() function.
-///
-/// The service associates the async functions to the request type, so that if multiple requests
-/// are scheduled, their async functions are guaranteed to never run at the same time. 
-///
-/// To implement that, it installs a mailbox processor for each type. 
-/// If the async functions need to run in parallel, use another type.
-
+﻿// A service that runs synchronous and asynchronous functions that are directly 
+// attached to the request by providing a Execute() function.
+//
+// The service associates the async functions to the request type, so that if multiple requests
+// are scheduled, their async functions are guaranteed to never run at the same time. 
+//
+// To implement that, it installs a mailbox processor for each type. 
+// If the async functions need to run in parallel, use another type.
 namespace Mom
 
 open System

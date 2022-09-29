@@ -31,7 +31,7 @@ let mom p = mom {
 [<Fact>]
 let createTrace() =
 
-    let traced = mom |> Tracing.trace 5
+    let traced = mom |> trace 5
 
     let trace = 
         traced
@@ -52,7 +52,7 @@ let simpleTraceAndReplay() =
     |> Seq.iter (printfn "%s")
 
     trace
-    |> Tracing.replay mom
+    |> replay mom
     |> printfn "%A"
 
 #if false

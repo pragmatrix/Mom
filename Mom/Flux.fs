@@ -35,7 +35,7 @@ module Flux =
     /// Dispatch an event to the flux that is currently waiting for one.
     let dispatch ev = function
         | Waiting cont -> cont ev
-        | flux -> failwithf "Flux.dispatch: can't dispatch an event to an flux that is not waiting for one: %A" flux
+        | flux -> failwith $"Flux.dispatch: Can't dispatch an event to an flux that is not waiting for one: %A{flux}"
 
     //
     // Completed state queries
@@ -53,18 +53,18 @@ module Flux =
     /// Returns the ExceptionDispatchInfo of a completed flux.
     let error = function
         | Completed (Error e) -> e
-        | flux -> failwithf "Flux.error: flux is not in error: %A" flux
+        | flux -> failwith $"Flux.error: Flux is not in error: %A{flux}"
 
     /// The result of a completed flux.
     let result = function
         | Completed r -> r
-        | flux -> failwithf "Flux.result: flux is not completed: %A" flux
+        | flux -> failwith $"Flux.result: Flux is not completed: %A{flux}"
 
     /// Returns the resulting value of a completed flux.
     let value = function
         | Completed (Value r) -> r
-        | Completed _ as flux -> failwithf "Flux.value: flux has not been completed with a resulting value: %A" flux
-        | flux -> failwithf "Flux.value: flux is not completed: %A" flux
+        | Completed _ as flux -> failwith $"Flux.value: Flux has not been completed with a resulting value: %A{flux}"
+        | flux -> failwith $"Flux.value: Flux is not completed: %A{flux}"
 
     let inline captureException e = 
         ExceptionDispatchInfo.Capture(e)
@@ -83,8 +83,8 @@ module Flux =
     type Cancel = Cancel
 
     exception AsynchronousCancellationException with
-        override __.ToString() =
-            sprintf "an Flux got into a waiting state, even though it is being cancelled and expected to run only synchronously"
+        override _.ToString() =
+            "an Flux got into a waiting state, even though it is being cancelled and expected to run only synchronously"
 
     /// Cancels the flux. 
     ///
