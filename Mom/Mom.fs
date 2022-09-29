@@ -314,16 +314,16 @@ module Mom =
     /// If one mom completes, it may take an arbitrary amount of time (steps) until the result is
     /// finally returned, because the remaining moms may refuse to get cancelled.
     let race (moms: 'r mom list) : 'r mom =
-        if List.isEmpty moms then
-            failwith "Internal error: Mom.race with zero nested moms would be unsound."
-
-        // Note: when an mom finishes, all the running ones are canceled in the reversed 
-        // order they were originally specified in the list 
-        // (independent of how many of them already received the current event)!
-
-        let arbiter _ = cancelField
-        field' arbiter Unchecked.defaultof<'r> moms
-
+        match moms with
+        | [] -> failwith "Internal error: Mom.race with zero nested moms would be unsound."
+        | [onlyOne] -> onlyOne
+        | _ ->
+            // Note: when an mom finishes, all the running ones are canceled in the reversed
+            // order they were originally specified in the list
+            // (independent of how many of them already received the current event)!
+            let arbiter _ = cancelField
+            field' arbiter Unchecked.defaultof<'r> moms
+    
     [<Obsolete("Use race")>]
     let inline any (moms: 'r mom list) : 'r mom = race moms
 
