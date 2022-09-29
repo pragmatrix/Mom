@@ -7,7 +7,7 @@ open Mom
 
 [<AutoOpen>]
 module Helper = 
-    let mom<'r> = Mom.Mom.mom<'r>
+    let mom<'r> = Mom.mom<'r>
     let step ev mom = Flux.dispatch ev mom
 
 [<Fact(Skip="brittle")>]
@@ -36,22 +36,22 @@ let longSequentialLoopDoesNotEatUpStackOrMemory() =
         if (cnt % memTrace = 0) then
             GC.Collect()
             let totalMem = GC.GetTotalMemory(true)
-            array.[cnt / memTrace] <- totalMem
+            array[cnt / memTrace] <- totalMem
         stepLoop (step null mom) (cnt+1)
 
     stepLoop mom 0
 
-    let memAtStart = array.[0]
-    let memAtEnd = array.[memTraces-1]
+    let memAtStart = array[0]
+    let memAtEnd = array[memTraces-1]
     let maxMemoryUse = 1000L
     let memoryUse = memAtEnd - memAtStart
 
     // usually this is about 344 bytes on my machine
-    System.Console.WriteLine(sprintf "memory use: %i bytes" memoryUse)
+    Console.WriteLine $"Memory use: {memoryUse} bytes"
     memoryUse |> should lessThan maxMemoryUse
         
     array
-    |> Array.iter (fun mem -> System.Console.WriteLine(sprintf "mem: %i" mem))
+    |> Array.iter (fun mem -> Console.WriteLine $"mem: {mem}")
 
 [<Fact(Skip="todo, see issue #29")>]
 let ``for loop does not eat up stack space``() = 
@@ -64,7 +64,7 @@ let ``for loop does not eat up stack space``() =
     }
 
     let r = Mom.start(loop())
-    printfn "%A" r
+    printfn $"%A{r}"
     Flux.isError
     |> should equal false
     

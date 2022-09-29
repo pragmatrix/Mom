@@ -15,9 +15,9 @@ type CancellationTracker() =
     let mutable _disposed = false
     
     interface IDisposable with
-        member __.Dispose() = _disposed <- true
+        member _.Dispose() = _disposed <- true
 
-    member __.Disposed = _disposed;
+    member _.Disposed = _disposed;
 
 type Event1 = Event1
 type Event2 = Event2
@@ -37,7 +37,7 @@ let stepH host mom =
     match mom with
     | Flux.Requesting (r, cont) -> 
         host r |> unbox |> Flux.Value |> cont
-    | _ -> failwithf "stepH: invalid state %A" mom
+    | _ -> failwith $"stepH: invalid state %A{mom}"
 
 
 module Cancellation = 
@@ -364,7 +364,7 @@ module Cancellation =
         |> dispatch Event2
         |> ignore
 
-        printfn "%A" finallyTracker
+        printfn $"%A{finallyTracker}"
 
         finallyTracker 
         |> should equal ['c';'e';'d';'b';'a']
@@ -509,7 +509,7 @@ module Finally =
             try
                 return 10
             finally
-                failwith "Nooo"
+                failwith "Nooooo"
                 ()
             }
 
@@ -525,7 +525,7 @@ module Finally =
                 return 10
             finally
                 mom { 
-                    failwith "Nooo"
+                    failwith "Nooooo"
                 }
             }
 
@@ -540,7 +540,7 @@ module Finally =
             try
                 return 10
             finally
-                failwith "Nooo"
+                failwith "Noo"
                 mom { 
                     return ()
                 }
@@ -642,10 +642,8 @@ module Exceptions =
                 raise TestException
                 return 0
             with 
-            | TestException as e ->
-                return 1
-            | e -> 
-                return 0
+            | TestException -> return 1
+            | _ -> return 0
         }
 
         let res = 
@@ -727,7 +725,7 @@ module UnresolvedIssues =
                 do! Mom.waitFor' (fun (_:Event1) -> true)
             }
 
-        // cancellation of the secondary Mom takes forvever
+        // Cancellation of the secondary Mom takes forever
         let secondaryMom = mom {
             try
                 do! Mom.waitFor' (fun (_:Event2) -> true)
@@ -834,7 +832,7 @@ module Delay =
         state 
         |> Flux.isCompleted |> should be True
 
-module CompuationExpressionSyntax =
+module ComputationExpressionSyntax =
 
     [<Fact>]
     let ``Request with response type``() = 
@@ -893,7 +891,7 @@ module CompuationExpressionSyntax =
         |> should equal (Flux.Value 3) 
 
     [<Fact>]
-    let ``For``() = 
+    let ``for``() = 
         let test = mom {
             for _ in [0..2] do
                 do! Mom.waitFor' (fun (_:Event1) -> true)
@@ -1079,7 +1077,7 @@ module Sideshow =
 
         (sideshowStarted, nestedContinued, sideshowFinalized) |> should equal (2, 2, 1)
 
-        let state = 
+        let _state = 
             state
             |> dispatch Event2
 
@@ -1100,7 +1098,7 @@ module Sideshow =
                 try
                     do! control.Begin sideshow
                     return false
-                with e ->
+                with _ ->
                     return true
             }
 
@@ -1123,7 +1121,7 @@ module Sideshow =
                 try
                     do! control.Begin sideshow
                     return false
-                with e ->
+                with _ ->
                     return true
             }
 
@@ -1149,7 +1147,7 @@ module Sideshow =
                 try
                     do! control.Begin sideshow
                     return false
-                with e ->
+                with _ ->
                     return true
             }
 

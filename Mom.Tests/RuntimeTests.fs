@@ -40,14 +40,14 @@ let ``host properly cancels its mom if the runtime gets disposed asynchronously`
 [<Fact>]
 let ``host errors are propagated inside the mom``() = 
 
-    let host _ req = 
+    let host _ _req = 
         failwith "Error"
 
     let mom = mom {
         try
             do! Mom.send Request1
             return false
-        with e ->
+        with _e ->
             return true
     }
 
@@ -70,7 +70,7 @@ let ``async can be used in moms``() =
 
     let host _ _ = None
 
-    let runtime = Mom.Runtime.newRuntime(host)
+    let runtime = Runtime.newRuntime(host)
     let result = runtime.Run test
     result |> should equal (Some 10)
 
@@ -91,7 +91,7 @@ let ``async exceptions are propagated``() =
 
     let host _ _ = None
 
-    let runtime = Mom.Runtime.newRuntime(host)
+    let runtime = Runtime.newRuntime(host)
         
     (fun () -> runtime.Run test |> ignore)
     |> should throw typeof<AsyncException>
@@ -109,13 +109,13 @@ let ``async exceptions can be catched inside an Mom``() =
         try
             let! v = Mom.await waitAndReturn10
             return v
-        with e ->
+        with _e ->
             return 11
     }
 
     let host _ _ = None
 
-    let runtime = Mom.Runtime.newRuntime(host)
+    let runtime = Runtime.newRuntime(host)
     runtime.Run test |> should equal (Some 11)
 
 let private momThatThrows() = mom {
@@ -136,5 +136,5 @@ let ``stack traces of exceptions are preserved``() =
         failwith "unexpected"
     with e ->
         let ex = string e
-        printfn "%s" ex
+        printfn $"{ex}"
         ex |> should haveSubstring "momThatThrows"

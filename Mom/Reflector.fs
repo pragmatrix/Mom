@@ -22,7 +22,7 @@ open System.Collections.Generic
 
 type Sender<'e> = 'e -> unit mom
 type Receiver<'e> = unit -> 'e mom
-type Channel<'e> = (Sender<'e> * Receiver<'e>)
+type Channel<'e> = Sender<'e> * Receiver<'e>
 
 [<AutoOpen>]
 module private Private =
@@ -47,7 +47,7 @@ let wrap (mkNested: Channel<'e> -> 'a mom) : 'a mom =
     }
 
     let receive() : 'e mom = 
-        Mom.Mom.waitFor (function
+        Mom.waitFor (function
         | ReflectedEvent(rid, e) when rid = id -> Some(e)
         | _ -> None)
 
@@ -58,7 +58,7 @@ let wrap (mkNested: Channel<'e> -> 'a mom) : 'a mom =
             then ReflectedEvent(id, queue.Dequeue()) |> f |> next
             else Waiting(f >> next)
         // TODO: might log if not all events are consumed
-        | Completed(_) as flux -> flux 
+        | Completed _ as flux -> flux 
         
     fun () ->
         mkNested (send, receive) () |> next

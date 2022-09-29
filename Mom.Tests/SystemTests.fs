@@ -29,7 +29,7 @@ let canGetMethodInfoFromGenericModuleFunctionViaQuotations() =
 
 type SomeInterface = interface end
 
-let someGenericFunction2<'t>(i: SomeInterface) : unit -> Async<obj> = 
+let someGenericFunction2<'t>(_i: SomeInterface) : unit -> Async<obj> = 
     let f() = async {
         return box null
     }
@@ -67,7 +67,7 @@ let ``ExceptionDispatchInfo properly preserves stack traces``() =
         failwith "unexpected"
     with e ->
         let str = string e
-        printfn "%s" str
+        printfn $"{str}"
         str |> should haveSubstring "functionThatThrows"
 
     
