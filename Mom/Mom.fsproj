@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Version>0.16.0</Version>
+    <Version>1.0.0</Version>
     <Description>F# computation expressions and combinators for deterministic coordination, simulation, and testing of concurrent processes.</Description>
     <PackageProjectUrl>https://github.com/pragmatrix/mom</PackageProjectUrl>
     <RepositoryUrl>https://github.com/pragmatrix/mom</RepositoryUrl>
