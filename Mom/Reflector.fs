@@ -39,7 +39,7 @@ let private create() : Channel<'e> * ('a flux -> 'a flux) =
     let id = idGen.GenerateId()
     let queue = Queue<'e>()
 
-    // For now, we send the event out _without_ going through a request of the nested IVR. This
+    // For now, we send the event out _without_ going through a request of the nested Moms. This
     // simplifies testing but reduces transparency. It also allows the event to be sent further up the Mom hierarchy.
     let send (ev: 'e) : unit mom = mom {
         queue.Enqueue(ev)

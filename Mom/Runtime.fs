@@ -44,33 +44,38 @@ type Runtime internal (eventQueue: SynchronizedQueue<Flux.Event>, host: IService
     /// Runs the mom synchronously. Returns `Some(value)` or `None` if the mom was cancelled.
     member _.Run mom = 
 
-        let rec runLoop flux =
+        // The most recent internal event is delivered first to keep internal consistency.
+        let rec runLoop events flux =
             match flux with
             | Flux.Completed c -> 
                 match c with 
-                | Flux.Value r 
-                    -> Some r
-                | Flux.Error e 
-                    -> e.Throw(); None
+                | Flux.Value r -> Some r
+                | Flux.Error e -> e.Throw(); None
                 | Flux.Cancelled -> None
-            | Flux.Requesting (request, cont) -> 
-                let result = 
-                    try
-                        host request 
-                        |> Flux.Value
-                    with e ->
-                        Flux.captureException e
-                result |> cont |> runLoop
+            | Flux.Requesting (request, cont) ->
+                match request with
+                | :? Mom.InternalEvent as ie ->
+                    let (Mom.InternalEvent ev) = ie
+                    Flux.Value (box ()) |> cont |> runLoop (ev::events)
+                | request ->
+                    try host request |> Flux.Value
+                    with e -> Flux.captureException e
+                    |> cont |> runLoop events
             | Flux.Waiting cont ->
-                let event = eventQueue.Dequeue()
-                match event with
-                | :? CancelMom -> Flux.cancel flux
-                | event -> cont event
-                |> runLoop 
+                // If there are internal events, run the most recent one first.
+                match events with
+                | ev::events ->
+                    ev |> cont |> runLoop events
+                | [] ->
+                    // Now process external ones.
+                    match eventQueue.Dequeue() with
+                    | :? CancelMom -> Flux.cancel flux
+                    | event -> cont event
+                    |> runLoop []
 
         mom
         |> Mom.start
-        |> runLoop
+        |> runLoop []
 
     member this.Run (mom, cancellationToken: CancellationToken) = 
         use __ = cancellationToken.Register(fun () -> this.Cancel())
@@ -145,7 +150,7 @@ let create builder = build builder
 /// Some predefined services that should be supported by every runtime.
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Service = 
-
+        
     let delay (context: IServiceContext) =
         let delayIdGenerator = Ids.newGenerator()
         let mutable activeTimers = Map.empty
@@ -222,7 +227,7 @@ module Service =
                 | ContinueService -> ()
                 None
 
-/// Creates a default builder, that includes the services delay, and async.
+/// Creates a default builder, that includes the services event, delay, and async.
 let newDefaultBuilder() = 
     newBuilder()
     |> withService Service.delay
