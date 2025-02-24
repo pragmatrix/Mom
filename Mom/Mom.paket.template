@@ -1,0 +1,9 @@
+type file
+id Mom
+version 1.2.0
+authors Armin Sander
+description F# computation expressions and combinators for deterministic coordination, simulation, and testing of concurrent processes.
+files
+    bin/Release/netstandard2.0/Mom.dll ==> lib/netstandard2.0
+dependencies
+    FSharp.Core >= 6.0.3
