@@ -35,7 +35,7 @@ module private Private =
 /// Wraps a mom so that it can use a direct channel for communication. This is implemented by
 /// installing an event reflector at the current node in the execution hierarchy.
 let wrap (mkNested: Channel<'e> -> 'a mom) : 'a mom = 
-    // We need an unique id to be sure that this reflector's receiver only process the events send
+    // We need a unique id to be sure that this reflector's receiver only process the events send
     // by this reflector's sender.
     let id = idGen.GenerateId()
     let queue = Queue<'e>()
