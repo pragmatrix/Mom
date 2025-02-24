@@ -3,7 +3,6 @@ source https://www.nuget.org/api/v2/
 framework: netstandard2.0,net8.0
 
 nuget FSharp.Core >= 6.0.3 content:none
-nuget FsUnit.xUnit ~> 5.0.0
-nuget xunit.runner.visualstudio ~> 2.4.3
-nuget Microsoft.NET.Test.Sdk ~> 17.1.0
-
+nuget FsUnit.xUnit ~> 7.0.1
+nuget xunit.runner.visualstudio ~> 3.0.2
+nuget Microsoft.NET.Test.Sdk ~> 17.13.0
