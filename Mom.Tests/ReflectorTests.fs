@@ -11,14 +11,14 @@ let ``Reflector sends and receive a message``() =
 
     let sender, receiver = Reflector.create()
     
-    let wrapped = mom {
+    let test = mom {
         // send a message
         do! sender(())
         // then receive it.
         do! receiver()
     }
 
-    wrapped
+    test
     |> Runtime.runCore
     |> should equal (Some ())
 
@@ -26,7 +26,7 @@ let ``Reflector sends and receive a message``() =
 let ``Reflector sends and two parallel receiver receive it`` () =
     
     let sender, receiver = Reflector.create()
-    let wrapped = mom {
+    let test = mom {
         // send a message
         do! sender(())
         // then receive it.
@@ -35,6 +35,6 @@ let ``Reflector sends and two parallel receiver receive it`` () =
     }
 
     // Expected to complete in one go.
-    wrapped
+    test
     |> Runtime.runCore
     |> should equal (Some ())
