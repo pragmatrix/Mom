@@ -623,7 +623,7 @@ module Mom =
     /// external events. Most recent events are delivered first.
     [<Struct>]
     type InternalEvent =
-        | InternalEvent of obj
+        | InternalEvent of Event
         interface IRequest<unit>
         
     let schedule (e: 'a) : unit mom = mom {
