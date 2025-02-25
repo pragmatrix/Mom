@@ -30,7 +30,7 @@ let ``Reflector sends and two parallel receiver receive it`` () =
         // send a message
         do! sender(())
         // then receive it.
-        let! _ = Mom.race [receiver(); receiver()]
+        let! _ = Mom.all [receiver(); receiver()]
         ()
     }
 
