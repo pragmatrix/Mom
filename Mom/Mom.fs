@@ -22,7 +22,7 @@ module Mom =
     [<NoComparison;NoEquality>]
     type 'result mom = unit -> 'result flux
 
-    /// Start up an mom.
+    /// Start up a mom.
     let inline start (mom : _ mom) = mom ()
 
     /// Lifts a result.
@@ -378,12 +378,12 @@ module Mom =
     type IRequest<'response> = 
         interface end
     
-    /// An Mom that synchronously sends a request to a host and returns its response. 
+    /// A Mom that synchronously sends a request to a host and returns its response. 
     let private sendUnsafe request : 'r mom = 
         fun () ->
             Requesting (box request, Result.map unbox >> Completed)
 
-    /// An Mom that synchronously sends a request to a host and returns its response. The requests
+    /// A Mom that synchronously sends a request to a host and returns its response. The requests
     /// need to implement the IRequest<_> interface so that the returned response value can be typed
     /// properly.
     let send (request: IRequest<'r>) : 'r mom = 
@@ -619,11 +619,22 @@ module Mom =
         | Delay of TimeSpan
         interface IRequest<Id>
 
+    /// Schedule an internal event to the Mom runtime currently running in. These events are delivered before all
+    /// external events. Most recent events are delivered first.
+    [<Struct>]
+    type InternalEvent =
+        | InternalEvent of Event
+        interface IRequest<unit>
+        
+    let schedule (e: 'a) : unit mom = mom {
+        do! send ^ InternalEvent (box e)
+    }
+    
     [<Struct>]    
     type CancelDelay = 
         | CancelDelay of Id
         interface IRequest<unit>
-
+    
     [<Struct>]
     type DelayCompleted = DelayCompleted of Id
 
