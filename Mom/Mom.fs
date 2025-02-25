@@ -22,7 +22,7 @@ module Mom =
     [<NoComparison;NoEquality>]
     type 'result mom = unit -> 'result flux
 
-    /// Start up an mom.
+    /// Start up a mom.
     let inline start (mom : _ mom) = mom ()
 
     /// Lifts a result.

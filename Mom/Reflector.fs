@@ -17,8 +17,6 @@
 module Mom.Reflector
 
 open Mom.GlobalExports
-open Mom.Flux
-open System.Collections.Generic
 
 type Sender<'e> = 'e -> unit mom
 type Receiver<'e> = unit -> 'e mom
@@ -33,47 +31,20 @@ module private Private =
         | ReflectedEvent of Id * 'e
 
 /// Creates a Reflector channel and a next / driver function for the receiving part.
-let private create() : Channel<'e> * ('a flux -> 'a flux) =
+let create() : Channel<'e> =
     // We need a unique id to be sure that this reflector's receiver only process the events send
     // by this reflector's sender.
     let id = idGen.GenerateId()
-    let queue = Queue<'e>()
 
     // For now, we send the event out _without_ going through a request of the nested Moms. This
     // simplifies testing but reduces transparency. It also allows the event to be sent further up the Mom hierarchy.
-    let send (ev: 'e) : unit mom = mom {
-        queue.Enqueue(ev)
-    }
+    let send (ev: 'e) : unit mom =
+        ReflectedEvent(id, ev)
+        |> Mom.schedule
 
     let receive() : 'e mom = 
         Mom.waitFor (function
         | ReflectedEvent(rid, e) when rid = id -> Some(e)
         | _ -> None)
 
-    let rec next = function
-        | Requesting(req, cont) -> Requesting(req, cont >> next)
-        | Waiting(f) ->
-            if queue.Count <> 0 
-            then ReflectedEvent(id, queue.Dequeue()) |> f |> next
-            else Waiting(f >> next)
-        // TODO: might log if not all events are consumed
-        | Completed _ as flux -> flux 
-
-    (send, receive), next   
-
-
-/// Wraps a mom so that it can use a direct channel for communication. This is implemented by
-/// installing an event reflector at the current node in the execution hierarchy.
-let wrap (mkNested: Channel<'e> -> 'a mom) : 'a mom = 
-    let (send, receive), next = create()
-    fun () ->
-        mkNested (send, receive) () |> next
-
-/// Same as wrap, but allows to send the event from Mom contexts further up the hierarchy (but must be run in the same
-/// Runtime).
-///
-/// Returns the sender and the wrapped receiver Mom.
-let wrapReceiver (mkNested: Receiver<'e> -> 'a mom) : Sender<'e> * 'a mom =
-    let (send, receive), next = create()
-    send, fun () ->
-        mkNested receive () |> next
+    (send, receive)

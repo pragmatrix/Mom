@@ -8,24 +8,25 @@ let (^) = (<|)
 
 [<Fact>]
 let ``Reflector sends and receive a message``() =
+
+    let sender, receiver = Reflector.create()
     
-    let wrapped = Reflector.wrap ^ fun (sender, receiver) ->  mom {
+    let wrapped = mom {
         // send a message
         do! sender(())
         // then receive it.
         do! receiver()
     }
 
-    // Expected to complete in one go.
     wrapped
-    |> Mom.start
-    |> Flux.isCompleted
-    |> should be True
+    |> Runtime.runCore
+    |> should equal (Some ())
 
 [<Fact>]
 let ``Reflector sends and two parallel receiver receive it`` () =
     
-    let wrapped = Reflector.wrap ^ fun (sender, receiver) ->  mom {
+    let sender, receiver = Reflector.create()
+    let wrapped = mom {
         // send a message
         do! sender(())
         // then receive it.
@@ -35,6 +36,5 @@ let ``Reflector sends and two parallel receiver receive it`` () =
 
     // Expected to complete in one go.
     wrapped
-    |> Mom.start
-    |> Flux.isCompleted
-    |> should be True
+    |> Runtime.runCore
+    |> should equal (Some ())

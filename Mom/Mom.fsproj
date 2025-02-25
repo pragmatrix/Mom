@@ -28,6 +28,7 @@
     <Compile Include="Runtime.fs" />
     <Compile Include="AsyncService.fs" />
     <Compile Include="InlineRequestService.fs" />
+    <Compile Include="AssemblyInfo.fs" />
     <Content Include="paket.references" />
     <None Include="Mom.paket.template" />
   </ItemGroup>
